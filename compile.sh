@@ -18,7 +18,7 @@ checkfail()
 
 
 # Download the portable SDK and uncompress it
-if [ ! -d emsdk_portable ]; then
+if [ ! -d emsdk-portable ]; then
     diagnostic "Emscripten not found. Fetching it"
     wget https://s3.amazonaws.com/mozilla-games/emscripten/releases/emsdk-portable.tar.gz
     tar xzf emsdk-portable.tar.gz
@@ -26,24 +26,34 @@ if [ ! -d emsdk_portable ]; then
 fi
 
 # Compile clang and emscripten
-if [ ! -e emsdk_portable/emscripten/master/emcc ]; then
+if [ ! -e emsdk-portable/emscripten/incoming/emcc ]; then
     diagnostic "Emscripten not built. Building it. It will take a LOT of time."
 
-    cd emsdk_portable
+    cd emsdk-portable
     # Fetch the latest registry of available tools.
     ./emsdk update
+    # Fetch the latest tags
+    ./emsdk update-tags
     # Download and install the latest SDK tools.
-    ./emsdk install latest
-    # Make the "latest" SDK "active"
-    ./emsdk activate latest
+    ./emsdk install --build=Release emscripten-incoming-64bit
+    # Make the "latest" SDK
+    ./emsdk activate --build=Release emscripten-incoming-64bit
     checkfail "Emscripten build failed"
+    # Download and install the corresponding node version
+    ./emsdk install --build=Release node-4.1.1-64bit
+    ./emsdk activate --build=Release node-4.1.1-64bit
+    checkfail "Node build failed"
+    # Download and install the corresponding clang version
+    ./emsdk install --build=Release clang-incoming-64bit
+	./emsdk activate --build=Release clang-incoming-64bit
+    checkfail "Clang build failed"
     cd ..
 fi
 
 diagnostic "Setting the environment"
 # Export the correct path to get everything working
-#export PATH=$PWD/emsdk_portable:$PWD/emsdk_portable/clang/fastcomp/build_master_64/bin:$PWD/emsdk_portable/node/4*64bit/bin:$PWD/emsdk_portable/emscripten/master:$PATH
-cd emsdk_portable && . ./emsdk_set_env.sh && cd ..
+#export PATH=$PWD/emsdk_portable:$PWD/emsdk_portable/clang/fastcomp/build_incoming_64/bin:$PWD/emsdk_portable/node/4*64bit/bin:$PWD/emsdk_portable/emscripten/incoming:$PATH
+cd emsdk-portable && . ./emsdk_env.sh && cd ..
 
 # Check that clang is working
 clang --version
@@ -97,7 +107,7 @@ cd contrib/contrib-emscripten
 CC=emcc CXX=em++ AR=emar RANLIB=emranlib \
     ../bootstrap --disable-disc --disable-gpl --disable-sout \
     --disable-network \
-    --host=x86_64-linux-gnu
+    --host=asmjs-unknown-emscripten --build=x86_64-linux
 checkfail "contribs: bootstrap failed"
 
 make list
