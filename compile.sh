@@ -36,7 +36,7 @@ if [ ! -e emsdk-portable/emscripten/incoming/emcc ]; then
     ./emsdk update-tags
     # Download and install the latest SDK tools.
     ./emsdk install --build=Release emscripten-incoming-64bit
-    # Make the "latest" SDK
+    # Make the "latest" SDK active
     ./emsdk activate --build=Release emscripten-incoming-64bit
     checkfail "Emscripten build failed"
     # Download and install the corresponding node version
@@ -49,14 +49,6 @@ if [ ! -e emsdk-portable/emscripten/incoming/emcc ]; then
     checkfail "Clang build failed"
     cd ..
 fi
-
-diagnostic "Setting the environment"
-# Export the correct path to get everything working
-#export PATH=$PWD/emsdk_portable:$PWD/emsdk_portable/clang/fastcomp/build_incoming_64/bin:$PWD/emsdk_portable/node/4*64bit/bin:$PWD/emsdk_portable/emscripten/incoming:$PATH
-cd emsdk-portable && . ./emsdk_env.sh && cd ..
-
-# Check that clang is working
-clang --version
 
 # Go go go vlc
 if [ ! -d "vlc" ]; then
@@ -86,7 +78,25 @@ cd extras/tools
 checkfail "buildsystem tools: bootstrap failed"
 make $MAKEFLAGS
 checkfail "buildsystem tools: make"
-cd ../..
+cd ../../..
+
+diagnostic "Setting the environment"
+# Export the correct path to get everything working
+#export PATH=$PWD/emsdk_portable:$PWD/emsdk_portable/clang/fastcomp/build_incoming_64/bin:$PWD/emsdk_portable/node/4*64bit/bin:$PWD/emsdk_portable/emscripten/incoming:$PATH
+cd emsdk-portable && . ./emsdk_env.sh && cd ..
+export PKG_CONFIG_PATH=$EMSDK/emscripten/incoming/system/lib/pkgconfig
+export PKG_CONFIG_LIBDIR=$PWD/vlc/contrib/asmjs_unknowm_emscripten/lib/pkgconfig
+export PKG_CONFIG_PATH_CUSTOM=$PKG_CONFIG_LIBDIR
+export CC=emcc
+export LD=emcc
+export LDSHARED=emcc
+export NM=llvm_nm
+export CXX=em++
+export AR=emar
+export RANLIB=emranlib
+
+# Check that clang is working
+clang --version
 
 # BOOTSTRAP
 
@@ -104,24 +114,62 @@ echo "Building the contribs"
 mkdir -p contrib/contrib-emscripten
 cd contrib/contrib-emscripten
 
-CC=emcc CXX=em++ AR=emar RANLIB=emranlib \
     ../bootstrap --disable-disc --disable-gpl --disable-sout \
     --disable-network \
     --host=asmjs-unknown-emscripten --build=x86_64-linux
 checkfail "contribs: bootstrap failed"
 
 make list
-#make $MAKEFLAGS fetch
-#checkfail "contribs: make fetch failed"
+make $MAKEFLAGS fetch
+checkfail "contribs: make fetch failed"
 
-CC=emcc CXX=em++ AR=emar RANLIB=emranlib make $MAKEFLAGS \
-    .zlib
+    make $MAKEFLAGS \
+    .zlib .libmpeg2 .png .dshow .goom .modplug .lua .luac \
+    .jpeg .openjpeg .zvbi .opus .xau .dca .glew .lame \
+	.twolame .fribidi .aribb24 .ogg .vorbis .crystalhd \
+	.theora .tremor .bpg .nfs
+	#.mad .xproto
+
+    CFLAGS="-D_FILE_OFFSET_BITS=64" \
+    make $MAKEFLAGS .mpg123
+
 checkfail "contribs: make failed"
 
 cd ../../
 
 # Build
 mkdir -p build-emscripten && cd build-emscripten
-CC=emcc CXX=em++ AR=emar RANLIB=emranlib \
-    ../configure --host=x86_64-linux-gnu --build=asmjs-unknown-emscripten
 
+OPTIONS="
+    --host=asmjs-unknown-emscripten
+    --enable-debug
+    --enable-gles2
+    --disable-nls
+    --disable-sout
+    --disable-vlm
+    --disable-addonmanagermodules
+    --disable-avcodec
+    --enable-merge-ffmpeg
+    --disable-swscale
+    --disable-a52
+    --disable-x264
+    --disable-xcb
+    --disable-xvideo
+    --disable-alsa
+    --disable-macosx
+    --disable-sparkle
+    --disable-qt
+    --disable-screen
+    --disable-xcb
+    --disable-pulse
+    --disable-alsa
+    --disable-oss
+    --disable-vlc"
+
+# Note :
+#        search.h is a blacklisted module
+#        time.h is a blacklisted module
+    ac_cv_func_sendmsg=yes ac_cv_func_recvmsg=yes ac_cv_func_if_nameindex=yes ac_cv_header_search_h=no ac_cv_header_time_h=no \
+../configure ${OPTIONS}
+
+make ${MAKEFLAGS}
