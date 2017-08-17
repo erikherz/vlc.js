@@ -1,0 +1,44 @@
+From 7a708eb0cb4fdac820f4b68342111443e9e62976 Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Thu, 6 Jul 2017 14:50:28 +0200
+Subject: [PATCH 1/6] Create a target for emscripten in the configure.ac.
+
+---
+ configure.ac | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index 8487fea895..f8884c501e 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -304,6 +304,19 @@ case "${host_os}" in
+     AC_LIBOBJ([recvmsg])
+     AC_LIBOBJ([sendmsg])
+     ;;
++  *emscripten*)
++    SYS=emscripten
++    CC=emcc
++    LD=emcc
++    LDSHARED=emcc
++    NM=llvm_nm
++    CPP=emcc
++    CXX=em++
++    AR=emar
++    RANLIB=emranlib
++    CFLAGS="${CFLAGS} -D__NEED_ssize_t"
++    CXXFLAGS="${CXXFLAGS}"
++  ;;
+   *)
+     SYS="${host_os}"
+     ;;
+@@ -341,6 +354,7 @@ AM_CONDITIONAL(HAVE_WIN32,   test "${SYS}" = "mingw32")
+ AM_CONDITIONAL(HAVE_WIN64,   test "${HAVE_WIN64}" = "1") dnl Only used for the packaging
+ AM_CONDITIONAL([HAVE_WINSTORE], [test "$vlc_winstore_app" = "1"])
+ AM_CONDITIONAL([HAVE_WIN32_DESKTOP], [test "${SYS}" = "mingw32" -a "$vlc_winstore_app" = "0"])
++AM_CONDITIONAL([HAVE_EMSCRIPTEN], [test "${SYS}" = "emscripten"])
+ 
+ dnl
+ dnl Sadly autoconf does not think about testing foo.exe when ask to test
+-- 
+2.14.1
+
