@@ -98,6 +98,21 @@ export RANLIB=emranlib
 # Check that clang is working
 clang --version
 
+diagnostic "Patching"
+# patching emscripten
+cd emsdk-portable/emscripten/incoming
+if [ -d ../../../patch_emscripten ] && [ "$(ls -A ../../../patch_emscripten)" ]; then
+    git am -3 ../../../patch_emscripten/*
+fi
+cd ../../..
+
+cd vlc
+
+# patching vlc
+if [ -d ../patch_vlc ] && [ "$(ls -A ../patch_vlc)" ]; then
+    git am -3 ../patch_vlc/*
+fi
+
 # BOOTSTRAP
 
 if [ ! -f configure ]; then
@@ -173,3 +188,18 @@ OPTIONS="
 ../configure ${OPTIONS}
 
 make ${MAKEFLAGS}
+
+diagnostic "Generating module list"
+cd ../..
+./generate_modules_list.sh
+cd vlc/build-emscripten
+emcc vlc-modules.c -o vlc-modules.bc
+cd ../..
+
+# copy Dolby_Canyon.vob
+diagnostic "copying video"
+cp Dolby_Canyon.vob vlc/build-emscripten/Dolby_Canyon.vob
+
+diagnostic "Generating executable"
+cp main.c vlc/build-emscripten/
+./create_main.sh
