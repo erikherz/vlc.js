@@ -53,3 +53,13 @@ Features to enable :
  * Set 'gfx.offscreencanvas.enabled' to true
 
 Then you can see vlc.js
+
+## Structure
+
+To can compile vlc, we apply patch to it. Emscripten being in devlopment, some patch have to be applied to fix problems.
+All patchs are grouped in folders :
+ * patch_vlc : all patch for vlc
+ * patch_emscripten : all patchs for emscripten
+
+The script compile.sh set up the toolchain, clone vlc, compile it, generate the module_list and compile all into an html + js pages.
+To generate the module_list it call a subscript which will generate a C file with all modules and enty points.
