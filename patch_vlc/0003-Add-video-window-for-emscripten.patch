@@ -1,0 +1,149 @@
+From 6fff0be8174328ffabe80a7840692c7f9bfcfd16 Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Mon, 14 Aug 2017 10:15:45 +0200
+Subject: [PATCH 3/6] Add video window for emscripten.
+
+---
+ include/vlc_vout_window.h                    |  2 +
+ modules/video_output/Makefile.am             |  8 +++
+ modules/video_output/emscripten/emscripten.c | 89 ++++++++++++++++++++++++++++
+ 3 files changed, 99 insertions(+)
+ create mode 100644 modules/video_output/emscripten/emscripten.c
+
+diff --git a/include/vlc_vout_window.h b/include/vlc_vout_window.h
+index 3a613d4e47..f8182c6446 100644
+--- a/include/vlc_vout_window.h
++++ b/include/vlc_vout_window.h
+@@ -53,6 +53,7 @@ enum vout_window_type {
+     VOUT_WINDOW_TYPE_NSOBJECT /**< MacOS X view */,
+     VOUT_WINDOW_TYPE_ANDROID_NATIVE /**< Android native window */,
+     VOUT_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
++    VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL /**< Emscripten surface */,
+ };
+ 
+ /**
+@@ -159,6 +160,7 @@ struct vout_window_t {
+         void     *nsobject;      /**< Mac OSX view object */
+         void     *anativewindow; /**< Android native window */
+         struct wl_surface *wl;   /**< Wayland surface (client pointer) */
++        uint32_t em_context;     /* Emscripten webgl context */
+     } handle;
+ 
+     /** Display server (mandatory)
+diff --git a/modules/video_output/Makefile.am b/modules/video_output/Makefile.am
+index ce6ce877c0..29d39c0933 100644
+--- a/modules/video_output/Makefile.am
++++ b/modules/video_output/Makefile.am
+@@ -439,6 +439,14 @@ if HAVE_EVAS
+ vout_LTLIBRARIES += libevas_plugin.la
+ endif
+ 
++### Emscripten ###
++libemscripten_window_plugin_la_SOURCES = video_output/emscripten/emscripten.c
++libemscripten_window_plugin_la_CFLAGS = $(AM_CFLAGS)
++libemscripten_window_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
++
++if HAVE_EMSCRIPTEN
++vout_LTLIBRARIES += libemscripten_window_plugin.la
++endif
+ 
+ ### Common ###
+ 
+diff --git a/modules/video_output/emscripten/emscripten.c b/modules/video_output/emscripten/emscripten.c
+new file mode 100644
+index 0000000000..0af0938cd3
+--- /dev/null
++++ b/modules/video_output/emscripten/emscripten.c
+@@ -0,0 +1,89 @@
++/**
++ * @file window.c
++ * @brief Emscripten webgl native window provider module for VLC media player
++ */
++/*****************************************************************************
++ * Copyright © 2017 VLC authors and VideoLAN
++ *
++ * Author: Etienne Brateau <etienne@videolabs.io>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include <config.h>
++#endif
++
++#include <stdarg.h>
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_vout_window.h>
++
++static int Open(vout_window_t*, const vout_window_cfg_t*);
++static void Close(vout_window_t*);
++static int Control(vout_window_t*, int, va_list ap);
++
++/*
++ * Module descriptor
++ */
++vlc_module_begin()
++    set_shortname(N_("Emscripten Window"))
++    set_description(N_("Emscripten drawing area"))
++    set_category(CAT_VIDEO)
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++    set_capability("vout window", 10)
++    set_callbacks(Open, Close)
++vlc_module_end()
++
++struct vout_window_sys_t {
++};
++
++static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
++{
++    if (cfg->type != VOUT_WINDOW_TYPE_INVALID &&
++            cfg->type != VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
++        return VLC_EGENERIC;
++
++    vout_window_sys_t *sys = calloc(1, sizeof (*sys));
++    if (sys == NULL)
++        return VLC_ENOMEM;
++
++    wnd->sys = sys;
++
++    wnd->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
++    wnd->control = Control;
++
++    return VLC_SUCCESS;
++
++error:
++    Close(wnd);
++    return VLC_EGENERIC;
++}
++
++static void Close(vout_window_t *wnd)
++{
++    vout_window_sys_t *sys = wnd->sys;
++
++    free(sys);
++}
++
++static int Control(vout_window_t *wnd, int cmd, va_list ap)
++{
++    VLC_UNUSED(cmd);
++    VLC_UNUSED(ap);
++    msg_Err(wnd, "control requests not supported");
++    return VLC_EGENERIC;
++}
+-- 
+2.14.1
+
