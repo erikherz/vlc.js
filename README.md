@@ -13,3 +13,17 @@ Notably when we have:
 we will be able to have a first version.
 
 After, when we have modules, then VLC modules could be downloaded at runtime.
+
+## Installation
+
+Update the config.sub in your system.
+
+```bash
+cp config.sub /usr/share/automake-1.15/config.sub
+```
+
+Compile vlc.
+
+```bash
+./compile.sh
+```
