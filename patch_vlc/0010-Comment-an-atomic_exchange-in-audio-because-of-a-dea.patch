@@ -1,0 +1,33 @@
+From 95d5fb9fa00b0a1882bcc6d8f157c2dd78ea893e Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Tue, 5 Sep 2017 18:56:11 +0200
+Subject: [PATCH 10/10] Comment an atomic_exchange in audio because of a
+ deadlock.
+
+---
+ src/audio_output/dec.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/audio_output/dec.c b/src/audio_output/dec.c
+index 11aa7b6ce0..7ba28abf3f 100644
+--- a/src/audio_output/dec.c
++++ b/src/audio_output/dec.c
+@@ -385,12 +385,13 @@ int aout_DecPlay (audio_output_t *aout, block_t *block, int input_rate)
+     if (block->i_flags & BLOCK_FLAG_DISCONTINUITY)
+         owner->sync.discontinuity = true;
+ 
+-    if (atomic_exchange(&owner->vp.update, false))
++	/* Emscripten : This cause a deadlock because the value never exchange
++    /*if (atomic_exchange(&owner->vp.update, false))
+     {
+         vlc_mutex_lock (&owner->vp.lock);
+         aout_FiltersChangeViewpoint (owner->filters, &owner->vp.value);
+         vlc_mutex_unlock (&owner->vp.lock);
+-    }
++    }*/
+ 
+     block = aout_FiltersPlay (owner->filters, block, input_rate);
+     if (block == NULL)
+-- 
+2.14.1
+
