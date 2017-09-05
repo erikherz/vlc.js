@@ -1,0 +1,142 @@
+From 3ed6e06908acbf19d5ebf5c80cc7fe71b78053f5 Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Tue, 5 Sep 2017 17:31:23 +0200
+Subject: [PATCH 05/10] Add functions in API to proxy calls for the video output
+ thread.
+
+---
+ include/vlc_vout.h              | 32 +++++++++++++++++
+ src/video_output/video_output.c | 77 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 109 insertions(+)
+
+diff --git a/include/vlc_vout.h b/include/vlc_vout.h
+index 9987404022..86e03de3ce 100644
+--- a/include/vlc_vout.h
++++ b/include/vlc_vout.h
+@@ -161,6 +161,38 @@ VLC_API void vout_PutSubpicture( vout_thread_t *, subpicture_t * );
+ VLC_API int vout_RegisterSubpictureChannel( vout_thread_t * );
+ VLC_API void vout_FlushSubpictureChannel( vout_thread_t *, int );
+ 
++/* */
++struct vout_proxy
++{
++    vlc_thread_t th;
++    vlc_mutex_t lock;
++    vlc_cond_t cond;
++    bool quit;
++    void *(*pf_run)(void*);
++    void *data;
++};
++
++/**
++ * This function will initalize the proxy thread. The proxy thread is used if the context
++ * can't be access easily from the video output.
++ *
++ * Return VLC_EGENERIC if the initialisation fail and VLC_SUCCESS if success.
++ */
++VLC_API int vout_proxy_init(vlc_object_t *p_libvlc);
++/**
++ * This function will deinit the proxy thread for the video output.
++ */
++VLC_API void vout_proxy_deinit(vlc_object_t *p_libvlc);
++/**
++ * This function run the Thread function in a thread that have the video context.
++ * 
++ * data is the arguments to pass to the thread function.
++ *
++ * Return VLC_SUCESS if the run success VLC_EGENERIC if the proxy thread can't be created
++ * or VLC_EMEM if no memory available.
++*/
++VLC_API int vout_proxy_run(vlc_object_t *p_libvlc, void *(pf_run)(void*), void* data);
++
+ /**@}*/
+ 
+ #endif /* _VLC_VIDEO_H */
+diff --git a/src/video_output/video_output.c b/src/video_output/video_output.c
+index c432c70aa0..54a9356407 100644
+--- a/src/video_output/video_output.c
++++ b/src/video_output/video_output.c
+@@ -1724,3 +1724,80 @@ static void *Thread(void *object)
+         vout_ManageWrapper(vout);
+     }
+ }
++
++/* Function for the proxy thread. */
++static void *vout_proxy_thread_run(void *data)
++{
++    struct vout_proxy *vproxy = data;
++
++    vlc_mutex_lock(&vproxy->lock);
++    while (!vproxy->quit)
++    {
++        while (vproxy->pf_run == NULL && !vproxy->quit)
++            vlc_cond_wait(&vproxy->cond, &vproxy->lock);
++
++        if (vproxy->quit)
++            break;
++
++        /* */
++        vproxy->pf_run(vproxy->data);
++        vproxy->pf_run = NULL;
++        vproxy->data = NULL;
++    }
++    vlc_mutex_unlock(&vproxy->lock);
++
++    return NULL;
++}
++
++void vout_proxy_deinit(vlc_object_t *p_libvlc)
++{
++    struct vout_proxy *vproxy = var_InheritAddress(p_libvlc, "vout-proxy");
++    assert(vproxy);
++
++    vlc_mutex_lock(&vproxy->lock);
++    vproxy->quit = true;
++    vlc_cond_signal(&vproxy->cond);
++    vlc_mutex_unlock(&vproxy->lock);
++    vlc_join(vproxy->th, NULL);
++    free(vproxy);
++}
++
++int vout_proxy_init(vlc_object_t *p_libvlc)
++{
++    struct vout_proxy *vproxy= malloc(sizeof(struct vout_proxy));
++    if (!vproxy)
++        return VLC_ENOMEM;
++
++    vproxy->quit = false;
++	vproxy->pf_run = NULL;
++	vproxy->data = NULL;
++    vlc_mutex_init(&vproxy->lock);
++    vlc_cond_init(&vproxy->cond);
++    if (vlc_clone(&vproxy->th, vout_proxy_thread_run, vproxy,
++                   VLC_THREAD_PRIORITY_OUTPUT))
++    {
++        vlc_mutex_destroy(&vproxy->lock);
++        vlc_cond_destroy(&vproxy->cond);
++        free(vproxy);
++        return VLC_EGENERIC;
++    }
++
++    var_Create(p_libvlc, "vout-proxy", VLC_VAR_ADDRESS);
++    var_SetAddress(p_libvlc, "vout-proxy", vproxy);
++
++    return VLC_SUCCESS;
++}
++
++int vout_proxy_run(vlc_object_t *obj, void *(pf_run)(void *), void *data)
++{
++    struct vout_proxy *vproxy = var_InheritAddress(obj, "vout-proxy");
++    if (!vproxy)
++        return VLC_EGENERIC;
++
++    vlc_mutex_lock(&vproxy->lock);
++    assert(vproxy->pf_run == NULL && vproxy->data == NULL);
++    vproxy->pf_run = pf_run;
++    vproxy->data = data;
++    vlc_cond_signal(&vproxy->cond);
++    vlc_mutex_unlock(&vproxy->lock);
++}
+-- 
+2.14.1
+
