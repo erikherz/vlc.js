@@ -1,0 +1,25 @@
+From 5581631cc23d5e91035e269a1514598c2235f29a Mon Sep 17 00:00:00 2001
+From: Jameson Ernst <jameson@jpernst.com>
+Date: Fri, 7 Jul 2017 11:21:55 -0700
+Subject: [PATCH 06/23] Add -Os flag to al.c
+
+---
+ tools/system_libs.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tools/system_libs.py b/tools/system_libs.py
+index 65ff8f8d0..99bbbbdbd 100755
+--- a/tools/system_libs.py
++++ b/tools/system_libs.py
+@@ -257,7 +257,7 @@ def calculate(temp_files, in_temp, stdout_, stderr_, forced=[]):
+   # al
+   def create_al(libname): # libname is ignored, this is just one .o file
+     o = in_temp('al.o')
+-    check_call([shared.PYTHON, shared.EMCC, shared.path_from_root('system', 'lib', 'al.c'), '-o', o])
++    check_call([shared.PYTHON, shared.EMCC, shared.path_from_root('system', 'lib', 'al.c'), '-o', o, '-Os'])
+     return o
+ 
+   def create_html5(libname):
+-- 
+2.14.1
+
