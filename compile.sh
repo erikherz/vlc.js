@@ -15,7 +15,7 @@ checkfail()
         exit 1
     fi
 }
-
+WORK_DIR=$PWD
 
 # Download the portable SDK and uncompress it
 if [ ! -d emsdk ]; then
@@ -25,6 +25,7 @@ if [ ! -d emsdk ]; then
     checkfail "emsdk: fetch failed"
 fi
 
+cd $WORK_DIR
 
 # Go go go vlc
 if [ ! -d "vlc" ]; then
@@ -54,7 +55,8 @@ cd extras/tools
 checkfail "buildsystem tools: bootstrap failed"
 make $MAKEFLAGS
 checkfail "buildsystem tools: make"
-cd ../../..
+
+cd $WORK_DIR
 
 diagnostic "Setting the environment"
 source emsdk/emsdk_env.sh
