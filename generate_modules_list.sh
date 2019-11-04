@@ -31,6 +31,7 @@ fi
 cd vlc
 
 PROJECT_DIR=$(pwd)
+NM="$EMSDK/upstream/bin/llvm-nm"
 
 cd build-emscripten/modules/.libs
 
@@ -54,7 +55,7 @@ done
 
 for file in $VLCMODULES
     do
-        symbols=$(llvm-nm -g $file)
+        symbols=$($NM -g $file)
         entryname=$(get_symbol "$symbols" _)
         DEFINITIONS+="int $entryname (int (*)(void *, void *, int, ...), void *);\n";
         BUILTINS+=" $entryname,\n"

@@ -149,7 +149,7 @@ diagnostic "Generating module list"
 cd ../..
 ./generate_modules_list.sh
 cd vlc/build-emscripten
-emcc vlc-modules.c -o vlc-modules.bc
+emcc vlc-modules.c -o vlc-modules.bc -pthread
 cd ../..
 
 # copy Dolby_Canyon.vob
