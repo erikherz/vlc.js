@@ -59,7 +59,7 @@ cd ../../..
 diagnostic "Setting the environment"
 source emsdk/emsdk_env.sh
 export PKG_CONFIG_PATH=$EMSDK/emscripten/incoming/system/lib/pkgconfig
-export PKG_CONFIG_LIBDIR=$PWD/vlc/contrib/asmjs_unknowm_emscripten/lib/pkgconfig
+export PKG_CONFIG_LIBDIR=$PWD/vlc/contrib/wasm32_unknowm_emscripten/lib/pkgconfig
 export PKG_CONFIG_PATH_CUSTOM=$PKG_CONFIG_LIBDIR
 
 # Check that clang is working
@@ -92,22 +92,13 @@ cd contrib/contrib-emscripten
 
     ../bootstrap --disable-disc --disable-gpl --disable-sout \
     --disable-network \
-    --host=asmjs-unknown-emscripten --build=x86_64-linux
+    --host=wasm32-unknown-emscripten --build=x86_64-linux
 checkfail "contribs: bootstrap failed"
 
-make list
-make $MAKEFLAGS fetch
+emmake make list
+emmake make $MAKEFLAGS fetch
 checkfail "contribs: make fetch failed"
-
-    make $MAKEFLAGS \
-    .zlib .libmpeg2 .png .dshow .goom .modplug .lua .luac \
-    .jpeg .openjpeg .zvbi .opus .xau .dca .glew .lame \
-	.twolame .fribidi .aribb24 .ogg .vorbis .crystalhd \
-	.theora .tremor .bpg .nfs
-	#.mad .xproto
-
-    CFLAGS="-D_FILE_OFFSET_BITS=64" \
-    make $MAKEFLAGS .mpg123
+emmake make $MAKEFLAGS .ffmpeg
 
 checkfail "contribs: make failed"
 
