@@ -108,20 +108,21 @@ cd ../../
 mkdir -p build-emscripten && cd build-emscripten
 
 OPTIONS="
-    --host=asmjs-unknown-emscripten
+    --host=wasm32-unknown-emscripten
     --enable-debug
     --enable-gles2
+    --disable-lua
+    --disable-ssp
     --disable-nls
     --disable-sout
     --disable-vlm
     --disable-addonmanagermodules
-    --disable-avcodec
+    --enable-avcodec
     --enable-merge-ffmpeg
     --disable-swscale
     --disable-a52
     --disable-x264
     --disable-xcb
-    --disable-xvideo
     --disable-alsa
     --disable-macosx
     --disable-sparkle
@@ -132,14 +133,17 @@ OPTIONS="
     --disable-alsa
     --disable-oss
     --disable-vlc"
-
+#     --disable-xvideo Unknown option
 # Note :
 #        search.h is a blacklisted module
 #        time.h is a blacklisted module
-    ac_cv_func_sendmsg=yes ac_cv_func_recvmsg=yes ac_cv_func_if_nameindex=yes ac_cv_header_search_h=no ac_cv_header_time_h=no \
-../configure ${OPTIONS}
+#        shm.h is a blacklisted module
+#        ssp is not supported on the wasm backend
 
-make ${MAKEFLAGS}
+emconfigure ../configure ${OPTIONS}  \
+	    ac_cv_func_sendmsg=yes ac_cv_func_recvmsg=yes ac_cv_func_if_nameindex=yes ac_cv_header_search_h=no ac_cv_header_time_h=no ac_cv_header_sys_shm_h=no
+
+emmake make ${MAKEFLAGS}
 
 diagnostic "Generating module list"
 cd ../..
