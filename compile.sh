@@ -28,7 +28,7 @@ fi
 cd $WORK_DIR
 
 # Go go go vlc
-if [ ! -d "vlc" ]; then
+if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
     git clone http://git.videolan.org/git/vlc.git vlc
     checkfail "vlc source: git clone failed"
@@ -154,9 +154,14 @@ cd vlc/build-emscripten
 emcc vlc-modules.c -o vlc-modules.bc -pthread
 cd ../..
 
+url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+
 # copy Dolby_Canyon.vob
-diagnostic "copying video"
-cp Dolby_Canyon.vob vlc/build-emscripten/Dolby_Canyon.vob
+diagnostic "getting video"
+cd vlc/build-emscripten/
+curl ${url} -o BigBuckBunny.mp4
+
+cd $WORK_DIR
 
 diagnostic "Generating executable"
 cp main.c vlc/build-emscripten/
