@@ -18,37 +18,13 @@ checkfail()
 
 
 # Download the portable SDK and uncompress it
-if [ ! -d emsdk-portable ]; then
-    diagnostic "Emscripten not found. Fetching it"
-    wget https://s3.amazonaws.com/mozilla-games/emscripten/releases/emsdk-portable.tar.gz
-    tar xzf emsdk-portable.tar.gz
-    checkfail "Emscripten: fetch failed"
+if [ ! -d emsdk ]; then
+    diagnostic "emsdk not found. Fetching it"
+    git clone http://github.com/emscripten-core/emsdk.git emsdk
+    cd emsdk && ./emsdk update-tags && ./emsdk install tot-upstream && ./emsdk activate tot-upstream
+    checkfail "emsdk: fetch failed"
 fi
 
-# Compile clang and emscripten
-if [ ! -e emsdk-portable/emscripten/incoming/emcc ]; then
-    diagnostic "Emscripten not built. Building it. It will take a LOT of time."
-
-    cd emsdk-portable
-    # Fetch the latest registry of available tools.
-    ./emsdk update
-    # Fetch the latest tags
-    ./emsdk update-tags
-    # Download and install the latest SDK tools.
-    ./emsdk install --build=Release emscripten-incoming-64bit
-    # Make the "latest" SDK active
-    ./emsdk activate --build=Release emscripten-incoming-64bit
-    checkfail "Emscripten build failed"
-    # Download and install the corresponding node version
-    ./emsdk install --build=Release node-4.1.1-64bit
-    ./emsdk activate --build=Release node-4.1.1-64bit
-    checkfail "Node build failed"
-    # Download and install the corresponding clang version
-    ./emsdk install --build=Release clang-incoming-64bit
-	./emsdk activate --build=Release clang-incoming-64bit
-    checkfail "Clang build failed"
-    cd ..
-fi
 
 # Go go go vlc
 if [ ! -d "vlc" ]; then
@@ -81,30 +57,15 @@ checkfail "buildsystem tools: make"
 cd ../../..
 
 diagnostic "Setting the environment"
-# Export the correct path to get everything working
-#export PATH=$PWD/emsdk_portable:$PWD/emsdk_portable/clang/fastcomp/build_incoming_64/bin:$PWD/emsdk_portable/node/4*64bit/bin:$PWD/emsdk_portable/emscripten/incoming:$PATH
-cd emsdk-portable && . ./emsdk_env.sh && cd ..
+source emsdk/emsdk_env.sh
 export PKG_CONFIG_PATH=$EMSDK/emscripten/incoming/system/lib/pkgconfig
 export PKG_CONFIG_LIBDIR=$PWD/vlc/contrib/asmjs_unknowm_emscripten/lib/pkgconfig
 export PKG_CONFIG_PATH_CUSTOM=$PKG_CONFIG_LIBDIR
-export CC=emcc
-export LD=emcc
-export LDSHARED=emcc
-export NM=llvm_nm
-export CXX=em++
-export AR=emar
-export RANLIB=emranlib
 
 # Check that clang is working
 clang --version
 
 diagnostic "Patching"
-# patching emscripten
-cd emsdk-portable/emscripten/incoming
-if [ -d ../../../patch_emscripten ] && [ "$(ls -A ../../../patch_emscripten)" ]; then
-    git am -3 ../../../patch_emscripten/*
-fi
-cd ../../..
 
 cd vlc
 

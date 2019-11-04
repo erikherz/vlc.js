@@ -21,7 +21,7 @@ get_symbol()
     echo "$1" | grep vlc_entry_$2 | cut -d " " -f 3
 }
 
-. emsdk-portable/emsdk_env.sh
+source emsdk/emsdk_env.sh
 
 if [ ! -d vlc ]; then
     diagnostic "vlc must exists. Execute compile.sh"
