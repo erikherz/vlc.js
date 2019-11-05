@@ -63,7 +63,7 @@ int main() {
       fprintf( stderr, "unable to create libvlc instance" );
       return -1;
     }
-  m = libvlc_media_new_path( libvlc, "./h264-sd.mp4" );
+  m = libvlc_media_new_path( libvlc, "./BigBuckBunny.mp4" );
   
   if (m == NULL)
     {
