@@ -1,0 +1,32 @@
+From 9bed6fe6444a86a6660d275e237bb9126942c471 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Thu, 24 Oct 2019 18:05:16 +0200
+Subject: [PATCH 1/2] contrib: bump dav1d to 0.5.0
+
+---
+ contrib/src/dav1d/SHA512SUMS | 2 +-
+ contrib/src/dav1d/rules.mak  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/contrib/src/dav1d/SHA512SUMS b/contrib/src/dav1d/SHA512SUMS
+index b3b14ff506..90996861fc 100644
+--- a/contrib/src/dav1d/SHA512SUMS
++++ b/contrib/src/dav1d/SHA512SUMS
+@@ -1 +1 @@
+-8ed44b3d747f01b87b34f86fada824dfb7f86c16168af641fe754c767af5714e9fe212b6eea2bc11b5b041460184c78f755e10d4947e46bc70d95e1bd750f79d  dav1d-0.4.0.tar.xz
++10d3b174fa7ade0fb56f354dec8218761291c69d1ce1825d04bb6c7f6b28581f8811fd6e65c0f2a7a609b9694c11138ef469a2447814e020c038dba8d04de4df  dav1d-0.5.0.tar.xz
+diff --git a/contrib/src/dav1d/rules.mak b/contrib/src/dav1d/rules.mak
+index 74a44dbb60..dbae572a02 100644
+--- a/contrib/src/dav1d/rules.mak
++++ b/contrib/src/dav1d/rules.mak
+@@ -1,6 +1,6 @@
+ # libdav1d
+ 
+-DAV1D_VERSION := 0.4.0
++DAV1D_VERSION := 0.5.0
+ DAV1D_URL := $(VIDEOLAN)/dav1d/$(DAV1D_VERSION)/dav1d-$(DAV1D_VERSION).tar.xz
+ #~ DAV1D_HASH := de2059a1167ed560269c3253768929ef19cae989
+ #~ DAV1D_VERSION := git-$(DAV1D_HASH)
+-- 
+2.23.0
+

@@ -1,0 +1,58 @@
+From f027bb628d1542be954b9aa580dad6e14810f03d Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Thu, 24 Oct 2019 18:06:52 +0200
+Subject: [PATCH 2/2] contrib: add dav1d emscripten support
+
+---
+ .../dav1d/0001-add-emscripten-support.patch   | 26 +++++++++++++++++++
+ contrib/src/dav1d/rules.mak                   |  1 +
+ 2 files changed, 27 insertions(+)
+ create mode 100644 contrib/src/dav1d/0001-add-emscripten-support.patch
+
+diff --git a/contrib/src/dav1d/0001-add-emscripten-support.patch b/contrib/src/dav1d/0001-add-emscripten-support.patch
+new file mode 100644
+index 0000000000..9e63e5219a
+--- /dev/null
++++ b/contrib/src/dav1d/0001-add-emscripten-support.patch
+@@ -0,0 +1,26 @@
++From fd9f38380eaf20b812091fbf6c2cea477c38d8e6 Mon Sep 17 00:00:00 2001
++From: Mehdi Sabwat <mehdisabwat@gmail.com>
++Date: Thu, 24 Oct 2019 14:05:31 +0200
++Subject: [PATCH 1/1] add emscripten support
++
++---
++ meson.build | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/meson.build b/meson.build
++index 90899a7..cc95315 100644
++--- a/meson.build
+++++ b/meson.build
++@@ -112,6 +112,9 @@ if host_machine.system() == 'windows'
++     # On Windows, we use a compatibility layer to emulate pthread
++     thread_dependency = []
++     thread_compat_dep = declare_dependency(sources : files('src/win32/thread.c'))
+++elif host_machine.system() == 'emscripten'
+++    thread_dependency = []
+++    thread_compat_dep = []
++ else
++     thread_dependency = dependency('threads')
++     thread_compat_dep = []
++-- 
++2.23.0
++
+diff --git a/contrib/src/dav1d/rules.mak b/contrib/src/dav1d/rules.mak
+index dbae572a02..e3cf065b0b 100644
+--- a/contrib/src/dav1d/rules.mak
++++ b/contrib/src/dav1d/rules.mak
+@@ -24,6 +24,7 @@ $(TARBALLS)/dav1d-$(DAV1D_VERSION).tar.xz:
+ 
+ dav1d: dav1d-$(DAV1D_VERSION).tar.xz .sum-dav1d
+ 	$(UNPACK)
++	$(APPLY) $(SRC)/dav1d/0001-add-emscripten-support.patch
+ 	$(MOVE)
+ 
+ .dav1d: dav1d crossfile.meson
+-- 
+2.23.0
+
