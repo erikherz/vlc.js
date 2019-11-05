@@ -35,4 +35,4 @@ emcc -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB  \
     $PROJECT_DIR/contrib/wasm32-unknown-emscripten/lib/*.a \
     $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
     $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
-    -o experimental.html --emrun --preload-file BigBuckBunny.mp4
+    -o ../../experimental.html --emrun --preload-file BigBuckBunny.mp4
