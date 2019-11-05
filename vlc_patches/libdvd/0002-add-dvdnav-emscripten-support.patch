@@ -1,0 +1,66 @@
+From b93ff01e3e1e3e3131b46f59f3d74b4c5129e735 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Wed, 23 Oct 2019 19:54:13 +0200
+Subject: [PATCH 2/3] add dvdnav emscripten support
+
+---
+ .../0001-add-emscripten-pthread-support.patch | 26 +++++++++++++++++++
+ contrib/src/dvdnav/rules.mak                  |  3 ++-
+ 2 files changed, 28 insertions(+), 1 deletion(-)
+ create mode 100644 contrib/src/dvdnav/0001-add-emscripten-pthread-support.patch
+
+diff --git a/contrib/src/dvdnav/0001-add-emscripten-pthread-support.patch b/contrib/src/dvdnav/0001-add-emscripten-pthread-support.patch
+new file mode 100644
+index 0000000000..216b2cc6d8
+--- /dev/null
++++ b/contrib/src/dvdnav/0001-add-emscripten-pthread-support.patch
+@@ -0,0 +1,26 @@
++From cf380d0f3739e7db5e6b5fa9e4be2d9255c6f879 Mon Sep 17 00:00:00 2001
++From: Mehdi Sabwat <mehdisabwat@gmail.com>
++Date: Wed, 23 Oct 2019 16:15:50 +0200
++Subject: [PATCH 1/1] add emscripten pthread support
++
++---
++ configure.ac | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/configure.ac b/configure.ac
++index 99d62ed..08f2f72 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -85,6 +85,9 @@ case $host in
++     ;;
++   *android*)
++     ;;
+++  *emscripten*)
+++    CFLAGS="-pthread"
+++    ;;
++   *)
++     AC_CHECK_LIB(pthread, pthread_create,
++         [THREAD_LIBS="-lpthread"],
++-- 
++2.23.0
++
+diff --git a/contrib/src/dvdnav/rules.mak b/contrib/src/dvdnav/rules.mak
+index 334ccfb198..10fd9c87f9 100644
+--- a/contrib/src/dvdnav/rules.mak
++++ b/contrib/src/dvdnav/rules.mak
+@@ -22,6 +22,7 @@ $(TARBALLS)/libdvdnav-$(LIBDVDNAV_VERSION).tar.bz2:
+ dvdnav: libdvdnav-$(LIBDVDNAV_VERSION).tar.bz2 .sum-dvdnav
+ 	$(UNPACK)
+ 	cd $(UNPACK_DIR) && sed -i -e 's,Requires.private,Requires,g' misc/*.pc.in
++	$(APPLY) $(SRC)/dvdnav/0001-add-emscripten-pthread-support.patch
+ 	$(MOVE)
+ 
+ DEPS_dvdnav = dvdread $(DEPS_dvdread)
+@@ -29,6 +30,6 @@ DEPS_dvdnav = dvdread $(DEPS_dvdread)
+ .dvdnav: dvdnav
+ 	$(REQUIRE_GPL)
+ 	$(RECONF) -I m4
+-	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-examples
++	cd $< && $(HOSTVARS) ./configure $(HOSTCONF) --disable-examples --enable-pthreads
+ 	cd $< && $(MAKE) install
+ 	touch $@
+-- 
+2.23.0
+
