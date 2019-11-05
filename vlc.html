@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>VLC.js</title>
+    <style>
+        .emscripten {
+            text-align: center;
+        }
+        body {
+            background-color: #343a40;
+        }
+        canvas.emscripten {
+            border:0 !important;
+            display: flex;
+            margin: 0 auto;
+            background-color: #000;
+        }
+        #spinner {
+            display: none;
+        }
+        #status {
+            display: none;
+        }
+        #progress {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        #logo {
+            width: 64px;
+            height: 64px;
+        }
+        #em_logo {
+            position: absolute;
+            width: 200px;
+            height: 80px;
+        }
+        #point {
+            color: #fff;
+            font-size: 60px;
+        }
+        #js {
+            color: #fff;
+            font-size: 60px;
+            font-weight: bold;
+        }
+        .banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .vlc_head {
+            flex: 1 1 0px;
+        }
+    </style>
+</head>
+<body>
+    <div class="emscripten_border">
+    <div class="emscripten">   
+        <div class="banner">
+            <img src="./assets/emscripten.svg" id ="em_logo">
+            <div class="vlc_head">
+                <img src="./assets/VLC_Icon.svg" id="logo">
+                <span id="point">.</span>
+                <span id="js">JS</span> 
+            </div>
+        </div>
+        <progress id="progress" value="0" max="100"></progress>
+        <div class="spinner" id='spinner'></div>
+        <div class="emscripten" id="status">Downloading...</div>
+    </div>
+        <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    </div>
+    <script type="text/javascript" src="./assets/module-loader.js"></script>
+    <script async type="text/javascript" src="./experimental.js"></script>
+</body>
+</html>
