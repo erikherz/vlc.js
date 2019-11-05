@@ -9,6 +9,7 @@
 libvlc_media_player_t *mp;
 libvlc_instance_t *libvlc; 
 libvlc_time_t t = -1;
+char flag = 1;
 
 void iter()
 {
@@ -19,6 +20,24 @@ void iter()
 		emscripten_cancel_main_loop();
 	}
 	t = libvlc_media_player_get_time(mp);
+}
+
+static EM_BOOL play_pause_handler(int eventType, const EmscriptenMouseEvent *e, void *userData)
+{
+  (void) e;
+  (void) userData; // To use when mp won't be a global.
+  if (eventType == EMSCRIPTEN_EVENT_CLICK)
+  {
+    if (flag == 1)
+      {
+	libvlc_media_player_play(mp);
+	flag = 0;
+      }
+    // Don't do that until you implement a/v synchro.
+    // libvlc_media_player_pause(mp);
+    // flag = 1;
+  }
+  return 0;
 }
 
 int main() {
@@ -76,4 +95,8 @@ int main() {
 	emscripten_set_main_loop(iter, 1, 1);
 
     return 0;
+  emscripten_set_click_callback("#canvas", 0, 1, play_pause_handler);
+  emscripten_set_main_loop(iter, 1, 1);
+  
+  return 0;
 }
