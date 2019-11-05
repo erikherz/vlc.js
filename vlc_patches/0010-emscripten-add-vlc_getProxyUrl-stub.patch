@@ -1,0 +1,73 @@
+From ddbd4c7b85feb5e8423787b646eacfb310b68b95 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Thu, 5 Sep 2019 23:56:20 +0200
+Subject: [PATCH 10/15] emscripten: add vlc_getProxyUrl stub.
+
+---
+ src/Makefile.am          |  3 ++-
+ src/emscripten/netconf.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 1 deletion(-)
+ create mode 100644 src/emscripten/netconf.c
+
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 3561a24db0..a18c297d89 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -456,7 +456,8 @@ libvlccore_la_SOURCES += \
+ 	posix/dirs.c \
+ 	posix/filesystem.c \
+ 	posix/specific.c \
+-	posix/timer.c
++	posix/timer.c \
++	emscripten/netconf.c
+ else
+ 
+ # All except OS2/WIN32/NACL/ANDROID/EMSCRIPTEN
+diff --git a/src/emscripten/netconf.c b/src/emscripten/netconf.c
+new file mode 100644
+index 0000000000..b972bf4976
+--- /dev/null
++++ b/src/emscripten/netconf.c
+@@ -0,0 +1,39 @@
++/*****************************************************************************
++ * netconf.c : Network configuration
++ *****************************************************************************
++ * Copyright (C) 2019
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <string.h>
++
++char *vlc_getProxyUrl(const char *url);
++
++/**
++ * Determines the network proxy server to use (if any).
++ * @param url absolute URL for which to get the proxy server
++ * @return proxy URL, NULL if no proxy or error
++ */
++char *vlc_getProxyUrl(const char *url)
++{
++  char *proxy = strdup(url);
++  
++  return proxy;
++}
+-- 
+2.23.0
+

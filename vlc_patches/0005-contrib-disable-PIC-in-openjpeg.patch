@@ -1,0 +1,29 @@
+From 7c674ad83adee5a8e7eaa30ae6640fc28cce3102 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Thu, 5 Sep 2019 19:46:34 +0200
+Subject: [PATCH 05/15] contrib: disable PIC in openjpeg
+
+It crashes the clang compiler.
+PIC is not supported in the wasm backend for now. Issue #9317 in Emscripten
+---
+ contrib/src/openjpeg/rules.mak | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/contrib/src/openjpeg/rules.mak b/contrib/src/openjpeg/rules.mak
+index 184c484f00..efa17da98e 100644
+--- a/contrib/src/openjpeg/rules.mak
++++ b/contrib/src/openjpeg/rules.mak
+@@ -20,7 +20,9 @@ ifdef HAVE_VISUALSTUDIO
+ endif
+ #	$(APPLY) $(SRC)/openjpeg/restrict.patch
+ 	$(APPLY) $(SRC)/openjpeg/install.patch
+-	$(APPLY) $(SRC)/openjpeg/pic.patch
++ifndef HAVE_EMSCRIPTEN
++        $(APPLY) $(SRC)/openjpeg/pic.patch
++endif
+ 	$(APPLY) $(SRC)/openjpeg/openjp2_pthread.patch
+ 	$(call pkg_static,"./src/lib/openjp2/libopenjp2.pc.cmake.in")
+ 	$(MOVE)
+-- 
+2.23.0
+

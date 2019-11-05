@@ -1,0 +1,77 @@
+From 5085d642685c1e47c78efeb9046373ca78f7b412 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Fri, 4 Oct 2019 19:37:18 +0200
+Subject: [PATCH 5/6] aout: Change function prototypes and add volume_set stub
+
+This commit enables a bug that is caused by an invalid pointer,
+that I couldn't find yet. This is not a good implementation, as
+audio will work, but will prevent frames from being displayed.
+Probably because of the Audio processing taking too much processing
+power out of the browser main thread.
+---
+ modules/audio_output/openal.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
+
+diff --git a/modules/audio_output/openal.c b/modules/audio_output/openal.c
+index 2a5f6f946d..374f2fd0a9 100644
+--- a/modules/audio_output/openal.c
++++ b/modules/audio_output/openal.c
+@@ -52,12 +52,13 @@
+ static int  Open 		( vlc_object_t * );
+ static void Close		( vlc_object_t * );
+ static void Stop		( audio_output_t *);
+-static void Play      	( audio_output_t *, block_t * );
++static void Play      	        ( audio_output_t *, block_t * , vlc_tick_t);
+ static void Flush		( audio_output_t *, bool );
+-static void Pause		( audio_output_t *, bool , mtime_t );
++static void Pause		( audio_output_t *, bool , vlc_tick_t);
+ static int Time_Get		( audio_output_t *, mtime_t * );
+ static int Start		( audio_output_t *, audio_sample_format_t *restrict );
+ static int DeviceSelect	( audio_output_t *, const char *);
++static int Volume_Set           ( audio_output_t *, float);
+ //static int FindDevicesCallback( vlc_object_t *p_this, char const *psz_name,
+ //                                vlc_value_t newval, vlc_value_t oldval, void *p_unused );
+ //static void GetDevices( vlc_object_t *, module_config_t * );
+@@ -143,8 +144,7 @@ static int Open( vlc_object_t *obj )
+ 	aout->pause = Pause;
+ 	aout->flush = Flush;
+ 	aout->time_get = Time_Get;
+-	aout->pause = Pause;
+-	aout->volume_set = NULL;
++	aout->volume_set = Volume_Set;
+ 	aout->mute_set = NULL;
+ //	aout->device_select = DeviceSelect;
+ 
+@@ -215,8 +215,9 @@ static void Stop (audio_output_t *aout)
+ /*****************************************************************************
+  * Play: method description here
+  *****************************************************************************/
+-static void Play( audio_output_t *aout, block_t *block )
++static void Play( audio_output_t *aout, block_t *block , vlc_tick_t date)
+ {
++  VLC_UNUSED(date);
+ 	aout_sys_t *sys = aout->sys;
+ 	const void* data = block->p_buffer;
+ 	size_t datalen = block->i_buffer;
+@@ -256,7 +257,7 @@ static void Play( audio_output_t *aout, block_t *block )
+ 	block_Release(block);
+ }
+ 
+-static void Pause( audio_output_t *aout, bool paused, mtime_t date )
++static void Pause( audio_output_t *aout, bool paused, vlc_tick_t date )
+ {
+ 	aout_sys_t *sys = aout->sys;
+ 	// TODO
+@@ -306,3 +307,9 @@ static void Close( vlc_object_t *obj )
+ 	free(sys);
+ }
+ 
++static int Volume_Set           ( audio_output_t *aout, float volume)
++{
++  VLC_UNUSED(aout);
++  VLC_UNUSED(volume);
++  return 0;
++}
+-- 
+2.23.0
+

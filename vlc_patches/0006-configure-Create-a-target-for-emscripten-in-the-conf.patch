@@ -1,0 +1,46 @@
+From 3468bd741f19ff68d1017c374fdec6955bb5454e Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Thu, 6 Jul 2017 14:50:28 +0200
+Subject: [PATCH 06/15] configure: Create a target for emscripten in the
+ configure.ac
+
+---
+ configure.ac | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index 210b4ca537..c9d04253cd 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -322,6 +322,19 @@ case "${host_os}" in
+     AC_LIBOBJ([recvmsg])
+     AC_LIBOBJ([sendmsg])
+     ;;
++  *emscripten*)
++    SYS=emscripten
++    CC=emcc
++    LD=emcc
++    LDSHARED=emcc
++    NM=llvm-nm
++    CPP=emcc
++    CXX=em++
++    AR=emar
++    RANLIB=emranlib
++    CFLAGS="${CFLAGS} -D__NEED_ssize_t -pthread"
++    CXXFLAGS="${CXXFLAGS}"
++  ;;
+   *)
+     SYS="${host_os}"
+     ;;
+@@ -388,6 +401,8 @@ AM_COND_IF([HAVE_X86ASM], [
+ AC_SUBST([X86ASMFLAGS])
+ AC_SUBST([X86ASMDEFS])
+ 
++AM_CONDITIONAL([HAVE_EMSCRIPTEN], [test "${SYS}" = "emscripten"])
++
+ dnl
+ dnl Sadly autoconf does not think about testing foo.exe when ask to test
+ dnl for program foo on win32
+-- 
+2.23.0
+

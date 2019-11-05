@@ -1,0 +1,32 @@
+From 09a5bb40c8e09967a07fdc9127337a9992e4afc9 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Thu, 12 Sep 2019 15:02:47 +0200
+Subject: [PATCH 13/15] window: add emscripten type
+
+---
+ include/vlc_vout_window.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/vlc_vout_window.h b/include/vlc_vout_window.h
+index 9116fa6561..8533a963f3 100644
+--- a/include/vlc_vout_window.h
++++ b/include/vlc_vout_window.h
+@@ -63,6 +63,7 @@ enum vout_window_type {
+     VOUT_WINDOW_TYPE_NSOBJECT /**< MacOS X view */,
+     VOUT_WINDOW_TYPE_ANDROID_NATIVE /**< Android native window */,
+     VOUT_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
++    VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL /**< Emscripten surface */,
+ };
+ 
+ /**
+@@ -360,6 +361,7 @@ typedef struct vout_window_t {
+         void     *nsobject;      /**< Mac OSX view object */
+         void     *anativewindow; /**< Android native window */
+         struct wl_surface *wl;   /**< Wayland surface (client pointer) */
++        uint32_t em_context;     /* Emscripten webgl context */
+     } handle;
+ 
+     /** Display server (mandatory)
+-- 
+2.23.0
+

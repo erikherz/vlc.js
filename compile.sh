@@ -72,8 +72,9 @@ diagnostic "Patching"
 cd vlc
 
 # patching vlc
-if [ -d ../patch_vlc ] && [ "$(ls -A ../patch_vlc)" ]; then
-    git am -3 ../patch_vlc/*
+if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
+    git am -3 ../vlc_patches/00*
+    git am -3 ../vlc_patches/openal/*
 fi
 
 # BOOTSTRAP

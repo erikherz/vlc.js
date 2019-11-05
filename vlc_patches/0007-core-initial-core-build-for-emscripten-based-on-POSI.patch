@@ -1,0 +1,45 @@
+From 8cd59d8ddef398be370a11ca9b61e005439f1148 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Thu, 5 Sep 2019 16:30:15 +0200
+Subject: [PATCH 07/15] core: initial core build for emscripten, based on POSIX
+
+posix/sort.c won't be added because qsort_r is not supported.
+---
+ src/Makefile.am | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/src/Makefile.am b/src/Makefile.am
+index b6c5996837..3561a24db0 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -448,8 +448,18 @@ libvlccore_la_SOURCES += \
+ 	linux/dirs.c \
+ 	linux/thread.c
+ else
++if HAVE_EMSCRIPTEN
++libvlccore_la_SOURCES += \
++	posix/thread.c \
++	posix/getaddrinfo.c \
++	posix/error.c \
++	posix/dirs.c \
++	posix/filesystem.c \
++	posix/specific.c \
++	posix/timer.c
++else
+ 
+-# All except OS2/WIN32/NACL/ANDROID
++# All except OS2/WIN32/NACL/ANDROID/EMSCRIPTEN
+ libvlccore_la_SOURCES += posix/sort.c
+ 
+ if HAVE_DARWIN
+@@ -490,6 +500,7 @@ endif
+ endif
+ endif
+ endif
++endif
+ 
+ if ENABLE_SOUT
+ libvlccore_la_SOURCES += \
+-- 
+2.23.0
+

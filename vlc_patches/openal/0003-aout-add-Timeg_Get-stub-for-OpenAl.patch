@@ -1,0 +1,42 @@
+From 7504f01518164b091e5b0cf8c5e0dc9679cb1138 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Wed, 2 Oct 2019 22:05:01 +0200
+Subject: [PATCH 3/6] aout: add Timeg_Get stub for OpenAl
+
+to avoid aborting in src/audio_output/output.c
+---
+ modules/audio_output/openal.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/modules/audio_output/openal.c b/modules/audio_output/openal.c
+index 6d4a707642..c48c5a0f5e 100644
+--- a/modules/audio_output/openal.c
++++ b/modules/audio_output/openal.c
+@@ -142,7 +142,7 @@ static int Open( vlc_object_t *obj )
+ 	aout->play = Play;
+ 	aout->pause = Pause;
+ 	aout->flush = Flush;
+-	//aout->time_get = Time_Get;
++	aout->time_get = Time_Get;
+ 	aout->pause = Pause;
+ 	aout->volume_set = NULL;
+ 	aout->mute_set = NULL;
+@@ -286,12 +286,12 @@ static int DeviceSelect( audio_output_t *aout, const char *psz_device)
+ 	return VLC_SUCCESS;
+ }
+ 
+-/*static void Time_Get( audio_output_t *aout, mtime_t *delay)
++static int Time_Get( audio_output_t *aout, mtime_t *delay)
+ {
+ 	aout_sys_t *sys = aout->sys;
+-
++	*delay = aout_TimeGetDefault(aout, delay);
+ 	return 0;
+-}*/
++}
+ 
+ /*****************************************************************************
+  * CloseAudio: close the audio device
+-- 
+2.23.0
+

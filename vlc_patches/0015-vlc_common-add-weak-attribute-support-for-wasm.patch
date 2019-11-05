@@ -1,0 +1,25 @@
+From 7b4679fbdf714f8b6c3ea79a650d1bcdb1acd240 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Wed, 25 Sep 2019 20:20:59 +0200
+Subject: [PATCH 15/15] vlc_common: add weak attribute support for wasm
+
+---
+ include/vlc_common.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/vlc_common.h b/include/vlc_common.h
+index e4c5cd85c9..359c53dac8 100644
+--- a/include/vlc_common.h
++++ b/include/vlc_common.h
+@@ -185,7 +185,7 @@
+ # define VLC_USED
+ #endif
+ 
+-#if defined (__ELF__) || defined (__MACH__)
++#if defined (__ELF__) || defined (__MACH__) || defined (__wasm__)
+ # define VLC_WEAK __attribute__((weak))
+ #else
+ /**
+-- 
+2.23.0
+

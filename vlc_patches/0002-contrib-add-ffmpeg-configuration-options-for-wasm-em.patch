@@ -1,0 +1,79 @@
+From 4a82c06361880c86123934b6dfb54263e0154051 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Wed, 4 Sep 2019 19:35:17 +0200
+Subject: [PATCH 01/15] contrib: add ffmpeg configuration options for
+ wasm-emscripten
+
+We need to specify the pthread flag for compilation and linking, otherwise tests will fail.
+---
+ ...001-configure-add-emscripten-support.patch | 33 +++++++++++++++++++
+ contrib/src/ffmpeg/rules.mak                  |  6 ++++
+ 2 files changed, 39 insertions(+)
+ create mode 100644 contrib/src/ffmpeg/0001-configure-add-emscripten-support.patch
+
+diff --git a/contrib/src/ffmpeg/0001-configure-add-emscripten-support.patch b/contrib/src/ffmpeg/0001-configure-add-emscripten-support.patch
+new file mode 100644
+index 0000000000..cb8471c90e
+--- /dev/null
++++ b/contrib/src/ffmpeg/0001-configure-add-emscripten-support.patch
+@@ -0,0 +1,33 @@
++From da7782c47f1f3d84eefb4ccce1c95e40d3b65fde Mon Sep 17 00:00:00 2001
++From: Mehdi Sabwat <mehdisabwat@gmail.com>
++Date: Tue, 13 Aug 2019 21:14:56 +0200
++Subject: [PATCH 1/1] configure: add emscripten support
++
++---
++ configure | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/configure b/configure
++index 7cea9d4d73..bafcbc87fc 100755
++--- a/configure
+++++ b/configure
++@@ -4239,6 +4239,7 @@ fi
++ exesuf() {
++     case $1 in
++         mingw32*|mingw64*|win32|win64|cygwin*|*-dos|freedos|opendos|os/2*|symbian) echo .exe ;;
+++        emscripten) echo .js ;;
++     esac
++ }
++ 
++@@ -5428,6 +5429,8 @@ case $target_os in
++         ;;
++     minix)
++         ;;
+++    emscripten)
+++        ;;
++     none)
++         ;;
++     *)
++-- 
++2.23.0
++
+diff --git a/contrib/src/ffmpeg/rules.mak b/contrib/src/ffmpeg/rules.mak
+index 1ba04616e5..e2ec5f3cd3 100644
+--- a/contrib/src/ffmpeg/rules.mak
++++ b/contrib/src/ffmpeg/rules.mak
+@@ -221,6 +221,11 @@ ifdef HAVE_NACL
+ FFMPEGCONF+=--disable-inline-asm --disable-asm --target-os=linux
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++FFMPEGCONF+=--target-os=emscripten --arch=wasm32 --ranlib=emranlib \
++	    --extra-ldflags="-pthread" --extra-ldexeflags="-pthread"
++endif
++
+ # Build
+ PKGS += ffmpeg
+ ifeq ($(call need_pkg,"libavcodec >= $(FFMPEG_LAVC_MIN) libavformat >= 53.21.0 libswscale"),)
+@@ -248,6 +253,7 @@ endif
+ ifdef USE_LIBAV
+ 	$(APPLY) $(SRC)/ffmpeg/libav_gsm.patch
+ endif
++	$(APPLY) $(SRC)/ffmpeg/0001-configure-add-emscripten-support.patch
+ 	$(MOVE)
+ 
+ .ffmpeg: ffmpeg
+-- 
+2.23.0
+

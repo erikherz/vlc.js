@@ -1,0 +1,48 @@
+From a9b2fc82c6a1cbd467b6a19c859b3bf5c3dfd899 Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Fri, 25 Aug 2017 12:05:38 +0200
+Subject: [PATCH 01/15] contrib: add emscripten target
+
+set toolchain variables in bootstrap and main.mak
+---
+ contrib/bootstrap    | 3 +++
+ contrib/src/main.mak | 9 +++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/contrib/bootstrap b/contrib/bootstrap
+index 577d8b0dc6..8c04d4ecee 100755
+--- a/contrib/bootstrap
++++ b/contrib/bootstrap
+@@ -348,6 +348,9 @@ case "${OS}" in
+ 	*nacl*)
+ 		add_make_enabled "HAVE_NACL"
+ 		;;
++	*emscripten*)
++		add_make_enabled "HAVE_EMSCRIPTEN"
++		;;
+ esac
+ 
+ #
+diff --git a/contrib/src/main.mak b/contrib/src/main.mak
+index 7eef7b85b6..8b65ffdd7b 100644
+--- a/contrib/src/main.mak
++++ b/contrib/src/main.mak
+@@ -126,6 +126,15 @@ CXX := clang++
+ endif
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++CC := emcc
++CXX := em++
++LD := emcc
++AR := emar
++RANLIB := emranlib
++CFLAGS="-pthread"
++endif
++
+ ifdef HAVE_MACOSX
+ EXTRA_CXXFLAGS += -stdlib=libc++
+ ifeq ($(ARCH),x86_64)
+-- 
+2.23.0
+
