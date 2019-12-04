@@ -4,20 +4,45 @@ This project is a port of VLC to run completely in the web-browser.
 
 It is, of course, quite insane, but it will be doable in the future, as WASM improves.
 
-It started with an asm.js port, now that WASM is ready with :
+The goal is to be able to have a full player and framework inside the browser
+to be able to customize it as you wish, and support more formats, instead of hacking
+around the browser video support and MSE integration.
+
+We could have support MKV, DVD menus, chapters, 4:2:2, 10bits, custom audio and video filters,
+or support for MPEG-2, Karaoke, SSA subtitles, interlaced video, or custom demuxers and decoders.
+We could support both software and hardware decoding...
+
+## History
+
+It started with an asm.js port, from the Firefox OS days, to have a PoC.
+But now that WASM is ready with :
  - threads
  - WASM (and not only asm.js)
  - SIMD.js/wasm
  - Full webgl support
  - Audio support in threads
 
-we are getting closer to a first version.
+we are getting closer to a usable version.
 
 After, when we have modules, then VLC modules could be downloaded at runtime.
 
+## Missing evolutions from webbrowsers
+
+In fact, we would need, in addition to what we have:
+1.  Webcodecs to have both software and hardware decoders,
+2.  Modules loading, to have a lean VLC installation that loads at runtime what it needs,
+3.  Sockets access for custom protocols,
+
+Nice to have would be:
+
+4.  Better audio API, like [Audio Device Client](https://github.com/WebAudio/web-audio-cg/tree/master/audio-device-client)
+5.  More APIs without calling to main thread, like logs...
+
+On the toolchain side, we need to find a way to recycle our existing .S asm files.
+
 ## Installation
 
-### Update the config.sub in your system.
+### Autotools: Update the config.sub in your system.
 
 ```bash
 cp config.sub /usr/share/automake-1.15/config.sub
