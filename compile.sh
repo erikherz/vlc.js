@@ -73,7 +73,22 @@ cd vlc
 
 # patching vlc
 if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
-    git am -3 ../vlc_patches/00*
+    # core patches
+    git am -3 ../vlc_patches/0001-contrib-add-emscripten-target.patch
+    git am -3 ../vlc_patches/0002-contrib-add-ffmpeg-configuration-options-for-wasm-em.patch
+    git am -3 ../vlc_patches/0003-contrib-delete-empty-variable.patch
+    git am -3 ../vlc_patches/0006-configure-Create-a-target-for-emscripten-in-the-conf.patch
+    git am -3 ../vlc_patches/0007-core-initial-core-build-for-emscripten-based-on-POSI.patch
+    git am -3 ../vlc_patches/0008-compat-add-sigwait-support-for-emscripten.patch
+    git am -3 ../vlc_patches/0009-compat-add-clock_nanosleep-support.patch
+    git am -3 ../vlc_patches/0010-emscripten-add-vlc_getProxyUrl-stub.patch
+    git am -3 ../vlc_patches/0011-configure-disable-deprecated-GL-functions-for-emscri.patch
+    git am -3 ../vlc_patches/0012-logger-add-emscripten-module.patch
+    git am -3 ../vlc_patches/0013-window-add-emscripten-type.patch
+    git am -3 ../vlc_patches/0014-vout-add-emscripten-gl-es2-and-window-modules.patch
+    git am -3 ../vlc_patches/0015-vlc_common-add-weak-attribute-support-for-wasm.patch
+    
+    # Add OPENAL support
     git am -3 ../vlc_patches/openal/*
 fi
 
