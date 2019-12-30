@@ -1,16 +1,18 @@
-From a9b2fc82c6a1cbd467b6a19c859b3bf5c3dfd899 Mon Sep 17 00:00:00 2001
-From: Etienne Brateau <etienne.brateau@gmail.com>
-Date: Fri, 25 Aug 2017 12:05:38 +0200
-Subject: [PATCH 01/15] contrib: add emscripten target
+From 89483da629c05701ac2ff8a157a67e031e5e471f Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Mon, 30 Dec 2019 13:55:23 +0100
+Subject: [PATCH 1/1] contrib: add emscripten target
 
 set toolchain variables in bootstrap and main.mak
+
+Co-Author: Etienne Brateau <etienne.brateau@gmail.com>
 ---
  contrib/bootstrap    | 3 +++
  contrib/src/main.mak | 9 +++++++++
  2 files changed, 12 insertions(+)
 
 diff --git a/contrib/bootstrap b/contrib/bootstrap
-index 577d8b0dc6..8c04d4ecee 100755
+index 01a234e55c..b6224bae9d 100755
 --- a/contrib/bootstrap
 +++ b/contrib/bootstrap
 @@ -348,6 +348,9 @@ case "${OS}" in
@@ -18,17 +20,17 @@ index 577d8b0dc6..8c04d4ecee 100755
  		add_make_enabled "HAVE_NACL"
  		;;
 +	*emscripten*)
-+		add_make_enabled "HAVE_EMSCRIPTEN"
++	        add_make_enabled "HAVE_EMSCRIPTEN"
 +		;;
  esac
  
  #
 diff --git a/contrib/src/main.mak b/contrib/src/main.mak
-index 7eef7b85b6..8b65ffdd7b 100644
+index 5e5846de97..897020517e 100644
 --- a/contrib/src/main.mak
 +++ b/contrib/src/main.mak
-@@ -126,6 +126,15 @@ CXX := clang++
- endif
+@@ -133,6 +133,15 @@ EXTRA_CFLAGS += -fno-stack-check
+ XCODE_FLAGS += OTHER_CFLAGS=-fno-stack-check
  endif
  
 +ifdef HAVE_EMSCRIPTEN
@@ -44,5 +46,5 @@ index 7eef7b85b6..8b65ffdd7b 100644
  EXTRA_CXXFLAGS += -stdlib=libc++
  ifeq ($(ARCH),x86_64)
 -- 
-2.23.0
+2.24.1
 
