@@ -1,0 +1,10 @@
+# Ignore build dirs
+vlc/
+emsdk/
+# and files
+experimental.data
+experimental.html
+experimental.js
+experimental.wasm
+experimental.worker.js
+
