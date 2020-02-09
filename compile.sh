@@ -87,6 +87,7 @@ if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
     git am -3 ../vlc_patches/0013-window-add-emscripten-type.patch
     git am -3 ../vlc_patches/0014-vout-add-emscripten-gl-es2-and-window-modules.patch
     git am -3 ../vlc_patches/0015-vlc_common-add-weak-attribute-support-for-wasm.patch
+    git am -3 ../vlc_patches/0016-Add-meson_system_name-for-emscripten.patch
     
     # Add OPENAL support
     git am -3 ../vlc_patches/openal/*
