@@ -1,21 +1,21 @@
-From 8cd59d8ddef398be370a11ca9b61e005439f1148 Mon Sep 17 00:00:00 2001
+From 747c6207acf654665d23625537b962152922c8c5 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdisabwat@gmail.com>
-Date: Thu, 5 Sep 2019 16:30:15 +0200
-Subject: [PATCH 07/15] core: initial core build for emscripten, based on POSIX
+Date: Mon, 24 Feb 2020 14:08:02 +0100
+Subject: [PATCH 1/1] core: initial core build for emscripten, based on POSIX
 
 posix/sort.c won't be added because qsort_r is not supported.
 ---
- src/Makefile.am | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ src/Makefile.am | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/src/Makefile.am b/src/Makefile.am
-index b6c5996837..3561a24db0 100644
+index bf91159fcc..474ddcdd63 100644
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -448,8 +448,18 @@ libvlccore_la_SOURCES += \
- 	linux/dirs.c \
- 	linux/thread.c
- else
+@@ -437,6 +437,17 @@ libvlccore_la_SOURCES += \
+ 	posix/timer.c
+ endif
+ 
 +if HAVE_EMSCRIPTEN
 +libvlccore_la_SOURCES += \
 +	posix/thread.c \
@@ -25,14 +25,20 @@ index b6c5996837..3561a24db0 100644
 +	posix/filesystem.c \
 +	posix/specific.c \
 +	posix/timer.c
-+else
- 
--# All except OS2/WIN32/NACL/ANDROID
-+# All except OS2/WIN32/NACL/ANDROID/EMSCRIPTEN
- libvlccore_la_SOURCES += posix/sort.c
- 
++endif
++
  if HAVE_DARWIN
-@@ -490,6 +500,7 @@ endif
+ libvlccore_la_SOURCES += \
+ 	darwin/error.c \
+@@ -481,6 +492,7 @@ if !HAVE_LINUX
+ libvlccore_la_SOURCES += posix/wait.c
+ endif
+ if !HAVE_ANDROID
++if !HAVE_EMSCRIPTEN
+ libvlccore_la_SOURCES += posix/sort.c
+ if !HAVE_DARWIN
+ libvlccore_la_SOURCES += \
+@@ -503,6 +515,7 @@ endif
  endif
  endif
  endif
@@ -41,5 +47,5 @@ index b6c5996837..3561a24db0 100644
  if ENABLE_SOUT
  libvlccore_la_SOURCES += \
 -- 
-2.23.0
+2.25.0
 
