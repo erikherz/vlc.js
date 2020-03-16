@@ -72,7 +72,126 @@
     </div>
         <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
     </div>
-    <script type="text/javascript" src="./assets/module-loader.js"></script>
-    <script async type="text/javascript" src="./experimental.js"></script>
+    <button class='start'>Start</button>
+    <script src="assets/module-loader.js"></script>
+    <script src="experimental.js"></script>
+    <!--
+	<script>
+      var audioWriter;
+      const ctx = new AudioContext();
+
+      Module.URLFromFiles(['worklet-processor.js', 'index.js']).then((e) => {
+	  if (ctx.audioWorklet === undefined) {
+	      console.log("No AudioWorklet. In Firefox, try going to about:config and flipping dom.audioworklet.enabled to true.")
+	  } else {
+	      ctx.audioWorklet.addModule(e).then(() => {
+		  const n = new AudioWorkletNode(ctx, "worklet-processor");
+		  n.connect(ctx.destination);
+		  let sab = Module.RingBuffer.getStorageForCapacity(ctx.sampleRate / 20, Float32Array);
+		  let rb = new Module.RingBuffer(sab, Float32Array);
+		  audioWriter = new Module.AudioWriter(rb);
+		  // let sab = Module.getSab(ctx.sampleRate);
+		  // Module.MyRingBuffer = new Module.RingBuffer(sab, Float32Array);
+		  // Module.MyAudioWriter = new Module.AudioWriter(Module.MyRingBuffer);
+		  console.log("Starting..." + audioWriter);
+		  try {
+		      n.port.postMessage({
+			  type: "recv-audio-queue",
+			  data: sab,
+		      });
+		  } catch(_){
+		      console.log("No SharedArrayBuffer transfer support, try another browser.");
+		      return;
+		  }
+		  
+		  // Synchronize with worker so that vlc can start the ring buffer
+		  // Module["SyncWorker"].postMessage("ready1");
+		  // 50ms of buffer, increase in case of glitches
+	      });
+	  };
+      });
+      document.getElementById("canvas").addEventListener("click", () => {
+	  ctx.resume();
+      });
+    </script>
+    <script>
+      function render() {
+	  requestAnimationFrame(render);
+	  if (!audioWriter) {
+	      return;
+	  }
+	  // Synthetize a simple sine wave so it's easy to hear glitches, continuously
+	  // if there is room in the ring buffer.
+	  while (audioWriter.available_write() > 128) {
+	      // Pull from emscripten Module object
+	      // Count with a global Module.render_count
+	      for (var i = 0; i < 128; i++) {
+		  Module.AudioFrames[i] = Math.random();
+	      }
+	      audioWriter.enqueue(Module.AudioFrames);
+	  }
+      }
+      requestAnimationFrame(render);
+    </script>
+    -->
+<!--
+    <script>
+      // Producer in VLC:
+      // You cannot write into ACQ if the SCQ is not set to 0.
+      // void wasm_audio_producer(void *pointer_to_block_t, size_t size); 
+      // 1- Create a view (on Module._AudioCircularQueue)
+      // 2- Set the values (Atomics.store on SCQ) from view on the pointer to block_t or by getting the value directly in float don't forget to Atomics.notify
+      // 3- Atomics wait on SCQ to continue
+      // 4- when you reach size, the function needs to be called again
+
+      // Consumer in WorkletProcessor:
+      // look for 1024 consecutive (1) values
+      // 1- Create a view.
+      // 2- Atomics.wait on value 1, then go to index in ACQ
+      // 3- Atomics.store = 0
+      var VLCAudioWorker = Module["VLCAudioWorker"];
+      document.getElementById('btn_1').addEventListener('click', () => {
+	  var context = new AudioContext();
+	  var workletProcessor;
+	  context.audioWorklet.addModule('worklet-processor.js').then( () => {
+	      workletProcessor = new AudioWorkletNode(context, 'worklet-processor');
+	      workletProcessor.port.postMessage({
+		  buffer: Module["_QueueCircularQueue"],
+		  state: Module["_StateCircularQueue"]
+	      });
+	      VLCAudioWorker.postMessage({
+		  type: "init_wait",
+		  state: Module["_StateCircularQueue"]
+	      });
+	      // Wait for signal from worker before you start processing.
+	      VLCAudioWorker.onmessage = (e) => {
+		  console.log("Received" + e.data);
+		  if (e.data === "start") {
+		      console.log("DID THE WORKLET START?");
+		      workletProcessor.connect(context.destination);
+		  }
+		  if (e.data === "pause") {
+		      context.resume().then( () => {
+			  console.log("AudioContext was resumed!");
+		      });
+		  }
+	      }
+	      workletProcessor.port.onmessage = (e) => {
+		  // Handle unlikely case where you'd need to pause the context
+		  if (e.data.type === "error") {
+		      context.suspend().then( () => {
+			  console.log("AudioContext was suspended!");
+		      });
+		      // wait for value to change
+		      VLCAudioWorker.postMessage({
+			  type: "wait",
+			  state_index: e.data.index
+		      });
+		  }
+	      }
+	  }); 
+      });
+    </script>
+-->
 </body>
 </html>
