@@ -1,0 +1,299 @@
+From 28cc9bf511753e31b0a37242398de72b703040ce Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 7 Oct 2020 19:48:29 +0200
+Subject: [PATCH 15/17] extras: add wasm-emscripten build script
+
+- merge the previous build scripts into one
+- allow building outside of vlc source
+- add wasm32-emscripten ci
+---
+ extras/ci/gitlab-ci.yml                 |  22 +++
+ extras/package/wasm-emscripten/build.sh | 229 ++++++++++++++++++++++++
+ 2 files changed, 251 insertions(+)
+ create mode 100644 extras/package/wasm-emscripten/build.sh
+
+diff --git a/extras/ci/gitlab-ci.yml b/extras/ci/gitlab-ci.yml
+index 463c4222c5..7588041f40 100644
+--- a/extras/ci/gitlab-ci.yml
++++ b/extras/ci/gitlab-ci.yml
+@@ -20,6 +20,7 @@ variables:
+     VLC_ANDROID_IMAGE: registry.videolan.org/vlc-debian-android:20200529135226
+     VLC_SNAP_IMAGE: registry.videolan.org/vlc-ubuntu-bionic:20190627090437
+     VLC_RASPBIAN_IMAGE: registry.videolan.org/vlc-debian-raspbian:20200213203125
++    VLC_WASM_EMSCRIPTEN: registry.videolan.org/vlc-debian-wasm-emscripten:20201009174247
+ 
+ .variables-debian: &variables-debian
+         HOST_ARCH: x86_64
+@@ -94,6 +95,10 @@ variables:
+         ANDROID_ARCH: x86_64
+         TRIPLET: x86_64-linux-android
+ 
++.variables-emscripten-wasm32: &variables-emscripten-wasm32
++        HOST_ARCH: wasm32
++        TRIPLET: $HOST_ARCH-unknown-emscripten
++
+ # Common rules
+ .base-template:
+     stage: build
+@@ -401,6 +406,23 @@ android-x86_64:
+     extends: .android-common
+     variables: *variables-android-x86_64
+ 
++#
++# Webassembly
++#
++
++wasm32-emscripten-build :    
++    extends: .base-template
++    tags:
++        - wasm32-emscripten-build
++    image:
++        name: $VLC_WASM_EMSCRIPTEN
++    script: 
++        - source $EMSCRIPTEN_SDK/emsdk_env.sh
++        - cd $CI_PROJECT_DIR/../
++        - /bin/bash vlc/extras/package/wasm-emscripten/build.sh
++        - cd $CI_PROJECT_DIR
++        - tar -cvjSf contrib/vlc-contrib-alpha.tar.bz2 ../build/wasm32-unknown-emscripten
++
+ #
+ # VLC Documentation
+ #
+diff --git a/extras/package/wasm-emscripten/build.sh b/extras/package/wasm-emscripten/build.sh
+new file mode 100644
+index 0000000000..3a010bca65
+--- /dev/null
++++ b/extras/package/wasm-emscripten/build.sh
+@@ -0,0 +1,229 @@
++#! /bin/bash
++# Copyright (C) 2003-2020 the VideoLAN team
++#
++# This file is under the same license as the vlc package.
++
++#
++# This script will :
++# 0. test for emscripten sdk presence and some patches (emscripten fs + config.sub emscripten)
++# 1. compile libvlc statically in a build directory and create vlc-modules.bc
++
++diagnostic()
++{
++     echo "$@" 1>&2;
++}
++
++checkfail()
++{
++    if [ ! $? -eq 0 ];then
++        diagnostic "$1"
++        exit 1
++    fi
++}
++
++usage()
++{
++	echo "Usage: $0 [--mode=(default=1)]"
++	echo "  --srcpath=VLC_SRCPATH  set vlc source location"
++	echo "  --path=BUILD_PATH  set build location"
++	echo "  --mode=1 (default) build all in a new directory "  
++}
++
++get_symbol()
++{
++    echo "$1" | grep vlc_entry_$2 | cut -d " " -f 3
++}
++
++while test -n "$1"
++do
++    case "$1" in
++	--help|-h)
++	    usage
++	    exit 0
++	    ;;
++	--path=*)
++	    BUILD_PATH="${1#--path=}"
++	    ;;
++	--mode=*)
++	    BUILD_MODE="${1#--mode=}"
++	    ;;
++	*)
++	    echo "Unrecognized options $1"
++	    usage
++	    exit 1
++	    ;;
++    esac
++    shift
++done
++
++BUILD_MODE=1
++
++# Make in //
++if [ -z "$MAKEFLAGS" ]; then
++    UNAMES=$(uname -s)
++    MAKEFLAGS=
++    if which nproc >/dev/null; then
++        MAKEFLAGS=-j`nproc`
++    elif [ "$UNAMES" == "Darwin" ] && which sysctl >/dev/null; then
++        MAKEFLAGS=-j`sysctl -n machdep.cpu.thread_count`
++    fi
++fi
++
++# build vlc outside the source code repository
++if [ "$BUILD_MODE" = "1" ]; then
++   mkdir -p $PWD/build;
++   VLC_SRCPATH="$PWD/vlc"; #to check with `basename`
++   BUILD_PATH="$PWD/build";
++   echo $BUILD_PATH;
++   echo $VLC_SRCPATH;
++fi
++
++# VLC tools
++
++mkdir -p $BUILD_PATH/extras/tools
++cd $BUILD_PATH/extras/tools
++$VLC_SRCPATH/extras/tools/bootstrap 
++checkfail "vlc tools: bootstrap failed"
++make -C $BUILD_PATH/extras/tools ${MAKEFLAGS}
++checkfail "vlc tools: make failed"
++cd $BUILD_PATH
++
++# update the PATH
++export PATH=$BUILD_PATH/extras/tools/build/bin:$PATH
++
++# SDK tests
++
++# checking if config.sub recognizes wasm32-unknown-emscripten
++/usr/share/automake-*/config.sub wasm32-unknown-emscripten
++checkfail "sdk tests: automake does not support emscripten, patch was not applied \n
++	  [https://code.videolan.org/-/snippets/1283]"
++
++# "checking if emscripten compiler is correctly setup"
++emcc -v
++checkfail "sdk tests: there is an issue with emsdk, emcc -v returned an error!"
++
++# "checking if emscripten supports native filesystem api"
++echo 'int main() {}' | emcc -s VLCJS_PATCH_FILESYSTEM=1 -xc -
++checkfail "sdk tests: emscripten does not support native filesystem, patch was not applied \n
++	  [https://code.videolan.org/-/snippets/1284]"
++# clean up
++rm -fr a.out.js  a.out.wasm
++
++# these variables control the features that we want in the static build
++CONTRIB_LIST=".ffmpeg .opus .vpx .ogg .dvbpsi .faad2 .dav1d"
++# emmake make list to have a list of available contribs
++VLC_CONFIGURE_OPTIONS="
++    --host=wasm32-unknown-emscripten
++    --enable-debug
++    --disable-shared
++    --enable-dvbpsi
++    --enable-dav1d  --enable-vpx 
++    --enable-merge-ffmpeg --enable-avcodec --enable-avformat
++    --enable-opus --enable-faad 
++    --enable-gles2 
++    --disable-xcb  
++    --disable-sout --disable-lua --disable-vlm 
++    --disable-archive --disable-live555 --disable-dc1394 --disable-dv1394 
++    --disable-linsys --disable-dvdread --disable-dvdnav --disable-bluray 
++    --disable-opencv --disable-smbclient --disable-dsm
++    --disable-sftp --disable-nfs --disable-smb2 --disable-v4l2 --disable-nvdec --disable-decklink
++    --disable-vcd --disable-libcddb --disable-screen --disable-vnc
++    --disable-freerdp --disable-asdcp  --disable-gme --disable-sid
++    --disable-ogg --disable-shout --disable-matroska --disable-mod --disable-mpc --disable-shine 
++    --disable-omxil --disable-rpi-omxil --disable-mad --disable-mpg123 --disable-gst-decode --disable-libva 
++    --disable-dxva2 --disable-d3d11va --disable-swscale --disable-postproc --disable-aom --disable-twolame 
++    --disable-fdkaac --disable-a52 --disable-dca --disable-flac --disable-libmpeg2 --disable-vorbis --disable-tremor
++    --disable-speex --disable-spatialaudio --disable-theora --disable-oggspots --disable-daala --disable-schroedinger
++    --disable-png --disable-jpeg --disable-bpg --disable-x262 --disable-x265 --disable-x264 --disable-x26410b --disable-mfx 
++    --disable-fluidsynth --disable-fluidlite --disable-zvbi --disable-telx --disable-aribsub --disable-aribb25
++    --disable-kate --disable-tiger --disable-css --disable-libplacebo --disable-vulkan --disable-vdpau --disable-wayland 
++    --disable-sdl-image --disable-freetype --disable-fribidi --disable-harfbuzz --disable-fontconfig --disable-libass --disable-svg
++    --disable-svgdec --disable-directx--disable-kms --disable-caca --disable-kva --disable-mmal --disable-alsa --disable-oss 
++    --disable-sndio --disable-wasapi --disable-jack --disable-opensles --disable-samplerate --disable-soxr --disable-kai --disable-chromaprint
++    --disable-chromecast --disable-qt --disable-qt-qml-cache --disable-qt-qml-debug --disable-skins2 --disable-libtar --disable-sparkle
++    --disable-ncurses --disable-lirc --disable-srt --disable-goom --disable-projectm --disable-vsxu --disable-avahi
++    --disable-udev --disable-mtp --disable-upnp --disable-microdns --disable-libxml2 --disable-libgcrypt --disable-gnutls --disable-taglib
++    --disable-secret --disable-kwallet --disable-update-check --disable-notify --disable-medialibrary --disable-vlc --disable-addonmanagermodules 
++    --disable-ssp
++"
++
++# set environment variables
++export PKG_CONFIG_PATH=$EMSDK/upstream/emscripten/system/lib/pkgconfig 
++export PKG_CONFIG_LIBDIR=$BUILD_PATH/wasm32_unknown_emscripten/lib/pkgconfig
++
++# Build vlc contribs
++
++mkdir -p $BUILD_PATH/contrib-emscripten
++cd $BUILD_PATH/contrib-emscripten
++$VLC_SRCPATH/contrib/bootstrap --disable-disc --enable-gpl --disable-sout \
++    --disable-network \
++    --host=wasm32-unknown-emscripten --build=x86_64-linux
++checkfail "vlc contribs: bootstrap failed"
++emmake make ${CONTRIB_LIST} ${MAKEFLAGS}
++checkfail "vlc contribs: make failed"
++
++cd $BUILD_PATH
++
++# Build libvlc
++
++BUILDDIR_NAME="build-emscripten"
++
++mkdir -p $BUILD_PATH/$BUILDDIR_NAME
++cd $BUILD_PATH/$BUILDDIR_NAME
++$VLC_SRCPATH/bootstrap
++checkfail "vlc build: bootstrap failed"
++emconfigure $VLC_SRCPATH/configure ${VLC_CONFIGURE_OPTIONS} \
++		       ac_cv_func_sendmsg=yes ac_cv_func_recvmsg=yes ac_cv_func_if_nameindex=yes ac_cv_header_search_h=no ac_cv_header_time_h=no ac_cv_header_sys_shm_h=no \
++		       --with-contrib=$BUILD_PATH/wasm32-unknown-emscripten
++# Note :
++#        search.h is a blacklisted module
++#        time.h is a blacklisted module
++#        shm.h is a blacklisted module
++checkfail "vlc build: configure failed"
++emmake make ${MAKEFLAGS}
++checkfail "vlc build: make failed"
++
++cd $BUILD_PATH
++
++# Build and compile static modules entry points
++# start by deleting previous versions so that they are not overridden
++rm -fr $BUILDDIR_NAME/vlc-modules.c $BUILDDIR_NAME/vlc-modules.wasm
++
++NM="$EMSDK/upstream/bin/llvm-nm"
++cd $BUILDDIR_NAME/modules/.libs
++
++# create module list
++echo "creating module list"
++touch $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c
++echo -e "// This file is autogenerated" > $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c
++echo -e "#include <unistd.h>\n\n" >> $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c
++
++BUILTINS="const void *vlc_static_modules[] = {\n"
++LDFLAGS=""
++DEFINITIONS=""
++VLCMODULES=""
++i=""
++
++for i in `ls *plugin.a`
++do
++    VLCMODULES="$i $VLCMODULES"
++done
++
++for file in $VLCMODULES
++    do
++        symbols=$($NM -g $file)
++        entryname=$(get_symbol "$symbols" _)
++        DEFINITIONS+="int $entryname (int (*)(void *, void *, int, ...), void *);\n";
++        BUILTINS+=" $entryname,\n"
++        LDFLAGS+="\$BUILD_PATH/$BUILDDIR_NAME/modules/.libs/$file "
++    done;
++
++BUILTINS="$BUILTINS NULL\n};\n"
++echo -e "$DEFINITIONS\n$BUILTINS" >> $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c
++
++# compile vlc-modules.c
++emcc -pthread -c $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c -o $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.wasm
++checkfail "vlc static modules: compilation failed"
++
++cd $BUILD_PATH
++echo "VLC for wasm32-unknown-emscripten build!"
+-- 
+2.28.0
+

@@ -1,10 +1,12 @@
 # Ignore build dirs
 vlc/
 emsdk/
+build/
 # and files
 experimental.data
 experimental.html
 experimental.js
 experimental.wasm
 experimental.worker.js
+experimental.wasm.map
 

@@ -1,0 +1,432 @@
+From 593089603d824726183b1e0bc162449d67089844 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Tue, 27 Oct 2020 14:46:18 +0100
+Subject: [PATCH 10/17] aout: add audio worklet support
+
+---
+ modules/audio_output/Makefile.am    |   8 +-
+ modules/audio_output/emscripten.cpp | 396 ++++++++++++++++++++++++++++
+ 2 files changed, 403 insertions(+), 1 deletion(-)
+ create mode 100644 modules/audio_output/emscripten.cpp
+
+diff --git a/modules/audio_output/Makefile.am b/modules/audio_output/Makefile.am
+index 9398e40770..c716a2207b 100644
+--- a/modules/audio_output/Makefile.am
++++ b/modules/audio_output/Makefile.am
+@@ -122,4 +122,10 @@ libopenal_audio_plugin_la_SOURCES = audio_output/openal.c
+ libopenal_audio_plugin_la_CFLAGS = $(AM_CFLAGS)
+ libopenal_audio_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(aoutdir)'
+ libopenal_audio_plugin_la_LIBADD = -lopenal
+-aout_LTLIBRARIES += libopenal_audio_plugin.la
++
++libemworklet_audio_plugin_la_SOURCES = audio_output/emscripten.cpp
++libemworklet_audio_plugin_la_CFLAGS = $(AM_CXXFLAGS) -std=c++11
++if HAVE_EMSCRIPTEN
++aout_LTLIBRARIES += libopenal_audio_plugin.la \
++		libemworklet_audio_plugin.la
++endif
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+new file mode 100644
+index 0000000000..f7d367cdfa
+--- /dev/null
++++ b/modules/audio_output/emscripten.cpp
+@@ -0,0 +1,396 @@
++/*****************************************************************************
++ * emscripten_worklet.c: output module to allow Emscripten Worklet integration
++ *****************************************************************************
++ *
++ * 
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++/*****************************************************************************
++ * Preamble
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <assert.h>
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_aout.h>
++
++#include <emscripten.h>
++#include <emscripten/val.h>
++#include <emscripten/bind.h>
++#include <emscripten/html5.h>
++
++#include <cstdint>
++#include <stdlib.h>
++
++/*****************************************************************************
++ * Local prototypes.
++ *****************************************************************************/
++static int  Open 		( vlc_object_t * );
++static void Close		( vlc_object_t * );
++static void Stop		( audio_output_t *);
++static void Play        ( audio_output_t *, block_t * , vlc_tick_t);
++static void Flush		( audio_output_t * );
++static void Pause		( audio_output_t *, bool , vlc_tick_t);
++static int Time_Get		( audio_output_t *, vlc_tick_t * );
++static int Start		( audio_output_t *, audio_sample_format_t *restrict );
++static int Volume_Set   ( audio_output_t *, float);
++
++/*****************************************************************************
++ * Module descriptor
++ *****************************************************************************/
++#define STORAGE_SIZE 1024 * 1024
++// Sample rate might change, and it would be good to be able to change it during playback.
++#define AUDIO_WORKLET_SAMPLE_RATE 44100
++// Don't know any way to get the browser's supported number of channels.
++#define AUDIO_WORKLET_NB_CHANNELS 2
++
++static EM_BOOL requestAnimationFrame_cb( double time, void *userData );
++
++vlc_module_begin ()
++    set_description( N_("Emscripten Worklet audio output") )
++    set_shortname( "emworklet" )
++    set_capability( "audio output", 100 )
++    set_category( CAT_AUDIO )
++    set_subcategory( SUBCAT_AUDIO_AOUT )
++    set_callbacks( Open, Close )
++vlc_module_end ()
++
++using namespace emscripten;
++
++class AWNodeWrapper {
++public:
++  val context = val::undefined();
++  val getCtx() const { return context; };
++  void setCtx(val _) { context = _; };
++  
++  uintptr_t sab_ptr;
++  uintptr_t getSabPtr() const { return sab_ptr; };
++  void setSabPtr(uintptr_t _) { sab_ptr = _; };
++  
++  size_t sab_size;
++  size_t getSabSize() const { return sab_size; };
++  void setSabSize(size_t _) { sab_size = _; };
++  
++  int8_t channels;
++  int8_t getChannels() const { return channels; };
++  void setChannels(int8_t _) { channels = _; };
++
++  AWNodeWrapper(int sample_rate) {
++    
++    // Prepare audio context options
++    val audio_ctx_options = val::object();
++    audio_ctx_options.set("sampleRate", sample_rate);
++    
++    context = val::global("AudioContext").new_(audio_ctx_options);
++    context.call<void>("suspend");
++  }
++  
++  val operator()( val undefined_promise_argument ) {
++    (val)undefined_promise_argument;
++    
++    // Prepare AWN Options
++    val awn_options = val::object();
++    val awn_opt_outputChannelCount = val::array();
++    awn_opt_outputChannelCount.call<val>("push", channels);
++    awn_options.set("outputChannelCount", awn_opt_outputChannelCount);
++    awn_options.set("numberOfInputs", 0);
++    awn_options.set("numberOfOutputs", 1);
++    
++    val AudioNode = val::global("AudioWorkletNode").new_(context, std::string("worklet-processor"), awn_options);
++    AudioNode.set("channelCount", channels);
++    
++    //Prepare postMessage message
++    val msg = val::object();
++    msg.set("type", std::string("recv-audio-queue"));
++    msg.set("data", val::module_property("wasmMemory")["buffer"]);
++    msg.set("sab_ptr", sab_ptr);
++    msg.set("sab_size", sab_size);
++    
++    AudioNode["port"].call<val>("postMessage", msg);
++    AudioNode.call<val>("connect", context["destination"]);
++
++    emscripten_request_animation_frame_loop(requestAnimationFrame_cb, this);
++        
++    return val::undefined();
++  }
++};
++
++EMSCRIPTEN_BINDINGS(AWWSCOPE) {
++  class_<AWNodeWrapper>("awn_cb_wrapper")
++    .constructor<int>()
++    .property("context", &AWNodeWrapper::getCtx, &AWNodeWrapper::setCtx)
++    .property("sab_ptr", &AWNodeWrapper::getSabPtr, &AWNodeWrapper::setSabPtr)
++    .property("sab_size", &AWNodeWrapper::getSabSize, &AWNodeWrapper::setSabSize)
++    .property("channels", &AWNodeWrapper::getChannels, &AWNodeWrapper::setChannels)
++    .function("awn_call", &AWNodeWrapper::operator());
++};
++
++
++static EM_BOOL requestAnimationFrame_cb( double time, void *userData ) {
++  (double) time;
++  AWNodeWrapper *inst = reinterpret_cast<AWNodeWrapper *>(userData);
++  uint32_t *sab = reinterpret_cast<uint32_t *>(inst->getSabPtr());
++  val view = val(typed_memory_view(inst->getSabSize(), sab));
++  val context = inst->getCtx();
++  if ( view[0].as<int>() == 1 ) {
++    context.call<val>("resume");
++    sab[0] = 0;
++    return EM_FALSE;
++  }
++  return EM_TRUE;
++}
++
++typedef struct aout_sys_t
++{
++  int8_t *sab;
++  size_t sab_size;
++  AWNodeWrapper *awn_inst;
++
++} aout_sys_t;
++
++unsigned int index_load(int8_t *sab_ptr, int8_t index, size_t sab_size){
++  uint32_t *buffer_view = reinterpret_cast<uint32_t *>(sab_ptr); 
++  val buffer = val(typed_memory_view(sab_size, buffer_view));
++
++  return val::global("Atomics").call<unsigned int>("load", buffer, index);
++}
++
++//rename to clarify Atomics are on JS memory, not WASM
++void index_store(int8_t *sab_ptr, int8_t index, unsigned int value, size_t sab_size) {
++  uint32_t *buffer_view = reinterpret_cast<uint32_t *>(sab_ptr); 
++  val buffer = val(typed_memory_view(sab_size, buffer_view));
++
++  return val::global("Atomics").call<void>("store", buffer, index, value);
++}
++
++/*****************************************************************************
++ * Open: open the audio device
++ *****************************************************************************
++ *****************************************************************************/
++static int Open( vlc_object_t *obj )
++{
++	audio_output_t * aout = (audio_output_t *) obj;
++
++	/* Allocate structures */
++	aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(malloc( sizeof( *sys ) ));
++	if( unlikely(sys == NULL) )
++	  return VLC_ENOMEM;
++	
++	aout->sys = sys;
++	aout->start = Start;
++	aout->stop = Stop;
++	aout->play = Play;
++	aout->pause = Pause;
++	aout->flush = Flush;
++	aout->time_get = Time_Get;
++	aout->volume_set = Volume_Set;
++	aout->mute_set = NULL;
++
++	sys->awn_inst = new AWNodeWrapper(AUDIO_WORKLET_SAMPLE_RATE);
++	sys->sab_size = 3 * sizeof(int32_t) + STORAGE_SIZE;
++	sys->sab = reinterpret_cast<int8_t *>(malloc( sys->sab_size ));
++
++
++	if ( unlikely(sys->sab == NULL) )
++	  return VLC_ENOMEM;
++	bzero(sys->sab, sys->sab_size);
++
++	val webaudio_context = sys->awn_inst->getCtx();
++	
++	// Prepare audioWorkletProcessor blob
++	val document = val::global("document");
++	val script = document.call<val>("createElement", std::string("SCRIPT"));
++	script.set("type", std::string("worklet"));
++	std::string processorStr = "class Processor extends AudioWorkletProcessor { \
++    constructor() { \
++        super(); \
++        this.port.onmessage = e => { \
++            if (e.data.type === 'recv-audio-queue') { \
++                this.buf = e.data.data; \
++                this.capacity = e.data.sab_size / 4; \
++                this.flag = new Uint32Array(this.buf, e.data.sab_ptr, 1); \
++                this.head = new Uint32Array(this.buf, e.data.sab_ptr + 4, 1); \
++                this.tail = new Uint32Array(this.buf, e.data.sab_ptr + 8, 1); \
++                this.storage = new Float32Array(this.buf, e.data.sab_ptr + 12, this.capacity); \
++            } else { \
++                throw 'unexpected.'; \
++            } \
++        }; \
++    } \
++    process(inputs, outputs, parameters) { \
++        const output = outputs[0]; \
++        const nbChannels = output.length; \
++        const nbSamples = output[0].length; \
++        if (this.head.buffer.byteLength == 0) { \
++            throw new Error('wasmMemory grew'); \
++        } \
++        var head = Atomics.load(this.head, 0) / 4; \
++        var tail = Atomics.load(this.tail, 0) / 4; \
++        var i = 0; \
++        while (tail != head && i < nbSamples) \
++        { \
++            for (let c = 0; c < nbChannels; ++c) { \
++                output[c][i] = this.storage[tail]; \
++                tail++; \
++                if (tail == this.capacity) { \
++                    tail = 0; \
++                } \
++            } \
++            i++; \
++        } \
++        Atomics.store(this.tail, 0, tail * 4); \
++        return true; \
++    } \
++} \
++registerProcessor('worklet-processor', Processor);";
++	script.set("innerText", processorStr);
++	val ProcessorTextArray = val::array();
++	ProcessorTextArray.call<val>("push", script["innerText"]);
++	val BlobObject = val::object();
++	BlobObject.set("type", std::string("application/javascript"));
++	val WorkletModuleUrl = val::global("URL").call<val>("createObjectURL", val::global("Blob").new_(ProcessorTextArray, BlobObject));
++	
++	// Prepare audioWorkletProcessor callback
++	val cb_caller = val::module_property("awn_cb_wrapper").new_(AUDIO_WORKLET_SAMPLE_RATE);
++	cb_caller.set("context", val(webaudio_context));
++	cb_caller.set("sab_ptr", val(reinterpret_cast<uintptr_t>(sys->sab)));
++	cb_caller.set("sab_size", val(sys->sab_size));
++	cb_caller.set("channels", val(AUDIO_WORKLET_NB_CHANNELS));
++	val awn_caller = cb_caller["awn_call"];
++	val awn_cb = awn_caller.call<val>("bind", cb_caller);
++	
++	// start audio worklet (since the context is suspended, sound won't start now
++	// Since the WebAudio Context cannot be created in a worker, we create it in the main_thread and use the SAB to signal it
++	// when we want it to start
++	webaudio_context["audioWorklet"].call<val>("addModule", WorkletModuleUrl).call<val>("then", awn_cb);
++	
++	return VLC_SUCCESS;
++}
++
++static int Start( audio_output_t *aout, audio_sample_format_t *restrict fmt )
++{
++    aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++    unsigned nbChannels = aout_FormatNbChannels(fmt);
++    // add assert ENVIRONMENT_IS_WORKER
++    if ( nbChannels == 0 )
++		return VLC_EGENERIC;
++    fmt->i_format = VLC_CODEC_FL32;
++    fmt->i_channels = AUDIO_WORKLET_NB_CHANNELS;
++    fmt->i_rate = AUDIO_WORKLET_SAMPLE_RATE;
++    // resume audio context
++    index_store(sys->sab, 0, 1, sys->sab_size);
++    
++    return VLC_SUCCESS;
++}
++
++static void Stop (audio_output_t *aout)
++{
++    Flush(aout);
++}
++
++/*****************************************************************************
++ * Play: method description here
++ *****************************************************************************/
++
++static int audio_worklet_push(audio_output_t *aout, const int8_t *data, unsigned data_size) {
++    aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++    int8_t *sab_view = sys->sab + 5 * sizeof(int32_t);
++    unsigned head = index_load(sys->sab, 1, sys->sab_size);
++    // TODO: check that we do not write on unconsumed data.
++
++    if (head + data_size > STORAGE_SIZE)
++    {
++        // Copy the part of the data at the buffer end
++        unsigned data_size_copy_end = STORAGE_SIZE - head;
++        memcpy(sab_view + head, data, data_size_copy_end);
++        head = 0;
++
++        // Copy the part of the data at the buffer start
++        unsigned data_size_copy_start = data_size - data_size_copy_end;
++        memcpy(sab_view + head, data, data_size_copy_start);
++        head = data_size_copy_start;
++    }
++    else
++    {
++        memcpy(sab_view + head, data, data_size);
++        head += data_size;
++    }
++
++    index_store(sys->sab, 1, head, sys->sab_size);
++
++    return 0;  // return success to indicate successful push.
++}
++
++static void Play( audio_output_t *aout, block_t *block, vlc_tick_t date)
++{
++    VLC_UNUSED(date);
++    const int8_t* data = (int8_t *)block->p_buffer;
++    size_t data_size = block->i_buffer;
++  
++    int ret = audio_worklet_push(aout, data, data_size);
++    VLC_UNUSED(ret);
++    block_Release(block);
++}
++
++static void Pause( audio_output_t *aout, bool paused, vlc_tick_t date )
++{
++    aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++    if (paused == false) {
++        index_store(sys->sab, 0, 0, sys->sab_size);
++        paused = true;
++    }
++    else {
++        index_store(sys->sab, 0, 1, sys->sab_size);
++        paused = false;
++    }
++    // VLC_UNUSED(paused);
++    VLC_UNUSED(date);
++    Flush(aout);
++}
++
++static void Flush( audio_output_t *aout )
++{
++    aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++	bzero(sys->sab, sys->sab_size);
++}
++
++static int Time_Get( audio_output_t *aout, vlc_tick_t *delay)
++{
++	return aout_TimeGetDefault(aout, delay);
++}
++
++/*****************************************************************************
++ * CloseAudio: close the audio device
++ *****************************************************************************/
++static void Close( vlc_object_t *obj )
++{
++  audio_output_t *aout = (audio_output_t *)obj;
++  struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
++
++  free(sys);
++}
++
++static int Volume_Set( audio_output_t *aout, float volume)
++{
++  VLC_UNUSED(aout);
++  VLC_UNUSED(volume);
++  return 0;
++}
+-- 
+2.28.0
+

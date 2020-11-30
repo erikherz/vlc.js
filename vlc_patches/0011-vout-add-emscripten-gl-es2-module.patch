@@ -1,24 +1,43 @@
-From 94cae7fd97cbdfe003d73aab433a031032556a50 Mon Sep 17 00:00:00 2001
+From d903035f889062ba673acd47d48c00df4e7ce760 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdisabwat@gmail.com>
 Date: Thu, 12 Sep 2019 15:03:28 +0200
-Subject: [PATCH 14/15] vout: add emscripten gl es2 and window modules
+Subject: [PATCH 11/17] vout: add emscripten gl es2 module
 
 The module contains a window module that sets
 the window type and a gl es2 submodule implementing
 webgl function calls.
-
-Co-authored-by: Etienne Brateau <etienne@videolabs.io>
 ---
+ include/vlc_vout_window.h         |   2 +
  modules/video_output/Makefile.am  |   9 ++
- modules/video_output/emscripten.c | 177 ++++++++++++++++++++++++++++++
- 2 files changed, 186 insertions(+)
+ modules/video_output/emscripten.c | 180 ++++++++++++++++++++++++++++++
+ 3 files changed, 191 insertions(+)
  create mode 100644 modules/video_output/emscripten.c
 
+diff --git a/include/vlc_vout_window.h b/include/vlc_vout_window.h
+index ea16d4b414..5208676d00 100644
+--- a/include/vlc_vout_window.h
++++ b/include/vlc_vout_window.h
+@@ -64,6 +64,7 @@ enum vout_window_type {
+     VOUT_WINDOW_TYPE_ANDROID_NATIVE /**< Android native window */,
+     VOUT_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
+     VOUT_WINDOW_TYPE_DCOMP /**< Win32 DirectComposition */,
++    VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL /**< Emscripten surface */,
+ };
+ 
+ /**
+@@ -362,6 +363,7 @@ typedef struct vout_window_t {
+         void     *anativewindow; /**< Android native window */
+         struct wl_surface *wl;   /**< Wayland surface (client pointer) */
+         void     *dcomp_visual;  /**<  Win32 direct composition visual */
++        uint32_t em_context;     /* Emscripten webgl context */
+     } handle;
+ 
+     /** Display server (mandatory)
 diff --git a/modules/video_output/Makefile.am b/modules/video_output/Makefile.am
-index a5b59f911a..f737781633 100644
+index 8f56e4f734..62a7e98cf2 100644
 --- a/modules/video_output/Makefile.am
 +++ b/modules/video_output/Makefile.am
-@@ -469,6 +469,15 @@ libcaca_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
+@@ -277,6 +277,15 @@ libcaca_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
  EXTRA_LTLIBRARIES += libcaca_plugin.la
  vout_LTLIBRARIES += $(LTLIBcaca)
  
@@ -36,19 +55,17 @@ index a5b59f911a..f737781633 100644
  libflaschen_plugin_la_SOURCES = video_output/flaschen.c
 diff --git a/modules/video_output/emscripten.c b/modules/video_output/emscripten.c
 new file mode 100644
-index 0000000000..1e582980e0
+index 0000000000..c87a2756b1
 --- /dev/null
 +++ b/modules/video_output/emscripten.c
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,180 @@
 +/**
 + * @file emscripten.c
 + * @brief Emscripten webgl video output for VLC media player
 + */
 +/*****************************************************************************
-+ * Copyright © 2019 VLC authors and VideoLAN
++ * Copyright © 2020 VLC authors and VideoLAN
 + *
-+ * Authors:   Etienne Brateau <etienne@videolabs.io>
-+ *            Mehdi Sabwat <mehdisabwat@gmail.com>
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms of the GNU Lesser General Public License as published by
@@ -81,6 +98,9 @@ index 0000000000..1e582980e0
 +
 +#include <emscripten.h>
 +#include <emscripten/html5.h>
++#include <webgl/webgl2.h>
++
++extern emscripten_GetProcAddress(char *name);
 +
 +static const struct vout_window_operations ops = {
 +       //TODO: Implement canvas operations
@@ -107,8 +127,8 @@ index 0000000000..1e582980e0
 +{
 +  // Not needed for OpenGL ES2
 +  VLC_UNUSED(gl);
-+  VLC_UNUSED(name);
-+  return NULL;
++  // VLC_UNUSED(name);
++  return (void *)emscripten_GetProcAddress(name);
 +}
 +static int MakeCurrent(vlc_gl_t *gl)
 +{
@@ -151,6 +171,8 @@ index 0000000000..1e582980e0
 +  EmscriptenWebGLContextAttributes attr;
 +
 +  emscripten_webgl_init_context_attributes(&attr);
++  attr.majorVersion=2;
++  attr.minorVersion=0;
 +  attr.explicitSwapControl = 1;
 +    
 +  vout_window_t *wnd = gl->surface;
@@ -183,11 +205,11 @@ index 0000000000..1e582980e0
 +  wnd->handle.em_context = sys->context;
 +
 +  // Implement egl routines: 
-+  gl->makeCurrent = MakeCurrent;
-+  gl->releaseCurrent = ReleaseCurrent;
++  gl->make_current = MakeCurrent;
++  gl->release_current = ReleaseCurrent;
 +  gl->resize = Resize;
 +  gl->swap = Swap;
-+  gl->getProcAddress = GetProcAddress;
++  gl->get_proc_address = GetProcAddress;
 +  gl->destroy = Close;
 +
 +  return VLC_SUCCESS;
@@ -218,5 +240,5 @@ index 0000000000..1e582980e0
 +vlc_module_end()
 +
 -- 
-2.23.0
+2.28.0
 

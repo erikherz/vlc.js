@@ -1,7 +1,7 @@
-From 4a82c06361880c86123934b6dfb54263e0154051 Mon Sep 17 00:00:00 2001
-From: Mehdi Sabwat <mehdisabwat@gmail.com>
+From 85641dc8dd9548038a064b1d4d7a1eb7b4d357d5 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Wed, 4 Sep 2019 19:35:17 +0200
-Subject: [PATCH 01/15] contrib: add ffmpeg configuration options for
+Subject: [PATCH 06/17] contrib: add ffmpeg configuration options for
  wasm-emscripten
 
 We need to specify the pthread flag for compilation and linking, otherwise tests will fail.
@@ -51,11 +51,11 @@ index 0000000000..cb8471c90e
 +2.23.0
 +
 diff --git a/contrib/src/ffmpeg/rules.mak b/contrib/src/ffmpeg/rules.mak
-index 1ba04616e5..e2ec5f3cd3 100644
+index 4ad0c56c50..7601b4eb27 100644
 --- a/contrib/src/ffmpeg/rules.mak
 +++ b/contrib/src/ffmpeg/rules.mak
-@@ -221,6 +221,11 @@ ifdef HAVE_NACL
- FFMPEGCONF+=--disable-inline-asm --disable-asm --target-os=linux
+@@ -209,6 +209,11 @@ endif
+ FFMPEGCONF += --target-os=sunos --enable-pic
  endif
  
 +ifdef HAVE_EMSCRIPTEN
@@ -66,7 +66,7 @@ index 1ba04616e5..e2ec5f3cd3 100644
  # Build
  PKGS += ffmpeg
  ifeq ($(call need_pkg,"libavcodec >= $(FFMPEG_LAVC_MIN) libavformat >= 53.21.0 libswscale"),)
-@@ -248,6 +253,7 @@ endif
+@@ -237,6 +242,7 @@ endif
  ifdef USE_LIBAV
  	$(APPLY) $(SRC)/ffmpeg/libav_gsm.patch
  endif
@@ -75,5 +75,5 @@ index 1ba04616e5..e2ec5f3cd3 100644
  
  .ffmpeg: ffmpeg
 -- 
-2.23.0
+2.28.0
 

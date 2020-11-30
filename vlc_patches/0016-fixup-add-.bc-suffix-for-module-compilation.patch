@@ -1,0 +1,26 @@
+From 3c1a969a303babbbcf43027ec70be3d7676f8191 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 30 Nov 2020 16:32:01 +0100
+Subject: [PATCH 16/17] fixup: add .bc suffix for module compilation
+
+WASM_STANDALONE does not support -pthread
+---
+ extras/package/wasm-emscripten/build.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/extras/package/wasm-emscripten/build.sh b/extras/package/wasm-emscripten/build.sh
+index 3a010bca65..f0de4abab4 100644
+--- a/extras/package/wasm-emscripten/build.sh
++++ b/extras/package/wasm-emscripten/build.sh
+@@ -222,7 +222,7 @@ BUILTINS="$BUILTINS NULL\n};\n"
+ echo -e "$DEFINITIONS\n$BUILTINS" >> $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c
+ 
+ # compile vlc-modules.c
+-emcc -pthread -c $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c -o $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.wasm
++emcc -pthread -c $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.c -o $BUILD_PATH/$BUILDDIR_NAME/vlc-modules.bc
+ checkfail "vlc static modules: compilation failed"
+ 
+ cd $BUILD_PATH
+-- 
+2.28.0
+

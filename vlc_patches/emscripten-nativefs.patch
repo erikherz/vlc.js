@@ -1,0 +1,89 @@
+From 854d7bd12555ffd31696f957955099c40cb8ac2b Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Mon, 21 Sep 2020 19:26:11 +0200
+Subject: [PATCH 1/1] wip: add fs support
+
+---
+ src/library_pthread.js |  3 +++
+ src/settings.js        | 25 +++++++++++++++++++++++++
+ src/worker.js          | 18 ++++++++++++++++--
+ 3 files changed, 44 insertions(+), 2 deletions(-)
+
+diff --git a/src/library_pthread.js b/src/library_pthread.js
+index a7621c1f6..e677ef292 100644
+--- a/src/library_pthread.js
++++ b/src/library_pthread.js
+@@ -408,6 +408,9 @@ var LibraryPThread = {
+ #endif
+ #if USE_OFFSET_CONVERTER
+         'wasmOffsetConverter': wasmOffsetConverter,
++#endif
++#if VLCJS_PATCH_FILESYSTEM
++	'fileHandle': Module["fileHandle"],
+ #endif
+       });
+     },
+diff --git a/src/settings.js b/src/settings.js
+index ae3bf3e56..ada16059a 100644
+--- a/src/settings.js
++++ b/src/settings.js
+@@ -1696,3 +1696,28 @@ var LEGACY_SETTINGS = [
+   ['EXPORT_FUNCTION_TABLES', [0], 'No longer needed'],
+   ['BINARYEN_SCRIPTS', [""], 'No longer needed'],
+ ];
++
++// VLCJS_PATCH_... settings
++// added in src/library_pthread.js and src/worker.js
++// goal is to have the fileHandle updated in the pthread workers, when have
++// this startup code:
++//    <button type="button" id="btn">NativeFSOpen</button>
++//    <input type="file" id="fileManager" multiple/>
++//    ...
++//    <script>
++//    if (window.chooseFileSystemEntries === undefined) {
++//        document.getElementById("btn").style.display = "none";
++//    }
++//    else {
++//        document.getElementById("fileManager").style.display = "none";
++//    }
++//    document.getElementById("fileManager").addEventListener('change', function(event) {
++//        Module["fileHandle"] = event.target.files[0];
++//        console.log("file api : sent file handle all pthread workers");
++//    }, false);                                                                                                                                                                                                                                                                                                              //    document.getElementById("btn").addEventListener('click', async (e) => {
++//        Module["fileHandle"] = await window.chooseFileSystemEntries();
++//        console.log("native fs: sent file handle all pthread workers");
++//    });
++//    </script>
++
++var VLCJS_PATCH_FILESYSTEM = 0;
+diff --git a/src/worker.js b/src/worker.js
+index 77507729e..ac7d39286 100644
+--- a/src/worker.js
++++ b/src/worker.js
+@@ -83,8 +83,22 @@ this.onmessage = function(e) {
+       Module['wasmModule'] = e.data.wasmModule;
+ #endif // MINIMAL_RUNTIME
+
+-      {{{ makeAsmImportsAccessInPthread('wasmMemory') }}} = e.data.wasmMemory;
+-
++	{{{ makeAsmImportsAccessInPthread('wasmMemory') }}} = e.data.wasmMemory;
++#if VLCJS_PATCH_FILESYSTEM
++	if (e.data.fileHandle) {
++	    if (typeof FileSystemFileHandle != "undefined") {
++		if (e.data.fileHandle instanceof FileSystemFileHandle) {
++		    e.data.fileHandle.getFile().then((fileHandle) => {
++			Module["fileHandle"] = fileHandle;
++		    });
++		}
++	    }
++	    if (e.data.fileHandle instanceof File) {
++		Module["fileHandle"] = e.data.fileHandle;
++	    }
++	    console.log("EMSCRIPTEN DEBUG: fileHandle received in pthread workers");
++	}
++#endif
+ #if LOAD_SOURCE_MAP
+       wasmSourceMapData = e.data.wasmSourceMap;
+ #endif
+--
+2.28.0

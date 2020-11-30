@@ -1,7 +1,4 @@
-#! /bin/sh
-set -e
-
-## FUNCTIONS
+#!/bin/bash
 
 diagnostic()
 {
@@ -15,175 +12,121 @@ checkfail()
         exit 1
     fi
 }
-WORK_DIR=$PWD
 
-# Download the portable SDK and uncompress it
+apply_patch() {
+    diagnostic "Applying $1..."
+    git am -3 $1 || git am --skip
+}
+
+
+VLCJS_DIR=$(pwd)
+PROJECT_DIR=$VLCJS_DIR/build
+TESTED_HASH="4deb73b6f62ce8fe8dea84ab0b0a138b79af4550"
+OFFSCREEN="OFFSCREEN_FRAMEBUFFER=1"
+
+# download emscripten sdk
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
     git clone http://github.com/emscripten-core/emsdk.git emsdk
-    cd emsdk && ./emsdk update-tags && ./emsdk install tot-upstream && ./emsdk activate tot-upstream
+    cd $VLCJS_DIR/emsdk && ./emsdk update-tags && ./emsdk install latest && ./emsdk activate latest
     checkfail "emsdk: fetch failed"
+    diagnotsic "applying emsripten-fs patch"
+    cd upstream/emscripten && \
+	patch -p1 < $VLCJS_DIR/vlc_patches/emscripten-nativefs.patch
+    checkfail "could not apply emscripten-fs patch"
+    cd $VLCJS_DIR
+    diagnostic "successfully downloaded and patched toolchain"
 fi
 
-cd $WORK_DIR
-TESTED_HASH="7bad2a86"
-# Go go go vlc
+. emsdk/emsdk_env.sh
+
+# download vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
-    git clone http://git.videolan.org/git/vlc.git vlc || checkfail "VLC source: git clone failed"
-    cd vlc
-    diagnostic "VLC source: resetting to the TESTED_HASH commit (${TESTED_HASH})"
-    git reset --hard ${TESTED_HASH} || checkfail "VLC source: TESTED_HASH ${TESTED_HASH} not found"
-    cd ..
+    git clone http://git.videolan.org/git/vlc.git vlc 
     checkfail "vlc source: git clone failed"
-fi
-
-cd vlc
-
-# Make in //
-if [ -z "$MAKEFLAGS" ]; then
-    UNAMES=$(uname -s)
-    MAKEFLAGS=
-    if which nproc >/dev/null; then
-        MAKEFLAGS=-j`nproc`
-    elif [ "$UNAMES" == "Darwin" ] && which sysctl >/dev/null; then
-        MAKEFLAGS=-j`sysctl -n machdep.cpu.thread_count`
-    fi
-fi
-
-# VLC tools
-export PATH=`pwd`/extras/tools/build/bin:$PATH
-echo "Building tools"
-cd extras/tools
-./bootstrap
-checkfail "buildsystem tools: bootstrap failed"
-make $MAKEFLAGS
-checkfail "buildsystem tools: make"
-
-cd $WORK_DIR
-
-diagnostic "Setting the environment"
-source emsdk/emsdk_env.sh
-export PKG_CONFIG_PATH=$EMSDK/emscripten/incoming/system/lib/pkgconfig
-export PKG_CONFIG_LIBDIR=$PWD/vlc/contrib/wasm32_unknowm_emscripten/lib/pkgconfig
-export PKG_CONFIG_PATH_CUSTOM=$PKG_CONFIG_LIBDIR
-
-# Check that clang is working
-clang --version
-
-diagnostic "Patching"
-
-cd vlc
-
-# patching vlc
-if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
-    # core patches
-    git am -3 ../vlc_patches/0001-contrib-add-emscripten-target.patch
-    git am -3 ../vlc_patches/0002-contrib-add-ffmpeg-configuration-options-for-wasm-em.patch
-    git am -3 ../vlc_patches/0003-contrib-delete-empty-variable.patch
-    git am -3 ../vlc_patches/0006-configure-Create-a-target-for-emscripten-in-the-conf.patch
-    git am -3 ../vlc_patches/0007-core-initial-core-build-for-emscripten-based-on-POSI.patch
-    git am -3 ../vlc_patches/0008-compat-add-sigwait-support-for-emscripten.patch
-    git am -3 ../vlc_patches/0009-compat-add-clock_nanosleep-support.patch
-    git am -3 ../vlc_patches/0010-emscripten-add-vlc_getProxyUrl-stub.patch
-    git am -3 ../vlc_patches/0011-configure-disable-deprecated-GL-functions-for-emscri.patch
-    git am -3 ../vlc_patches/0012-logger-add-emscripten-module.patch
-    git am -3 ../vlc_patches/0013-window-add-emscripten-type.patch
-    git am -3 ../vlc_patches/0014-vout-add-emscripten-gl-es2-and-window-modules.patch
-    git am -3 ../vlc_patches/0015-vlc_common-add-weak-attribute-support-for-wasm.patch
-    git am -3 ../vlc_patches/0016-Add-meson_system_name-for-emscripten.patch
+    cd $VLCJS_DIR/vlc
     
-    # Add OPENAL support
-    git am -3 ../vlc_patches/openal/*
+    diagnostic "applying vlc patches"
+    git reset --hard ${TESTED_HASH}
+    checkfail "vlc.js: could not reset to ${TESTED_HASH}"
+    
+    apply_patch $VLCJS_DIR/vlc_patches/0001-nacl-remove-deprecated-platform.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0002-wasm-emscripten-Create-a-target-for-emscripten-in-th.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0003-compat-add-clock_nanosleep-sigwait-support-for-emscr.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0004-core-initial-core-build-for-emscripten-based-on-POSI.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0005-contrib-add-emscripten-support-for-openjpeg.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0006-contrib-add-ffmpeg-configuration-options-for-wasm-em.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0007-demux-disable-ytdl-module.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0008-logger-add-emscripten-module.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0009-aout-add-an-openal-audio-module.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0010-aout-add-audio-worklet-support.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0011-vout-add-emscripten-gl-es2-module.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0015-extras-add-wasm-emscripten-build-script.patch
+
+    #wip:
+    apply_patch $VLCJS_DIR/vlc_patches/0016-fixup-add-.bc-suffix-for-module-compilation.patch
+    apply_patch $VLCJS_DIR/vlc_patches/0017-fixup-temporarily-disable-dav1d.patch
+    checkfail "vlc.js: there was an issue while applying patches"
+    cd $VLCJS_DIR
 fi
 
-# BOOTSTRAP
+# TODO: patches for emscriptenfs + offscreen_canvas
+#apply_patch 0012-vout-add-offscreen-canvas-initial-support.patch
+#apply_patch 0015-access-initial-emscripten-file-api-support.patch
 
-if [ ! -f configure ]; then
-    echo "Bootstraping"
-    ./bootstrap
-    checkfail "vlc: bootstrap failed"
-fi
-
-############
-# Contribs #
-############
-
-echo "Building the contribs"
-mkdir -p contrib/contrib-emscripten
-cd contrib/contrib-emscripten
-
-    ../bootstrap --disable-disc --disable-gpl --disable-sout \
-    --disable-network \
-    --host=wasm32-unknown-emscripten --build=x86_64-linux
-checkfail "contribs: bootstrap failed"
-
-emmake make list
-emmake make $MAKEFLAGS fetch
-checkfail "contribs: make fetch failed"
-emmake make $MAKEFLAGS .ffmpeg
-
-checkfail "contribs: make failed"
-
-cd ../../
-
-# Build
-mkdir -p build-emscripten && cd build-emscripten
-
-OPTIONS="
-    --host=wasm32-unknown-emscripten
-    --enable-debug
-    --enable-gles2
-    --disable-lua
-    --disable-ssp
-    --disable-nls
-    --disable-sout
-    --disable-vlm
-    --disable-addonmanagermodules
-    --enable-avcodec
-    --enable-merge-ffmpeg
-    --disable-swscale
-    --disable-a52
-    --disable-x264
-    --disable-xcb
-    --disable-alsa
-    --disable-macosx
-    --disable-sparkle
-    --disable-qt
-    --disable-screen
-    --disable-xcb
-    --disable-pulse
-    --disable-alsa
-    --disable-oss
-    --disable-vlc"
-#     --disable-xvideo Unknown option
-# Note :
-#        search.h is a blacklisted module
-#        time.h is a blacklisted module
-#        shm.h is a blacklisted module
-#        ssp is not supported on the wasm backend
-
-emconfigure ../configure ${OPTIONS}  \
-	    ac_cv_func_sendmsg=yes ac_cv_func_recvmsg=yes ac_cv_func_if_nameindex=yes ac_cv_header_search_h=no ac_cv_header_time_h=no ac_cv_header_sys_shm_h=no
-
-emmake make ${MAKEFLAGS}
-
-diagnostic "Generating module list"
-cd ../..
-./generate_modules_list.sh
-cd vlc/build-emscripten
-emcc vlc-modules.c -o vlc-modules.bc -pthread
-cd ../..
+#build libvlc
+# TODO: add this in the script if the triplet is not supported
+# cp ../config.sub vlc/autotools/config.sub
+. $VLCJS_DIR/vlc/extras/package/wasm-emscripten/build.sh
+cp -r $VLCJS_DIR/vlc/include $VLCJS_DIR/build/.
+cd $VLCJS_DIR
 
 url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+#download media
+if [ ! -f BigBuckBunny.mp4 ]; then
+    diagnostic "Downloading mediafile..."
+    curl ${url} -o BigBuckBunny.mp4
+    cp BigBuckBunny.mp4 $VLCJS_DIR/build/build-emscripten/.
+    checkfail "failed to download mediafile!"
+    diagnostic "Success: mediafile downloaded"
+fi
 
-# copy Dolby_Canyon.vob
-diagnostic "getting video"
-cd vlc/build-emscripten/
-curl ${url} -o BigBuckBunny.mp4
+# ci build procedure + cp vlc/include
+diagnostic "vlc.js: build vlc.js"
+cd $VLCJS_DIR/build/build-emscripten
+# for release: add -Os
+# for source maps to work, the preloaded file shouldn't be too heavy
+# if not serving locally localhost:6931 should be changed
 
-cd $WORK_DIR
+# if you can if you want to use the sanitizer add:
+# -fsanitize=address -s ALLOW_MEMORY_GROWTH=1
+emcc -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB  \
+     -s MAX_WEBGL_VERSION=2 -s MIN_WEBGL_VERSION=2 \
+     -s ${OFFSCREEN} --profiling-funcs \
+     -s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 \
+     -g4 --source-map-base http://localhost:6931/ \
+     -I $PROJECT_DIR/include/ -I $PROJECT_DIR/wasm32-unknown-emscripten/include/ $VLCJS_DIR/main.c \
+     $PROJECT_DIR/build-emscripten/lib/.libs/libvlc.a \
+     $PROJECT_DIR/build-emscripten/vlc-modules.bc $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
+     $PROJECT_DIR/wasm32-unknown-emscripten/lib/*.a \
+     $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
+     $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
+     -o $VLCJS_DIR/experimental.js --bind --emrun --preload-file $VLCJS_DIR/build/build-emscripten/BigBuckBunny.mp4
 
-diagnostic "Generating executable"
-cp main.c vlc/build-emscripten/
-./create_main.sh
+checkfail "could not compile vlc.js"
+cd $VLCJS_DIR
+diagnostic "successfully compiled vlc.js"
+
+diagnostic "creating archives"
+
+tar -cvjSf $VLCJS_DIR/vlc-contrib-alpha.tar.bz2 $VLCJS_DIR/build/wasm32-unknown-emscripten
+checkfail "error: could not create contrib archive"
+
+zip -r build.zip assets/* experimental.* vlc.html
+checkfail "error: could not create build archive"
+
+diagnostic "successfully created archives"
+
+emrun --no_browser vlc.html
+diagnostic "vlc.js: serving demo"

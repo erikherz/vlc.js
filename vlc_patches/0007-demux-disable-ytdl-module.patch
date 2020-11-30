@@ -1,0 +1,32 @@
+From 6b4d5c24282a1bbc8d673cc32064a49757976f26 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Tue, 17 Nov 2020 02:24:16 +0100
+Subject: [PATCH 07/17] demux: disable ytdl module
+
+json_parse is already defined in misc/, the way wasm-emscripten build
+works does not support partial linking.
+
+https://trac.videolan.org/vlc/ticket/25156
+---
+ modules/demux/Makefile.am | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/modules/demux/Makefile.am b/modules/demux/Makefile.am
+index 0d6e23ce66..dca78db6be 100644
+--- a/modules/demux/Makefile.am
++++ b/modules/demux/Makefile.am
+@@ -506,9 +506,11 @@ libytdl_plugin_la_SOURCES = demux/ytdl.c
+ libytdl_plugin_la_LIBADD = libvlc_json.la
+ if !HAVE_WIN32
+ if !HAVE_ANDROID
++if !HAVE_EMSCRIPTEN
+ demux_LTLIBRARIES += libytdl_plugin.la
+ endif
+ endif
++endif
+ 
+ libnoseek_plugin_la_SOURCES = demux/filter/noseek.c
+ demux_LTLIBRARIES += libnoseek_plugin.la
+-- 
+2.28.0
+

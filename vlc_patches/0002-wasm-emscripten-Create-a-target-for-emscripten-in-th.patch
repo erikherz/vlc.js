@@ -1,0 +1,115 @@
+From 94c2cefaf5820abf733baf6acae08e4dfbc29e6e Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Thu, 6 Jul 2017 14:50:28 +0200
+Subject: [PATCH 02/17] wasm-emscripten: Create a target for emscripten in the
+ configure.ac
+
+Co-Author: Etienne Brateau <etienne.brateau@gmail.com>
+
+- add emscripten target
+- set toolchain variables in bootstrap and main.mak
+- add meson_system_name for emscripten
+- add CMAKE_SYSTEM_NAME
+---
+ configure.ac         | 15 +++++++++++++++
+ contrib/bootstrap    |  3 +++
+ contrib/src/main.mak | 16 ++++++++++++++++
+ 3 files changed, 34 insertions(+)
+
+diff --git a/configure.ac b/configure.ac
+index e7e4fcb4cd..b29755cb26 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -370,6 +370,19 @@ case "${host_os}" in
+     X86ASMFLAGS="-f aout"
+     X86ASMDEFS="-DARCH_X86_32=1 -DARCH_X86_64=0 -DPREFIX"
+     ;;
++  *emscripten*)
++    SYS=emscripten
++    CC=emcc
++    LD=emcc
++    LDSHARED=emcc
++    NM=llvm-nm
++    CPP=emcc
++    CXX=em++
++    AR=emar
++    RANLIB=emranlib
++    CFLAGS="${CFLAGS} -D__NEED_ssize_t -pthread"
++    CXXFLAGS="${CXXFLAGS} -pthread"
++  ;;
+   *)
+     SYS="${host_os}"
+     ;;
+@@ -442,6 +455,8 @@ AS_IF([test x$with_pic = xyes], [X86ASMDEFS="${X86ASMDEFS} -DPIC"])
+ AC_SUBST([X86ASMFLAGS])
+ AC_SUBST([X86ASMDEFS])
+ 
++AM_CONDITIONAL([HAVE_EMSCRIPTEN], [test "${SYS}" = "emscripten"])
++
+ dnl
+ dnl Sadly autoconf does not think about testing foo.exe when ask to test
+ dnl for program foo on win32
+diff --git a/contrib/bootstrap b/contrib/bootstrap
+index 194f861fd0..9abeab01dc 100755
+--- a/contrib/bootstrap
++++ b/contrib/bootstrap
+@@ -345,6 +345,9 @@ case "${OS}" in
+ 	*solaris*)
+ 		add_make_enabled "HAVE_SOLARIS"
+ 		;;
++	*emscripten*)
++	        add_make_enabled "HAVE_EMSCRIPTEN"
++		;;
+ esac
+ 
+ #
+diff --git a/contrib/src/main.mak b/contrib/src/main.mak
+index fb71479d68..5bc59243f2 100644
+--- a/contrib/src/main.mak
++++ b/contrib/src/main.mak
+@@ -129,6 +129,15 @@ EXTRA_CFLAGS += -fno-stack-check
+ XCODE_FLAGS += OTHER_CFLAGS=-fno-stack-check
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++CC := emcc
++CXX := em++
++LD := emcc
++AR := emar
++RANLIB := emranlib
++CFLAGS="-pthread"
++endif
++
+ ifdef HAVE_MACOSX
+ EXTRA_CXXFLAGS += -stdlib=libc++
+ ifeq ($(ARCH),aarch64)
+@@ -564,6 +573,9 @@ endif
+ ifdef HAVE_DARWIN_OS
+ CMAKE_SYSTEM_NAME = Darwin
+ endif
++ifdef HAVE_EMSCRIPTEN
++CMAKE_SYSTEM_NAME = Emscripten
++endif
+ 
+ ifdef HAVE_ANDROID
+ CFLAGS += -DANDROID_NATIVE_API_LEVEL=$(ANDROID_API)
+@@ -632,12 +644,16 @@ else
+ ifdef HAVE_LINUX
+ 	# android has also system = linux and defines HAVE_LINUX
+ 	MESON_SYSTEM_NAME = linux
++else
++ifdef HAVE_EMSCRIPTEN
++        MESON_SYSTEM_NAME = emscripten
+ else
+ 	$(error "No meson system name known for this target")
+ endif
+ endif
+ endif
+ endif
++endif
+ 
+ crossfile.meson: $(SRC)/gen-meson-crossfile.py
+ 	$(HOSTVARS_MESON) \
+-- 
+2.28.0
+

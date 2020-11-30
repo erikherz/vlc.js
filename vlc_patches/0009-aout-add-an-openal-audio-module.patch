@@ -1,27 +1,22 @@
-From b1cefb4947b07ce2e4064c03d6cc20c3e6013af5 Mon Sep 17 00:00:00 2001
+From fbe2b0461ba52ba3951ad6d3108bfc01ab4a13e6 Mon Sep 17 00:00:00 2001
 From: Etienne Brateau <etienne.brateau@gmail.com>
 Date: Tue, 29 Aug 2017 13:30:51 +0200
-Subject: [PATCH 1/6] Add an openal audio module.
+Subject: [PATCH 09/17] aout: add an openal audio module.
 
 ---
- modules/audio_output/Makefile.am |  11 ++
- modules/audio_output/openal.c    | 305 +++++++++++++++++++++++++++++++
- 2 files changed, 316 insertions(+)
+ modules/audio_output/Makefile.am |   6 +
+ modules/audio_output/openal.c    | 313 +++++++++++++++++++++++++++++++
+ 2 files changed, 319 insertions(+)
  create mode 100644 modules/audio_output/openal.c
 
 diff --git a/modules/audio_output/Makefile.am b/modules/audio_output/Makefile.am
-index 4af4d78c5f..120673ca6a 100644
+index b64659e6c9..9398e40770 100644
 --- a/modules/audio_output/Makefile.am
 +++ b/modules/audio_output/Makefile.am
-@@ -117,3 +117,14 @@ endif
+@@ -117,3 +117,9 @@ endif
  if HAVE_TVOS
  aout_LTLIBRARIES += libaudiounit_ios_plugin.la
  endif
-+
-+libtizen_audio_plugin_la_SOURCES = audio_output/tizen_audio.c
-+libtizen_audio_plugin_la_CFLAGS = $(AM_CFLAGS)
-+EXTRA_LTLIBRARIES += libtizen_audio_plugin.la
-+aout_LTLIBRARIES += $(LTLIBtizen_audio)
 +
 +libopenal_audio_plugin_la_SOURCES = audio_output/openal.c
 +libopenal_audio_plugin_la_CFLAGS = $(AM_CFLAGS)
@@ -30,10 +25,10 @@ index 4af4d78c5f..120673ca6a 100644
 +aout_LTLIBRARIES += libopenal_audio_plugin.la
 diff --git a/modules/audio_output/openal.c b/modules/audio_output/openal.c
 new file mode 100644
-index 0000000000..1c0b97a358
+index 0000000000..48fdadb9dd
 --- /dev/null
 +++ b/modules/audio_output/openal.c
-@@ -0,0 +1,305 @@
+@@ -0,0 +1,313 @@
 +/*****************************************************************************
 + * openal.c: output module to allow OpenAL integration
 + *****************************************************************************
@@ -88,12 +83,13 @@ index 0000000000..1c0b97a358
 +static int  Open 		( vlc_object_t * );
 +static void Close		( vlc_object_t * );
 +static void Stop		( audio_output_t *);
-+static void Play      	( audio_output_t *, block_t * );
++static void Play      	        ( audio_output_t *, block_t * , vlc_tick_t);
 +static void Flush		( audio_output_t *, bool );
-+static void Pause		( audio_output_t *, bool , mtime_t );
-+static int Time_Get		( audio_output_t *, mtime_t * );
++static void Pause		( audio_output_t *, bool , vlc_tick_t);
++static int Time_Get		( audio_output_t *, vlc_tick_t * );
 +static int Start		( audio_output_t *, audio_sample_format_t *restrict );
 +static int DeviceSelect	( audio_output_t *, const char *);
++static int Volume_Set           ( audio_output_t *, float);
 +//static int FindDevicesCallback( vlc_object_t *p_this, char const *psz_name,
 +//                                vlc_value_t newval, vlc_value_t oldval, void *p_unused );
 +//static void GetDevices( vlc_object_t *, module_config_t * );
@@ -120,7 +116,7 @@ index 0000000000..1c0b97a358
 + * This structure is part of the audio output thread descriptor.
 + * It describes the direct sound specific properties of an audio device.
 + *****************************************************************************/
-+struct aout_sys_t
++typedef struct aout_sys_t
 +{
 +	ALCdevice *dev;
 +	ALCcontext *ctx;
@@ -130,7 +126,7 @@ index 0000000000..1c0b97a358
 +	ALuint source;
 +	ALuint is_playing;
 +	ALuint next_buffer;
-+};
++} aout_sys_t;
 +
 +/*****************************************************************************
 + * Module descriptor
@@ -178,9 +174,8 @@ index 0000000000..1c0b97a358
 +	aout->play = Play;
 +	aout->pause = Pause;
 +	aout->flush = Flush;
-+	//aout->time_get = Time_Get;
-+	aout->pause = Pause;
-+	aout->volume_set = NULL;
++	aout->time_get = Time_Get;
++	aout->volume_set = Volume_Set;
 +	aout->mute_set = NULL;
 +//	aout->device_select = DeviceSelect;
 +
@@ -227,7 +222,8 @@ index 0000000000..1c0b97a358
 +	alSource3f(sys->source, AL_VELOCITY, 0, 0, 0);
 +
 +	alcGetIntegerv(sys->dev, ALC_FREQUENCY, 1, &sys->freq);
-+	msg_Dbg(aout, "Openal Dev freq: %d", sys->freq);
++	
++	//msg_Dbg(aout, "Openal Dev freq: %d", sys->freq);
 +
 +	sys->start_date = 0;
 +	sys->next_buffer = 0;
@@ -250,8 +246,9 @@ index 0000000000..1c0b97a358
 +/*****************************************************************************
 + * Play: method description here
 + *****************************************************************************/
-+static void Play( audio_output_t *aout, block_t *block )
++static void Play( audio_output_t *aout, block_t *block , vlc_tick_t date)
 +{
++  VLC_UNUSED(date);
 +	aout_sys_t *sys = aout->sys;
 +	const void* data = block->p_buffer;
 +	size_t datalen = block->i_buffer;
@@ -291,7 +288,7 @@ index 0000000000..1c0b97a358
 +	block_Release(block);
 +}
 +
-+static void Pause( audio_output_t *aout, bool paused, mtime_t date )
++static void Pause( audio_output_t *aout, bool paused, vlc_tick_t date )
 +{
 +	aout_sys_t *sys = aout->sys;
 +	// TODO
@@ -305,6 +302,7 @@ index 0000000000..1c0b97a358
 +
 +static int DeviceSelect( audio_output_t *aout, const char *psz_device)
 +{
++  aout_sys_t *sys = aout->sys;
 +	/*if ( psz_device == NULL )
 +		return VLC_EGENERIC;
 +	char* psz_end;
@@ -314,31 +312,36 @@ index 0000000000..1c0b97a358
 +	if (aout->sys->dev == (ALCdevice*)ptr)
 +		return VLC_SUCCESS;*/
 +	const ALCchar* devInputName = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER); 
-+	aout->sys->dev = alcOpenDevice(devInputName);
-+	var_SetAddress (aout->obj.parent, "emscripten-openal-device", aout->sys->dev );
++
++	sys->dev = alcOpenDevice(devInputName);
++	var_SetAddress (vlc_object_parent(aout), "emscripten-openal-device", sys->dev );
 +	aout_RestartRequest( aout, AOUT_RESTART_OUTPUT );
 +	return VLC_SUCCESS;
 +}
 +
-+/*static void Time_Get( audio_output_t *aout, mtime_t *delay)
++static int Time_Get( audio_output_t *aout, vlc_tick_t *delay)
 +{
-+	aout_sys_t *sys = aout->sys;
-+
-+	return 0;
-+}*/
++	return aout_TimeGetDefault(aout, delay);
++}
 +
 +/*****************************************************************************
 + * CloseAudio: close the audio device
 + *****************************************************************************/
 +static void Close( vlc_object_t *obj )
 +{
-+	msg_Dbg(obj, "Openal Close");
++  //msg_Dbg(obj, "Openal Close");
 +	audio_output_t *aout = (audio_output_t *)obj;
 +	struct aout_sys_t *sys = aout->sys;
 +
 +	free(sys);
 +}
 +
++static int Volume_Set           ( audio_output_t *aout, float volume)
++{
++  VLC_UNUSED(aout);
++  VLC_UNUSED(volume);
++  return 0;
++}
 -- 
-2.23.0
+2.28.0
 

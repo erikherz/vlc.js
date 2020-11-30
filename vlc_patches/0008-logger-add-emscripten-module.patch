@@ -1,12 +1,12 @@
-From bde1b91e748fa7b2a97041605628ab7c96bd6a61 Mon Sep 17 00:00:00 2001
-From: Mehdi Sabwat <mehdisabwat@gmail.com>
-Date: Mon, 9 Sep 2019 19:18:36 +0200
-Subject: [PATCH 12/15] logger: add emscripten module
+From 3114ceb6b3379c425d62221b6bf36d653289f4d1 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 9 Nov 2020 22:35:32 +0100
+Subject: [PATCH 08/17] logger: add emscripten module
 
 ---
- modules/logger/Makefile.am  |  7 ++++
- modules/logger/emscripten.c | 82 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 89 insertions(+)
+ modules/logger/Makefile.am  |  7 +++
+ modules/logger/emscripten.c | 93 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 100 insertions(+)
  create mode 100644 modules/logger/emscripten.c
 
 diff --git a/modules/logger/Makefile.am b/modules/logger/Makefile.am
@@ -26,12 +26,12 @@ index 4addf6dcfd..9b26a68afd 100644
 +endif
 diff --git a/modules/logger/emscripten.c b/modules/logger/emscripten.c
 new file mode 100644
-index 0000000000..bb7ef220de
+index 0000000000..48b8cd39a7
 --- /dev/null
 +++ b/modules/logger/emscripten.c
-@@ -0,0 +1,82 @@
+@@ -0,0 +1,93 @@
 +/*****************************************************************************
-+ * emscripten.c: Android logger using logcat
++ * emscripten.c: Emscripten logger
 + *****************************************************************************
 + * Copyright © 2019 VLC authors and VideoLAN
 + *
@@ -66,14 +66,22 @@ index 0000000000..bb7ef220de
 +                               const char *format, va_list ap)
 +{
 +    int prio;
-+    char *format2;
++    char *new_format;
++    char *message;
 +    int verbose = (intptr_t)opaque;
 +
 +    if (verbose < type)
 +        return;
-+
-+    if (asprintf(&format2, "[LIBVLC DEBUG] %s %s: %s", p_item->psz_module, p_item->psz_object_type, format) < 0)
-+		 return;
++    /*
++    if (asprintf(&new_format, "[LIBVLC DEBUG] %s %s: %s",
++                 p_item->psz_module, p_item->psz_object_type, format) < 0)
++        return;
++    */
++    if (asprintf(&new_format, "[vlc.js: 0x%"PRIxPTR"/0x%"PRIxPTR"] %s %s: %s",
++                 p_item->i_object_id, p_item->tid, p_item->psz_module,
++                 p_item->psz_object_type, format) < 0)
++        return;
++    
 +    switch (type) {
 +        case VLC_MSG_ERR:
 +            prio = EM_LOG_ERROR;
@@ -85,8 +93,11 @@ index 0000000000..bb7ef220de
 +        case VLC_MSG_DBG:
 +            prio = EM_LOG_CONSOLE;
 +    }
-+    emscripten_log(prio, format2, ap);
-+    free(format2);
++
++    vasprintf(&message, new_format, ap);
++    emscripten_log(prio, "%s", message);
++    free(new_format);
++    free(message);
 +}
 +
 +static const struct vlc_logger_operations ops = { EmscriptenPrintMsg, NULL };
@@ -105,13 +116,13 @@ index 0000000000..bb7ef220de
 +}
 +
 +vlc_module_begin()
-+    set_shortname(N_("Emscripten log"))
-+    set_description(N_("Emscripten log using logcat"))
++    set_shortname(N_("emlog"))
++    set_description(N_("Emscripten loggger"))
 +    set_category(CAT_ADVANCED)
 +    set_subcategory(SUBCAT_ADVANCED_MISC)
 +    set_capability("logger", 30)
 +    set_callbacks(Open, NULL)
 +vlc_module_end ()
 -- 
-2.23.0
+2.28.0
 

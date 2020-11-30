@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+
     <title>VLC.js</title>
     <style>
         .emscripten {
@@ -28,6 +29,7 @@
             margin-right: auto;
         }
         #logo {
+	    visibility: absolute;
             width: 64px;
             height: 64px;
         }
@@ -70,9 +72,16 @@
         <div class="spinner" id='spinner'></div>
         <div class="emscripten" id="status">Downloading...</div>
     </div>
-        <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+        <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" width=1280 height=720 tabindex=-1></canvas>
     </div>
+    <button type="button" id="nativeFsFileManager">NativeFSOpen</button>
+    <input type="file" id="fileManager" multiple/>
+    <input type="text" id="libvlc_opts" value="-vvv --no-spu --no-osd -Idummy --ignore-config BigBuckBunny.mp4"/>
+    <button type="button" id="libvlc_init">Start VLC</button>
     <script type="text/javascript" src="./assets/module-loader.js"></script>
     <script async type="text/javascript" src="./experimental.js"></script>
+    <script>
+    </script>
 </body>
 </html>
+  

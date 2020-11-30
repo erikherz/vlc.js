@@ -1,0 +1,33 @@
+From 2f79632e3f0e4907ba48256f022164814729badb Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 30 Nov 2020 16:34:06 +0100
+Subject: [PATCH 17/17] fixup: temporarily disable dav1d
+
+---
+ extras/package/wasm-emscripten/build.sh | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/extras/package/wasm-emscripten/build.sh b/extras/package/wasm-emscripten/build.sh
+index f0de4abab4..c4ed8dcd07 100644
+--- a/extras/package/wasm-emscripten/build.sh
++++ b/extras/package/wasm-emscripten/build.sh
+@@ -110,14 +110,14 @@ checkfail "sdk tests: emscripten does not support native filesystem, patch was n
+ rm -fr a.out.js  a.out.wasm
+ 
+ # these variables control the features that we want in the static build
+-CONTRIB_LIST=".ffmpeg .opus .vpx .ogg .dvbpsi .faad2 .dav1d"
++CONTRIB_LIST=".ffmpeg .opus .vpx .ogg .dvbpsi .faad2 "
+ # emmake make list to have a list of available contribs
+ VLC_CONFIGURE_OPTIONS="
+     --host=wasm32-unknown-emscripten
+     --enable-debug
+     --disable-shared
+     --enable-dvbpsi
+-    --enable-dav1d  --enable-vpx 
++    --disable-dav1d  --enable-vpx 
+     --enable-merge-ffmpeg --enable-avcodec --enable-avformat
+     --enable-opus --enable-faad 
+     --enable-gles2 
+-- 
+2.28.0
+

@@ -3,9 +3,75 @@ var progressElement = document.getElementById('progress');
 var spinnerElement = document.getElementById('spinner');
 
 var Module = {
-  preRun: [],
-  postRun: [],
-  print: (function() {
+    noInitialRun: true,
+    preRun: [ function() {
+	// add libvlc options:
+	var flag = 0
+
+	args = document.getElementById("libvlc_opts").value.split(" ")
+	for (index in args) {
+	    if ( args[index].includes("emscriptenfs") === false) {
+		document.getElementById("fileManager").style.display = "none";
+		document.getElementById("nativeFsFileManager").style.display = "none";
+	    }
+	    Module["arguments"].push(args[index]);
+	}
+	document.getElementById("libvlc_opts").addEventListener('change', function(event) {
+	    args = document.getElementById("libvlc_opts").value.split(" ")
+	    for (index in args) {
+		if ( args[index].includes("emscriptenfs") === false) {
+		    document.getElementById("fileManager").style.display = "none";
+		    document.getElementById("nativeFsFileManager").style.display = "none";
+		}
+		Module["arguments"].push(args[index]);
+	    }
+	    alert("libvlc set with options: " + Module["arguments"] + "please reload the page if you want to change them again.")
+	    // noInitialRun is set, we call the main here: 
+	    if (flag == 0) {
+		callMain(Module["arguments"])
+		flag = 1;
+	    }
+	});
+	document.getElementById("libvlc_init").addEventListener('click', function(event) {
+	    // make sure main is not called again
+	    if (flag == 0) {
+		callMain(Module["arguments"])
+		flag = 1;
+	    }
+	});
+	if (window.chooseFileSystemEntries === undefined) {
+	    document.getElementById("nativeFsFileManager").style.display = "none";
+	}
+	else {
+	    document.getElementById("fileManager").style.display = "none";
+	}
+	document.getElementById("fileManager").addEventListener('change', function(event) {
+	    Module["fileHandle"] = event.target.files[0];
+	    console.log("file api : sent file handle all pthread workers");
+	}, false);
+	document.getElementById("nativeFsFileManager").addEventListener('click', async (e) => {
+	    Module["fileHandle"] = await window.chooseFileSystemEntries();
+	    console.log("native fs: sent file handle all pthread workers");
+	});	
+    }],
+    postRun: [ function() {
+	// this should be set only if offscreen_canvas is activated
+/*	var bitmapcontext = document.getElementById("canvas").getContext("bitmaprenderer");
+	addEventListener('worker_message', function(msg) {
+	    var bitmap = msg.detail;
+	    bitmapcontext.transferFromImageBitmap(bitmap);
+	});
+	// This should run after the wasm module is instantiated
+	// before, the Pthread object won't be available
+	PThread.receiveObjectTransfer = function (data) {
+	    let event = new CustomEvent('worker_message', {
+		detail: data.msg
+	    });
+	    window.dispatchEvent(event);
+	}
+  */  }],
+    fileHandle: undefined,
+    print: (function() {
     var element = document.getElementById('output');
     if (element) element.value = ''; // clear browser cache
     return function(text) {
