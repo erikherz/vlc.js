@@ -21,7 +21,7 @@ WORK_DIR=$PWD
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
     git clone http://github.com/emscripten-core/emsdk.git emsdk
-    cd emsdk && ./emsdk update-tags && ./emsdk install tot-upstream && ./emsdk activate tot-upstream
+    cd emsdk && ./emsdk update-tags && ./emsdk install 2.0.0 && ./emsdk activate 2.0.0
     checkfail "emsdk: fetch failed"
 fi
 
