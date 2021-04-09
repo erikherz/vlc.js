@@ -119,7 +119,7 @@ cd contrib/contrib-emscripten
 checkfail "contribs: bootstrap failed"
 
 emmake make list
-emmake make $MAKEFLAGS fetch
+#emmake make $MAKEFLAGS fetch
 checkfail "contribs: make fetch failed"
 emmake make $MAKEFLAGS .ffmpeg
 
@@ -172,7 +172,7 @@ diagnostic "Generating module list"
 cd ../..
 ./generate_modules_list.sh
 cd vlc/build-emscripten
-emcc vlc-modules.c -o vlc-modules.bc -pthread
+emcc -c vlc-modules.c -o vlc-modules.bc -pthread
 cd ../..
 
 url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -180,7 +180,8 @@ url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBun
 # copy Dolby_Canyon.vob
 diagnostic "getting video"
 cd vlc/build-emscripten/
-curl ${url} -o BigBuckBunny.mp4
+curl ${url} -o BigBuckBunny1.mp4
+ffmpeg -t 10 -i BigBuckBunny1.mp4 -c copy BigBuckBunny.mp4 
 
 cd $WORK_DIR
 
