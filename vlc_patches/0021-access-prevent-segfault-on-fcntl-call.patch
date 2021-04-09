@@ -1,0 +1,25 @@
+From 902a2ae16a1ab6dddfc449eaacb446bf20a07e1b Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Fri, 9 Apr 2021 18:45:37 +0200
+Subject: [PATCH 5/6] access: prevent segfault on fcntl() call
+
+---
+ modules/access/file.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/access/file.c b/modules/access/file.c
+index d37ac28446..2f55e366ca 100644
+--- a/modules/access/file.c
++++ b/modules/access/file.c
+@@ -182,7 +182,7 @@ int FileOpen( vlc_object_t *p_this )
+ 
+ #if O_NONBLOCK
+     /* Force blocking mode back */
+-    fcntl (fd, F_SETFL, fcntl (fd, F_GETFL) & ~O_NONBLOCK);
++    fcntl (fd, F_SETFL, fcntl (fd, F_GETFL, 0) & ~O_NONBLOCK);
+ #endif
+ 
+     /* Directories can be opened and read from, but only readdir() knows
+-- 
+2.28.0
+

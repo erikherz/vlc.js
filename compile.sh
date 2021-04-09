@@ -95,6 +95,14 @@ if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
     
     # Add OPENAL support
     git am -3 ../vlc_patches/openal/*
+
+    git am -3 ../vlc_patches/0017-add-CMAKE_SYSTEM_NAME-for-Emscripten.patch
+    git am -3 ../vlc_patches/0018-contrib-disable-big-endian-test-for-openjpeg.patch
+    git am -3 ../vlc_patches/0019-logger-add-emscripten-module.patch
+    git am -3 ../vlc_patches/0020-aout-add-audio-worklet-support.patch
+    git am -3 ../vlc_patches/0021-access-prevent-segfault-on-fcntl-call.patch
+    git am -3 ../vlc_patches/0022-core-handle-thread_id-for-emscripten-logger.patch
+
 fi
 
 # BOOTSTRAP

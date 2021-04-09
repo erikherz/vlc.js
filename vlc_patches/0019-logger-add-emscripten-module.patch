@@ -1,0 +1,70 @@
+From f7eaea35a7a877426f97b3def5cb6695e00166ac Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 9 Nov 2020 22:35:32 +0100
+Subject: [PATCH 3/6] logger: add emscripten module
+
+---
+ modules/logger/emscripten.c | 24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
+
+diff --git a/modules/logger/emscripten.c b/modules/logger/emscripten.c
+index bb7ef220de..bd140c946e 100644
+--- a/modules/logger/emscripten.c
++++ b/modules/logger/emscripten.c
+@@ -1,5 +1,5 @@
+ /*****************************************************************************
+- * emscripten.c: Android logger using logcat
++ * emscripten.c: Emscripten logger
+  *****************************************************************************
+  * Copyright © 2019 VLC authors and VideoLAN
+  *
+@@ -34,14 +34,17 @@ static void EmscriptenPrintMsg(void *opaque, int type, const vlc_log_t *p_item,
+                                const char *format, va_list ap)
+ {
+     int prio;
+-    char *format2;
++    char *new_format;
++    char *message;
+     int verbose = (intptr_t)opaque;
+ 
+     if (verbose < type)
+         return;
+-
+-    if (asprintf(&format2, "[LIBVLC DEBUG] %s %s: %s", p_item->psz_module, p_item->psz_object_type, format) < 0)
+-		 return;
++    if (asprintf(&new_format, "[vlc.js: 0x%"PRIxPTR"/0x%"PRIxPTR"] %s %s: %s",
++                 p_item->i_object_id, p_item->tid, p_item->psz_module,
++                 p_item->psz_object_type, format) < 0)
++        return;
++    
+     switch (type) {
+         case VLC_MSG_ERR:
+             prio = EM_LOG_ERROR;
+@@ -53,8 +56,11 @@ static void EmscriptenPrintMsg(void *opaque, int type, const vlc_log_t *p_item,
+         case VLC_MSG_DBG:
+             prio = EM_LOG_CONSOLE;
+     }
+-    emscripten_log(prio, format2, ap);
+-    free(format2);
++
++    vasprintf(&message, new_format, ap);
++    emscripten_log(prio, "%s", message);
++    free(new_format);
++    free(message);
+ }
+ 
+ static const struct vlc_logger_operations ops = { EmscriptenPrintMsg, NULL };
+@@ -73,8 +79,8 @@ static const struct vlc_logger_operations *Open(vlc_object_t *obj, void **sysp)
+ }
+ 
+ vlc_module_begin()
+-    set_shortname(N_("Emscripten log"))
+-    set_description(N_("Emscripten log using logcat"))
++    set_shortname(N_("emlog"))
++    set_description(N_("Emscripten loggger"))
+     set_category(CAT_ADVANCED)
+     set_subcategory(SUBCAT_ADVANCED_MISC)
+     set_capability("logger", 30)
+-- 
+2.28.0
+

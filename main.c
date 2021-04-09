@@ -52,6 +52,7 @@ int main() {
 			    "-vvv",
 			    "--no-spu",
 			    "--no-osd",
+                "--aout=emworklet",
 			    "-Idummy",
 			    "--ignore-config",
   };

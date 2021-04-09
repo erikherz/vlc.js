@@ -1,0 +1,26 @@
+From 5072def71b2ac567aec82b6bde129a0bbcc15bd0 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Fri, 9 Apr 2021 13:36:29 +0200
+Subject: [PATCH 1/6] add CMAKE_SYSTEM_NAME for Emscripten
+
+---
+ contrib/src/main.mak | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/contrib/src/main.mak b/contrib/src/main.mak
+index c294d60870..b05d09820b 100644
+--- a/contrib/src/main.mak
++++ b/contrib/src/main.mak
+@@ -551,6 +551,9 @@ help:
+ .PHONY: all fetch fetch-all install mostlyclean clean distclean package list help prebuilt
+ 
+ CMAKE_SYSTEM_NAME =
++ifdef HAVE_EMSCRIPTEN
++CMAKE_SYSTEM_NAME = Emscripten
++endif
+ ifdef HAVE_WIN32
+ CMAKE_SYSTEM_NAME = Windows
+ ifdef HAVE_VISUALSTUDIO
+-- 
+2.28.0
+
