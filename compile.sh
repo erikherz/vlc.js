@@ -102,7 +102,7 @@ if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
     git am -3 ../vlc_patches/0020-aout-add-audio-worklet-support.patch
     git am -3 ../vlc_patches/0021-access-prevent-segfault-on-fcntl-call.patch
     git am -3 ../vlc_patches/0022-core-handle-thread_id-for-emscripten-logger.patch
-
+    git am -3 ../vlc_patches/0023-use-emranlib-for-openjp2.patch
 fi
 
 # BOOTSTRAP

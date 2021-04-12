@@ -1,0 +1,26 @@
+From c290f66f2a449f231e7a094568bb3065c0d26106 Mon Sep 17 00:00:00 2001
+From: mehdi <mehdi@videolabs.io>
+Date: Mon, 12 Apr 2021 17:11:02 +0200
+Subject: [PATCH 1/1] use emranlib for openjp2
+
+---
+ contrib/src/main.mak | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/contrib/src/main.mak b/contrib/src/main.mak
+index b05d09820b..94cb0c0769 100644
+--- a/contrib/src/main.mak
++++ b/contrib/src/main.mak
+@@ -614,6 +614,9 @@ endif
+ endif
+ 	echo "set(CMAKE_C_COMPILER $(CC))" >> $@
+ 	echo "set(CMAKE_CXX_COMPILER $(CXX))" >> $@
++ifdef HAVE_EMSCRIPTEN
++	echo "set(CMAKE_RANLIB emranlib)" >> $@
++endif
+ ifdef MSYS_BUILD
+ 	echo "set(CMAKE_FIND_ROOT_PATH `cygpath -m $(PREFIX)`)" >> $@
+ else
+-- 
+2.31.1
+
