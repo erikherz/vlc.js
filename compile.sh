@@ -69,8 +69,8 @@ export PKG_CONFIG_LIBDIR=$PWD/vlc/contrib/wasm32_unknowm_emscripten/lib/pkgconfi
 export PKG_CONFIG_PATH_CUSTOM=$PKG_CONFIG_LIBDIR
 
 # Check that clang is working
-clang --version
 
+emcc -v
 diagnostic "Patching"
 
 cd vlc
@@ -188,8 +188,7 @@ url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBun
 # copy Dolby_Canyon.vob
 diagnostic "getting video"
 cd vlc/build-emscripten/
-curl ${url} -o BigBuckBunny1.mp4
-ffmpeg -t 10 -i BigBuckBunny1.mp4 -c copy BigBuckBunny.mp4 
+curl ${url} -o BigBuckBunny.mp4
 
 cd $WORK_DIR
 
