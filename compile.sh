@@ -21,19 +21,19 @@ WORK_DIR=$PWD
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
     git clone http://github.com/emscripten-core/emsdk.git emsdk
-    cd emsdk && ./emsdk update-tags && ./emsdk install 2.0.0 && ./emsdk activate 2.0.0
+    cd emsdk && ./emsdk update-tags && ./emsdk install 2.0.17 && ./emsdk activate 2.0.17 
     checkfail "emsdk: fetch failed"
 fi
 
 cd $WORK_DIR
-TESTED_HASH="7bad2a86"
+#TESTED_HASH="7bad2a86"
 # Go go go vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
     git clone http://git.videolan.org/git/vlc.git vlc || checkfail "VLC source: git clone failed"
     cd vlc
-    diagnostic "VLC source: resetting to the TESTED_HASH commit (${TESTED_HASH})"
-    git reset --hard ${TESTED_HASH} || checkfail "VLC source: TESTED_HASH ${TESTED_HASH} not found"
+#   diagnostic "VLC source: resetting to the TESTED_HASH commit (${TESTED_HASH})"
+#   git reset --hard ${TESTED_HASH} || checkfail "VLC source: TESTED_HASH ${TESTED_HASH} not found"
     cd ..
     checkfail "vlc source: git clone failed"
 fi
@@ -78,31 +78,7 @@ cd vlc
 # patching vlc
 if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
     # core patches
-    git am -3 ../vlc_patches/0001-contrib-add-emscripten-target.patch
-    git am -3 ../vlc_patches/0002-contrib-add-ffmpeg-configuration-options-for-wasm-em.patch
-    git am -3 ../vlc_patches/0003-contrib-delete-empty-variable.patch
-    git am -3 ../vlc_patches/0006-configure-Create-a-target-for-emscripten-in-the-conf.patch
-    git am -3 ../vlc_patches/0007-core-initial-core-build-for-emscripten-based-on-POSI.patch
-    git am -3 ../vlc_patches/0008-compat-add-sigwait-support-for-emscripten.patch
-    git am -3 ../vlc_patches/0009-compat-add-clock_nanosleep-support.patch
-    git am -3 ../vlc_patches/0010-emscripten-add-vlc_getProxyUrl-stub.patch
-    git am -3 ../vlc_patches/0011-configure-disable-deprecated-GL-functions-for-emscri.patch
-    git am -3 ../vlc_patches/0012-logger-add-emscripten-module.patch
-    git am -3 ../vlc_patches/0013-window-add-emscripten-type.patch
-    git am -3 ../vlc_patches/0014-vout-add-emscripten-gl-es2-and-window-modules.patch
-    git am -3 ../vlc_patches/0015-vlc_common-add-weak-attribute-support-for-wasm.patch
-    git am -3 ../vlc_patches/0016-Add-meson_system_name-for-emscripten.patch
-    
-    # Add OPENAL support
-    git am -3 ../vlc_patches/openal/*
-
-    git am -3 ../vlc_patches/0017-add-CMAKE_SYSTEM_NAME-for-Emscripten.patch
-    git am -3 ../vlc_patches/0018-contrib-disable-big-endian-test-for-openjpeg.patch
-    git am -3 ../vlc_patches/0019-logger-add-emscripten-module.patch
-    git am -3 ../vlc_patches/0020-aout-add-audio-worklet-support.patch
-    git am -3 ../vlc_patches/0021-access-prevent-segfault-on-fcntl-call.patch
-    git am -3 ../vlc_patches/0022-core-handle-thread_id-for-emscripten-logger.patch
-    git am -3 ../vlc_patches/0023-use-emranlib-for-openjp2.patch
+    git am -3 ../vlc_patches/upstream-core/*
 fi
 
 # BOOTSTRAP

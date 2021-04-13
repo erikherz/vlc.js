@@ -1,0 +1,211 @@
+From 9d0d3f81bfc45e84f22b4cd6ff385fdc64f07424 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 24 Feb 2020 14:08:02 +0100
+Subject: [PATCH 4/7] core: initial core build for emscripten, based on POSIX
+
+posix/sort.c won't be added because qsort_r is not supported.
+
+- add vlc_getProxyUrl stub for emscripten
+- disable deprecated GL functions for emscripten
+
+The build system assumes OpenGL functions are implemented if the headers are defined.
+Which is wrong, so we need to disable the HAVE_GL marker.
+
+we use AM_LINK_IFELSE() because AC_COMPILE will add the "-c" option, and thus the
+in wasm-emscripten this function will appear supported even if it is not.
+
+- add thread_id for emscripten
+
+- add weak attribute support for wasm
+
+- handle sout linking when disabled
+
+this commit fixes a mismatch in the prototype of sout_StreamChainNew,
+and  adds a stub for sout_instance_ControlsPace to allow linking without
+error.
+---
+ configure.ac             |  9 ++++++---
+ include/vlc_common.h     |  2 +-
+ src/Makefile.am          | 16 +++++++++++++++-
+ src/emscripten/netconf.c | 39 +++++++++++++++++++++++++++++++++++++++
+ src/missing.c            |  8 +++++++-
+ src/posix/thread.c       | 11 ++++++++++-
+ 6 files changed, 78 insertions(+), 7 deletions(-)
+ create mode 100644 src/emscripten/netconf.c
+
+diff --git a/configure.ac b/configure.ac
+index 5138c39b9c..98f923a75f 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3326,13 +3326,16 @@ PKG_CHECK_MODULES([GL], [gl], [
+   have_gl="yes"
+ ], [
+   AC_MSG_CHECKING([for OpenGL])
+-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
++  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+ #ifdef _WIN32
+ # include <GL/glew.h>
+ #endif
+ #include <GL/gl.h>
+-]], [
+-    [int t0 = GL_TEXTURE0;]])
++]], [[
++	int t0 = GL_TEXTURE0;
++	// glColorMaterial is unavailable in webgl, and emscripten
++	glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
++	]])
+   ], [
+     GL_CFLAGS=""
+     have_gl="yes"
+diff --git a/include/vlc_common.h b/include/vlc_common.h
+index f62ff86d04..3f64caa455 100644
+--- a/include/vlc_common.h
++++ b/include/vlc_common.h
+@@ -185,7 +185,7 @@
+ # define VLC_USED
+ #endif
+ 
+-#if defined (__ELF__) || defined (__MACH__)
++#if defined (__ELF__) || defined (__MACH__) || defined (__wasm__)
+ # define VLC_WEAK __attribute__((weak))
+ #else
+ /**
+diff --git a/src/Makefile.am b/src/Makefile.am
+index ae580acc68..d3bb52df9e 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -431,6 +431,18 @@ libvlccore_la_SOURCES += \
+ 	os2/thread.c
+ endif
+ 
++if HAVE_EMSCRIPTEN
++libvlccore_la_SOURCES += \
++	posix/thread.c \
++	posix/getaddrinfo.c \
++	posix/error.c \
++	posix/dirs.c \
++	posix/filesystem.c \
++	posix/specific.c \
++	posix/timer.c \
++	emscripten/netconf.c
++endif
++
+ if HAVE_DARWIN
+ libvlccore_la_SOURCES += \
+ 	darwin/error.c \
+@@ -473,8 +485,10 @@ if !HAVE_LINUX
+ libvlccore_la_SOURCES += posix/wait.c
+ endif
+ if !HAVE_ANDROID
++if !HAVE_EMSCRIPTEN
++libvlccore_la_SOURCES += posix/sort.c
++endif
+ libvlccore_la_SOURCES += \
+-	posix/sort.c \
+ 	posix/thread.c
+ if !HAVE_DARWIN
+ libvlccore_la_SOURCES += \
+diff --git a/src/emscripten/netconf.c b/src/emscripten/netconf.c
+new file mode 100644
+index 0000000000..b972bf4976
+--- /dev/null
++++ b/src/emscripten/netconf.c
+@@ -0,0 +1,39 @@
++/*****************************************************************************
++ * netconf.c : Network configuration
++ *****************************************************************************
++ * Copyright (C) 2019
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <string.h>
++
++char *vlc_getProxyUrl(const char *url);
++
++/**
++ * Determines the network proxy server to use (if any).
++ * @param url absolute URL for which to get the proxy server
++ * @return proxy URL, NULL if no proxy or error
++ */
++char *vlc_getProxyUrl(const char *url)
++{
++  char *proxy = strdup(url);
++  
++  return proxy;
++}
+diff --git a/src/missing.c b/src/missing.c
+index 46baa65214..0b738ffb28 100644
+--- a/src/missing.c
++++ b/src/missing.c
+@@ -157,7 +157,7 @@ noreturn void sout_StreamChainDelete(sout_stream_t *first,
+     vlc_assert_unreachable ();
+ }
+ 
+-noreturn sout_stream_t *sout_StreamChainNew(vlc_object_t *sout,
++noreturn sout_stream_t *sout_StreamChainNew( vlc_object_t *sout,
+                                             const char *chain,
+                                             sout_stream_t *next)
+ {
+@@ -165,6 +165,12 @@ noreturn sout_stream_t *sout_StreamChainNew(vlc_object_t *sout,
+     vlc_assert_unreachable ();
+ }
+ 
++noreturn bool sout_instance_ControlsPace( sout_instance_t *sout )
++{
++    (void) sout;
++    vlc_assert_unreachable ();
++}
++
+ int vlc_sdp_Start (struct vlc_memstream *sdp, vlc_object_t *obj, const char *cfg,
+                      const struct sockaddr *src, size_t srclen,
+                      const struct sockaddr *addr, size_t addrlen)
+diff --git a/src/posix/thread.c b/src/posix/thread.c
+index d617bd7292..8031d26484 100644
+--- a/src/posix/thread.c
++++ b/src/posix/thread.c
+@@ -199,7 +199,12 @@ void vlc_join(vlc_thread_t th, void **result)
+ 
+ VLC_WEAK unsigned long vlc_thread_id(void)
+ {
+-     return -1;
++#if defined (__EMSCRIPTEN__)
++    return pthread_self();
++#else
++    // not implemented
++    return -1;
++#endif
+ }
+ 
+ int vlc_set_priority (vlc_thread_t th, int priority)
+@@ -309,7 +314,11 @@ unsigned vlc_GetCPUCount(void)
+     free (cpulist);
+     return count ? count : 1;
+ #elif defined(_SC_NPROCESSORS_CONF)
++#ifdef __EMSCRIPTEN__
++    return 1;
++#else
+     return sysconf(_SC_NPROCESSORS_CONF);
++#endif
+ #else
+ #   warning "vlc_GetCPUCount is not implemented for your platform"
+     return 1;
+-- 
+2.31.1
+

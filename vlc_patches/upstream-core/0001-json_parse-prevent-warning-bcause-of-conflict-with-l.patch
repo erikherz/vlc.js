@@ -1,0 +1,27 @@
+From b3319f43011f5f210ae999615b3a9f72b2003a12 Mon Sep 17 00:00:00 2001
+From: mehdi <mehdi@videolabs.io>
+Date: Tue, 13 Apr 2021 21:31:43 +0200
+Subject: [PATCH 1/1] json_parse:  prevent warning bcause of conflict with
+ libjson_parse
+
+---
+ modules/misc/Makefile.am | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/modules/misc/Makefile.am b/modules/misc/Makefile.am
+index bc3252ab22..15fe691347 100644
+--- a/modules/misc/Makefile.am
++++ b/modules/misc/Makefile.am
+@@ -22,7 +22,9 @@ libfingerprinter_plugin_la_SOURCES =  \
+ 	misc/fingerprinter.c
+ libfingerprinter_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/misc
+ libfingerprinter_plugin_la_LIBADD = $(LIBM)
++if !HAVE_EMSCRIPTEN
+ misc_LTLIBRARIES += libfingerprinter_plugin.la
++endif
+ 
+ libgnutls_plugin_la_SOURCES = misc/gnutls.c
+ libgnutls_plugin_la_CFLAGS = $(AM_CFLAGS) $(GNUTLS_CFLAGS)
+-- 
+2.31.1
+
