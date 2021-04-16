@@ -1,7 +1,7 @@
-From f95459b20e4a2af4752b016f0c098f7462050e50 Mon Sep 17 00:00:00 2001
+From 978c8e6582d064af999aa3bb43e830bcc3c07494 Mon Sep 17 00:00:00 2001
 From: mehdi <mehdi@videolabs.io>
 Date: Mon, 12 Apr 2021 17:11:02 +0200
-Subject: [PATCH 7/7] use emranlib for openjp2
+Subject: [PATCH 08/11] use emranlib for openjp2
 
 ---
  contrib/src/main.mak | 3 +++

@@ -1,7 +1,7 @@
-From 9d0d3f81bfc45e84f22b4cd6ff385fdc64f07424 Mon Sep 17 00:00:00 2001
+From 145b122f557c9b890bad09f4304569e1f2c3f4ae Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Mon, 24 Feb 2020 14:08:02 +0100
-Subject: [PATCH 4/7] core: initial core build for emscripten, based on POSIX
+Subject: [PATCH 05/11] core: initial core build for emscripten, based on POSIX
 
 posix/sort.c won't be added because qsort_r is not supported.
 

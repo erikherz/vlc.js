@@ -27,12 +27,12 @@ PROJECT_DIR=$(pwd)/vlc
 
 cd vlc/build-emscripten
 # for release, remove profiling-funcs and add -Os
-EMCC_DEBUG=1 emcc --bind -O0 -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB  \
-     -s OFFSCREEN_FRAMEBUFFER=1 --profiling-funcs \
+EMCC_DEBUG=1 emcc --bind -O0 -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=10 \
+     -s OFFSCREEN_FRAMEBUFFER=1 -s LLD_REPORT_UNDEFINED --profiling-funcs \
      -I $PROJECT_DIR/include/ -I $PROJECT_DIR/contrib/wasm32-unknown-emscripten/include/ main.c \
      $PROJECT_DIR/build-emscripten/lib/.libs/libvlc.a \
      vlc-modules.bc $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
      $PROJECT_DIR/contrib/wasm32-unknown-emscripten/lib/*.a \
      $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
      $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
-     -o ../../experimental.html --emrun --preload-file BigBuckBunny.mp4
+     -o ../../experimental.html --preload-file BigBuckBunny.mp4

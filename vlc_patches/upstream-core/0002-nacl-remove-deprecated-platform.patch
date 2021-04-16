@@ -1,7 +1,7 @@
-From 709e76c29aa904a8f1913b13c853c4fc8e60ebc0 Mon Sep 17 00:00:00 2001
+From 3440423a0d06ce78180c4363db4aed8a3d25ecd4 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Wed, 4 Nov 2020 17:40:30 +0100
-Subject: [PATCH 1/7] nacl: remove deprecated platform
+Subject: [PATCH 02/11] nacl: remove deprecated platform
 
 https://blog.chromium.org/2020/08/changes-to-chrome-app-support-timeline.html
 ---

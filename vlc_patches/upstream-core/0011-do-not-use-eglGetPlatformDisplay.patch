@@ -1,0 +1,25 @@
+From 394fa69e4e84b64cf0f0f90213424c18aaab3acf Mon Sep 17 00:00:00 2001
+From: mehdi <mehdi@videolabs.io>
+Date: Fri, 16 Apr 2021 15:18:23 +0200
+Subject: [PATCH 11/11] do not use eglGetPlatformDisplay
+
+---
+ modules/video_output/opengl/egl_display_generic.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/modules/video_output/opengl/egl_display_generic.c b/modules/video_output/opengl/egl_display_generic.c
+index dfb841feef..9f590cb94e 100644
+--- a/modules/video_output/opengl/egl_display_generic.c
++++ b/modules/video_output/opengl/egl_display_generic.c
+@@ -55,6 +55,8 @@ Open(struct vlc_egl_display *display)
+ #ifdef __ANDROID__
+     /* The default display is refcounted on Android */
+     display->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
++#elif defined(__EMSCRIPTEN__)
++    display->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+ #elif defined(EGL_KHR_display_reference)
+     const char *extensions = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+ 
+-- 
+2.31.1
+
