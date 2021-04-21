@@ -26,14 +26,14 @@ if [ ! -d emsdk ]; then
 fi
 
 cd $WORK_DIR
-#TESTED_HASH="7bad2a86"
+TESTED_HASH="5924cb42a5c71a2583b606ec4c49c4c9ddb5f2c4"
 # Go go go vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
     git clone http://git.videolan.org/git/vlc.git vlc || checkfail "VLC source: git clone failed"
     cd vlc
-#   diagnostic "VLC source: resetting to the TESTED_HASH commit (${TESTED_HASH})"
-#   git reset --hard ${TESTED_HASH} || checkfail "VLC source: TESTED_HASH ${TESTED_HASH} not found"
+   diagnostic "VLC source: resetting to the TESTED_HASH commit (${TESTED_HASH})"
+   git reset --hard ${TESTED_HASH} || checkfail "VLC source: TESTED_HASH ${TESTED_HASH} not found"
     cd ..
     checkfail "vlc source: git clone failed"
 fi
