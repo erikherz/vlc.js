@@ -1,7 +1,7 @@
-From 2af67add138b22007ba3e26fbd04e5594216488f Mon Sep 17 00:00:00 2001
+From 872a13c52b19a1d5f636b8b16b07c3d1ff9cb956 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Wed, 4 Sep 2019 19:35:17 +0200
-Subject: [PATCH 07/11] contrib: add ffmpeg configuration options for
+Subject: [PATCH 06/12] contrib: add ffmpeg configuration options for
  wasm-emscripten
 
 We need to specify the pthread flag for compilation and linking, otherwise tests will fail.
@@ -75,5 +75,5 @@ index 4ad0c56c50..7601b4eb27 100644
  
  .ffmpeg: ffmpeg
 -- 
-2.31.1
+2.27.0
 

@@ -1,7 +1,7 @@
-From 978c8e6582d064af999aa3bb43e830bcc3c07494 Mon Sep 17 00:00:00 2001
+From 5f0e88ac64ec4500a04617603b1884681c355668 Mon Sep 17 00:00:00 2001
 From: mehdi <mehdi@videolabs.io>
 Date: Mon, 12 Apr 2021 17:11:02 +0200
-Subject: [PATCH 08/11] use emranlib for openjp2
+Subject: [PATCH 07/12] use emranlib for openjp2
 
 ---
  contrib/src/main.mak | 3 +++
@@ -22,5 +22,5 @@ index 5bc59243f2..0c75af95cd 100644
  	echo "set(CMAKE_FIND_ROOT_PATH `cygpath -m $(PREFIX)`)" >> $@
  else
 -- 
-2.31.1
+2.27.0
 

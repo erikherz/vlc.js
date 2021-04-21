@@ -1,7 +1,7 @@
-From f2d7fd6e84cd6a227dcd6740c4dfa7748c4c4776 Mon Sep 17 00:00:00 2001
+From 5690663a2697f98662b1ea6359e2474f03c1ad26 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Wed, 20 May 2020 01:31:35 +0000
-Subject: [PATCH 04/11] compat: add clock_nanosleep & sigwait support for
+Subject: [PATCH 03/12] compat: add clock_nanosleep & sigwait support for
  emscripten
 
 clock_nanosleep() is not supported in emscripten
@@ -105,5 +105,5 @@ index 4c0a3a3586..5138c39b9c 100644
      LD=emcc
      LDSHARED=emcc
 -- 
-2.31.1
+2.27.0
 

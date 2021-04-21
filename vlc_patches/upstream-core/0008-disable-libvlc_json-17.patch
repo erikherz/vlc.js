@@ -1,7 +1,7 @@
-From 03a6f2394e284125e16a104512aa59175f37e88f Mon Sep 17 00:00:00 2001
+From c4d68601e2fa8651e659d04be80dba3b592cb93c Mon Sep 17 00:00:00 2001
 From: mehdi <mehdi@videolabs.io>
 Date: Fri, 16 Apr 2021 11:32:33 +0200
-Subject: [PATCH 09/11] disable libvlc_json #17
+Subject: [PATCH 08/12] disable libvlc_json #17
 
 ---
  modules/demux/Makefile.am | 4 ++++
@@ -31,5 +31,5 @@ index 48f5d7a97d..dbfe923650 100644
  noinst_LTLIBRARIES += libvlc_json.la
 +endif
 -- 
-2.31.1
+2.27.0
 

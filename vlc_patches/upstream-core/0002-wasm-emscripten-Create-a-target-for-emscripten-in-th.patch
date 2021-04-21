@@ -1,7 +1,7 @@
-From 314c65928043a384622f3f2649ab386afa7b0fae Mon Sep 17 00:00:00 2001
+From e97f953fb19afacb3d67f5fb41ec6181c2ab513e Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Thu, 6 Jul 2017 14:50:28 +0200
-Subject: [PATCH 03/11] wasm-emscripten: Create a target for emscripten in the
+Subject: [PATCH 02/12] wasm-emscripten: Create a target for emscripten in the
  configure.ac
 
 Co-Author: Etienne Brateau <etienne.brateau@gmail.com>
@@ -111,5 +111,5 @@ index fb71479d68..5bc59243f2 100644
  crossfile.meson: $(SRC)/gen-meson-crossfile.py
  	$(HOSTVARS_MESON) \
 -- 
-2.31.1
+2.27.0
 

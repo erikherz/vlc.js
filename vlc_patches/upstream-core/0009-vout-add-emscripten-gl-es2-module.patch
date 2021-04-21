@@ -1,7 +1,7 @@
-From f0f45b977057d2010f52c041226a719fe61b39ff Mon Sep 17 00:00:00 2001
+From 3f42b0399ecc9d172096b4783e4e05665b72ab89 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdisabwat@gmail.com>
 Date: Thu, 12 Sep 2019 15:03:28 +0200
-Subject: [PATCH 10/11] vout: add emscripten gl es2 module
+Subject: [PATCH 09/12] vout: add emscripten gl es2 module
 
 The module contains a window module that sets
 the window type and a gl es2 submodule implementing
@@ -240,5 +240,5 @@ index 0000000000..c87a2756b1
 +vlc_module_end()
 +
 -- 
-2.31.1
+2.27.0
 

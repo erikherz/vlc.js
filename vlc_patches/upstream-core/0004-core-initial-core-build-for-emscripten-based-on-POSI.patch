@@ -1,7 +1,7 @@
-From 145b122f557c9b890bad09f4304569e1f2c3f4ae Mon Sep 17 00:00:00 2001
+From 754a8f30f902f028422289422e75613eb732a486 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Mon, 24 Feb 2020 14:08:02 +0100
-Subject: [PATCH 05/11] core: initial core build for emscripten, based on POSIX
+Subject: [PATCH 04/12] core: initial core build for emscripten, based on POSIX
 
 posix/sort.c won't be added because qsort_r is not supported.
 
@@ -177,7 +177,7 @@ index 46baa65214..0b738ffb28 100644
                       const struct sockaddr *src, size_t srclen,
                       const struct sockaddr *addr, size_t addrlen)
 diff --git a/src/posix/thread.c b/src/posix/thread.c
-index d617bd7292..8031d26484 100644
+index 28975b1f93..4f8a9a377c 100644
 --- a/src/posix/thread.c
 +++ b/src/posix/thread.c
 @@ -199,7 +199,12 @@ void vlc_join(vlc_thread_t th, void **result)
@@ -194,9 +194,9 @@ index d617bd7292..8031d26484 100644
  }
  
  int vlc_set_priority (vlc_thread_t th, int priority)
-@@ -309,7 +314,11 @@ unsigned vlc_GetCPUCount(void)
-     free (cpulist);
-     return count ? count : 1;
+@@ -311,7 +316,11 @@ unsigned vlc_GetCPUCount(void)
+ #elif defined(_SC_NPROCESSORS_ONLN)
+     return sysconf(_SC_NPROCESSORS_ONLN);
  #elif defined(_SC_NPROCESSORS_CONF)
 +#ifdef __EMSCRIPTEN__
 +    return 1;
@@ -207,5 +207,5 @@ index d617bd7292..8031d26484 100644
  #   warning "vlc_GetCPUCount is not implemented for your platform"
      return 1;
 -- 
-2.31.1
+2.27.0
 
