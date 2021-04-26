@@ -16,23 +16,14 @@ checkfail()
     fi
 }
 
-source emsdk/emsdk_env.sh
-
-if [ ! -d vlc ]; then
-    diagnostic "vlc must exists. Execute compile.sh"
-    exit 1
-fi
-
-PROJECT_DIR=$(pwd)/vlc
-
-cd vlc/build-emscripten
 # for release, remove profiling-funcs and add -Os
 emcc --bind -O0 -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
      -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
-     -I $PROJECT_DIR/include/ -I $PROJECT_DIR/contrib/wasm32-unknown-emscripten/include/ main.c \
+     -I$PATH_VLC/include/ -I$PROJECT_DIR/wasm32-unknown-emscripten/include/ main.c \
      $PROJECT_DIR/build-emscripten/lib/.libs/libvlc.a \
-     vlc-modules.bc $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
-     $PROJECT_DIR/contrib/wasm32-unknown-emscripten/lib/*.a \
+     $PROJECT_DIR/build-emscripten/vlc-modules.bc \
+     $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
+     $PROJECT_DIR/wasm32-unknown-emscripten/lib/*.a \
      $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
      $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
-     -o ../../experimental.html --preload-file BigBuckBunny.mp4
+     -o ./experimental.html --preload-file $SAMPLE
