@@ -1,15 +1,15 @@
 #include <stdio.h>
 #include <vlc/vlc.h>
 #include <vlc_common.h>
+#include <assert.h>
 #include <errno.h>
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
 libvlc_media_player_t *mp;
-libvlc_instance_t *libvlc; 
+libvlc_instance_t *libvlc;
 libvlc_time_t t = -1;
-char flag = 1;
 
 static void iter()
 {
@@ -22,23 +22,8 @@ static void iter()
 	t = libvlc_media_player_get_time(mp);
 }
 
-static EM_BOOL play_pause_handler(int eventType, const EmscriptenMouseEvent *e, void *userData)
-{
-  (void) e;
-  (void) userData; // To use when mp won't be a global.
-  if (eventType == EMSCRIPTEN_EVENT_CLICK)
-  {
-    if (flag == 1)
-      {
-	libvlc_media_player_play(mp);
-	flag = 0;
-      }
-    // Don't do that until you implement a/v synchro.
-    // libvlc_media_player_pause(mp);
-    // flag = 1;
-  }
-  return 0;
-}
+extern void update_overlay();
+extern void on_position_changed(const libvlc_event_t *p_event, void *p_data);
 
 int main() {
 
@@ -55,9 +40,9 @@ int main() {
 			    "-Idummy",
 			    "--ignore-config",
   };
-  
+
   libvlc = libvlc_new( ARRAY_SIZE( vlc_argv ), vlc_argv );
-    
+
   if (libvlc == NULL)
     {
       fprintf( stderr, "unable to create libvlc instance" );
@@ -76,18 +61,76 @@ int main() {
       fprintf(stderr, "unable to create media player");
       return -1;
     }
-  
+
   libvlc_media_release( m );
   m = libvlc_media_player_get_media(mp);
-  // libvlc_audio_set_volume (mp, 100);
-  // int res = libvlc_media_player_play (mp);
-  /*	if (res != 0) {	
-        fprintf( stderr, "unable to play media" );
-	return -1;
-	}
-  */
-  emscripten_set_click_callback("#canvas", 0, 1, play_pause_handler);
+
+  libvlc_event_manager_t* event_manager = libvlc_media_player_event_manager(mp);
+  int res;
+  res = libvlc_event_attach(
+    event_manager,
+    libvlc_MediaPlayerPositionChanged,
+    on_position_changed,
+    NULL
+  );
+  assert(res == 0);
+  res = libvlc_event_attach(
+    event_manager,
+    libvlc_MediaPlayerPaused,
+    on_position_changed,
+    NULL
+  );
+  assert(res == 0);
+
   emscripten_set_main_loop(iter, 1, 1);
-  
+
   return 0;
+}
+
+
+int g_is_started = 0;
+
+void EMSCRIPTEN_KEEPALIVE play_video() {
+    if (g_is_started == 0)
+    {
+      libvlc_media_player_play(mp);
+      g_is_started = 1;
+    }
+    else {
+      libvlc_media_player_pause(mp);
+    }
+    update_overlay();
+}
+
+EM_BOOL EMSCRIPTEN_KEEPALIVE is_paused() {
+  return !libvlc_media_player_is_playing(mp);
+}
+
+float EMSCRIPTEN_KEEPALIVE get_position() {
+  return libvlc_media_player_get_position(mp);
+}
+
+int EMSCRIPTEN_KEEPALIVE set_position(float position) {
+  // TODO - what does "fast" argument do?
+  return libvlc_media_player_set_position(mp, position, false);
+}
+
+int EMSCRIPTEN_KEEPALIVE get_volume() {
+  return libvlc_audio_get_volume(mp);
+}
+
+int EMSCRIPTEN_KEEPALIVE set_volume(int i_volume) {
+  return libvlc_audio_set_volume(mp, i_volume);
+}
+
+void EMSCRIPTEN_KEEPALIVE toggle_mute() {
+  libvlc_audio_toggle_mute(mp);
+}
+
+EM_BOOL EMSCRIPTEN_KEEPALIVE get_mute() {
+  return libvlc_audio_get_mute(mp);
+}
+
+void EMSCRIPTEN_KEEPALIVE set_mute(int i_status) {
+  libvlc_audio_set_mute(mp, i_status);
 }

@@ -37,4 +37,5 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     $PROJECT_DIR/wasm32-unknown-emscripten/lib/*.a \
     $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
     $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
+     --js-library library.js \
     -o experimental.html --preload-file ${SAMPLE_DIR}

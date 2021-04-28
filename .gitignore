@@ -7,5 +7,5 @@ experimental.data
 experimental.html
 experimental.js
 experimental.wasm
+experimental.wasm.map
 experimental.worker.js
-
