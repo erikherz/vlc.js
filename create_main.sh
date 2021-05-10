@@ -27,9 +27,9 @@ PROJECT_DIR=$(pwd)/vlc
 
 cd vlc/build-emscripten
 # for release, remove profiling-funcs and add -Os
-emcc -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB  \
-    -s OFFSCREEN_FRAMEBUFFER=1 --profiling-funcs \
     -I $PROJECT_DIR/include/ -I $PROJECT_DIR/contrib/wasm32-unknown-emscripten/include/ main.c \
+emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
+    -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
     $PROJECT_DIR/build-emscripten/lib/.libs/libvlc.a \
     vlc-modules.bc $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
     $PROJECT_DIR/contrib/wasm32-unknown-emscripten/lib/*.a \

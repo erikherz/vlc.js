@@ -1,0 +1,620 @@
+From 14b7ce9b2644f480a70bfa36b1fe2264bd98f85c Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 4 Nov 2020 17:40:30 +0100
+Subject: [PATCH 01/16] nacl: remove deprecated platform
+
+This commit removes conditional code for the Nacl platform, in the core
+and contribs.
+
+https://blog.chromium.org/2020/08/changes-to-chrome-app-support-timeline.html
+---
+ compat/flockfile.c               | 11 -----
+ compat/getpid.c                  |  2 -
+ compat/pathconf.c                | 40 ----------------
+ compat/recvmsg.c                 | 79 --------------------------------
+ compat/sendmsg.c                 | 61 ------------------------
+ compat/sigwait.c                 |  4 +-
+ configure.ac                     | 11 +----
+ contrib/bootstrap                |  3 --
+ contrib/src/ass/rules.mak        |  6 ---
+ contrib/src/ffmpeg/rules.mak     |  4 --
+ contrib/src/fontconfig/rules.mak |  4 --
+ contrib/src/gcrypt/rules.mak     |  6 ---
+ contrib/src/gmp/rules.mak        |  5 --
+ contrib/src/gnutls/rules.mak     |  4 --
+ contrib/src/gpg-error/rules.mak  |  9 ----
+ contrib/src/mpg123/rules.mak     |  4 --
+ contrib/src/postproc/rules.mak   |  4 --
+ include/vlc_fixups.h             | 24 +---------
+ m4/dolt.m4                       |  2 +-
+ src/Makefile.am                  | 13 ------
+ src/network/getaddrinfo.c        |  3 +-
+ 21 files changed, 7 insertions(+), 292 deletions(-)
+ delete mode 100644 compat/pathconf.c
+
+diff --git a/compat/flockfile.c b/compat/flockfile.c
+index 1db85a23a1..f3c4fff284 100644
+--- a/compat/flockfile.c
++++ b/compat/flockfile.c
+@@ -54,17 +54,6 @@ int putc_unlocked (int c, FILE *stream)
+ {
+     return _putc_nolock (c, stream);
+ }
+-
+-#elif defined __native_client__
+-void flockfile (FILE *stream)
+-{
+-    _flockfile(stream);
+-}
+-
+-void funlockfile (FILE *stream)
+-{
+-    _funlockfile(stream);
+-}
+ #else
+ # error flockfile not implemented on your platform!
+ #endif
+diff --git a/compat/getpid.c b/compat/getpid.c
+index d6275e7df3..5645d50bb4 100644
+--- a/compat/getpid.c
++++ b/compat/getpid.c
+@@ -31,8 +31,6 @@ pid_t getpid (void)
+ {
+ #if defined (_WIN32)
+     return (pid_t) GetCurrentProcessId ();
+-#elif defined (__native_client__)
+-    return 1;
+ #else
+ # error Unimplemented!
+ #endif
+diff --git a/compat/pathconf.c b/compat/pathconf.c
+deleted file mode 100644
+index 34f990ab19..0000000000
+--- a/compat/pathconf.c
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*****************************************************************************
+- * pathconf.c: POSIX pathconf() replacement
+- *****************************************************************************
+- * Copyright (C) 2017 VLC authors and VideoLAN
+- *
+- * Authors: Dennis Hamester <dhamester@jusst.de>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU Lesser General Public License as published by
+- * the Free Software Foundation; either version 2.1 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU Lesser General Public License for more details.
+- *
+- * You should have received a copy of the GNU Lesser General Public License
+- * along with this program; if not, write to the Free Software Foundation,
+- * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+- *****************************************************************************/
+-
+-#ifdef HAVE_CONFIG_H
+-# include <config.h>
+-#endif
+-
+-#include <vlc_common.h>
+-
+-#ifdef __native_client__
+-long pathconf (const char *path, int name)
+-{
+-    VLC_UNUSED(path);
+-    VLC_UNUSED(name);
+-    return -1;
+-}
+-#elif defined(_WIN32)
+-/* Windows does not have pathconf, but that is OK */
+-#else
+-# error pathconf not implemented on your platform!
+-#endif
+diff --git a/compat/recvmsg.c b/compat/recvmsg.c
+index 1c348fcee2..d110232f1e 100644
+--- a/compat/recvmsg.c
++++ b/compat/recvmsg.c
+@@ -83,85 +83,6 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
+     return -1;
+ }
+ 
+-#elif defined __native_client__
+-#include <errno.h>
+-#include <limits.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#ifdef HAVE_SYS_SOCKET_H
+-#include <sys/socket.h>
+-#endif
+-#ifdef HAVE_SYS_UIO_H
+-#include <sys/uio.h>
+-#endif
+-
+-ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
+-{
+-    if (msg->msg_controllen != 0)
+-    {
+-        errno = ENOSYS;
+-        return -1;
+-    }
+-
+-    if ((msg->msg_iovlen <= 0) || (msg->msg_iovlen > IOV_MAX))
+-    {
+-        errno = EMSGSIZE;
+-        return -1;
+-    }
+-
+-    size_t full_size = 0;
+-    for (int i = 0; i < msg->msg_iovlen; ++i)
+-        full_size += msg->msg_iov[i].iov_len;
+-
+-    if (full_size > SSIZE_MAX) {
+-        errno = EINVAL;
+-        return -1;
+-    }
+-
+-    /**
+-     * We always allocate here, because whether recv/recvfrom allow NULL message
+-     * or not is unspecified.
+-     */
+-    char *data = malloc(full_size ? full_size : 1);
+-    if (!data) {
+-        errno = ENOMEM;
+-        return -1;
+-    }
+-
+-    ssize_t res;
+-    if (msg->msg_name)
+-        res = recvfrom(fd, data, full_size, flags, msg->msg_name, &msg->msg_namelen);
+-    else
+-        res = recv(fd, data, full_size, flags);
+-
+-    if (res > 0) {
+-        size_t left;
+-        if ((size_t)res <= full_size) {
+-            left = res;
+-            msg->msg_flags = 0;
+-        }
+-        else {
+-            left = full_size;
+-            msg->msg_flags = MSG_TRUNC;
+-        }
+-
+-        const char *src = data;
+-        for (int i = 0; (i < msg->msg_iovlen) && (left > 0); ++i)
+-        {
+-            size_t to_copy = msg->msg_iov[i].iov_len;
+-            if (to_copy > left)
+-                to_copy = left;
+-
+-            memcpy(msg->msg_iov[i].iov_base, src, to_copy);
+-            src += to_copy;
+-            left -= to_copy;
+-        }
+-    }
+-
+-    free(data);
+-    return res;
+-}
+-
+ #else
+ #error recvmsg not implemented on your platform!
+ #endif
+diff --git a/compat/sendmsg.c b/compat/sendmsg.c
+index 0b08ce0942..3b5a6c42fd 100644
+--- a/compat/sendmsg.c
++++ b/compat/sendmsg.c
+@@ -73,67 +73,6 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
+     return -1;
+ }
+ 
+-#elif defined __native_client__
+-#include <errno.h>
+-#include <limits.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#ifdef HAVE_SYS_SOCKET_H
+-#include <sys/socket.h>
+-#endif
+-#ifdef HAVE_SYS_UIO_H
+-#include <sys/uio.h>
+-#endif
+-
+-ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
+-{
+-    if (msg->msg_controllen != 0)
+-    {
+-        errno = ENOSYS;
+-        return -1;
+-    }
+-
+-    if ((msg->msg_iovlen <= 0) || (msg->msg_iovlen > IOV_MAX))
+-    {
+-        errno = EMSGSIZE;
+-        return -1;
+-    }
+-
+-    size_t full_size = 0;
+-    for (int i = 0; i < msg->msg_iovlen; ++i)
+-        full_size += msg->msg_iov[i].iov_len;
+-
+-    if (full_size > SSIZE_MAX) {
+-        errno = EINVAL;
+-        return -1;
+-    }
+-
+-    /**
+-     * We always allocate here, because whether send/sento allow NULL message or
+-     * not is unspecified.
+-     */
+-    char *data = malloc(full_size ? full_size : 1);
+-    if (!data) {
+-        errno = ENOMEM;
+-        return -1;
+-    }
+-
+-    size_t tmp = 0;
+-    for (int i = 0; i < msg->msg_iovlen; ++i) {
+-        memcpy(data + tmp, msg->msg_iov[i].iov_base, msg->msg_iov[i].iov_len);
+-        tmp += msg->msg_iov[i].iov_len;
+-    }
+-
+-    ssize_t res;
+-    if (msg->msg_name)
+-        res = sendto(fd, data, full_size, flags, msg->msg_name, msg->msg_namelen);
+-    else
+-        res = send(fd, data, full_size, flags);
+-
+-    free(data);
+-    return res;
+-}
+-
+ #else
+ #error sendmsg not implemented on your platform!
+ #endif
+diff --git a/compat/sigwait.c b/compat/sigwait.c
+index e5a082d2d6..30e0205dac 100644
+--- a/compat/sigwait.c
++++ b/compat/sigwait.c
+@@ -24,8 +24,8 @@
+ # include <config.h>
+ #endif
+ 
+-#ifdef __native_client__
+-/* NaCl has no working sigwait, but SIGPIPE, for which vlc uses sigwait
++#if defined(__EMSCRIPTEN__) 
++/* Emscripten has no working sigwait, but SIGPIPE, for which vlc uses sigwait
+  * currently, is never generated in NaCl. So for SIGPIPE it's safe to instantly
+  * return, for all others run into an assertion. */
+ 
+diff --git a/configure.ac b/configure.ac
+index c7de27e7fd..831e4f10c1 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -371,13 +371,6 @@ case "${host_os}" in
+     X86ASMFLAGS="-f aout"
+     X86ASMDEFS="-DARCH_X86_32=1 -DARCH_X86_64=0 -DPREFIX"
+     ;;
+-  *nacl*)
+-    SYS=nacl
+-    AC_DEFINE([_XOPEN_SOURCE], [700], [POSIX and XPG 7th edition])
+-    AC_LIBOBJ([sigwait])
+-    AC_LIBOBJ([recvmsg])
+-    AC_LIBOBJ([sendmsg])
+-    ;;
+   *)
+     SYS="${host_os}"
+     ;;
+@@ -427,7 +420,6 @@ AM_CONDITIONAL([HAVE_IOS],     [test "${HAVE_IOS}" = "1"])
+ AM_CONDITIONAL([HAVE_OSX],     [test "${HAVE_OSX}" = "1"])
+ AM_CONDITIONAL([HAVE_TVOS],    [test "${HAVE_TVOS}" = "1"])
+ 
+-AM_CONDITIONAL([HAVE_NACL],    [test "${SYS}" = "nacl"])
+ AM_CONDITIONAL([HAVE_LIBANL],  [test "${HAVE_LIBANL}" = "1"])
+ 
+ AM_CONDITIONAL([HAVE_WIN32],   [test "${SYS}" = "mingw32"])
+@@ -697,7 +689,8 @@ need_libc=false
+ 
+ dnl Check for usual libc functions
+ AC_CHECK_FUNCS([accept4 dup3 fcntl flock fstatat fstatvfs fork getmntent_r getenv getpwuid_r isatty memalign mkostemp mmap open_memstream newlocale pipe2 pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale wordexp])
+-AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir flockfile fsync getdelim getpid lfind lldiv memrchr nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy tfind timegm timespec_get strverscmp pathconf])
++AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir flockfile fsync getdelim getpid lfind lldiv memrchr nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy tfind timegm timespec_get strverscmp])
++
+ AC_REPLACE_FUNCS([gettimeofday])
+ AC_CHECK_FUNC(fdatasync,,
+   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
+diff --git a/contrib/bootstrap b/contrib/bootstrap
+index e395a02652..72ca130520 100755
+--- a/contrib/bootstrap
++++ b/contrib/bootstrap
+@@ -355,9 +355,6 @@ case "${OS}" in
+ 	*solaris*)
+ 		add_make_enabled "HAVE_SOLARIS"
+ 		;;
+-	*nacl*)
+-		add_make_enabled "HAVE_NACL"
+-		;;
+ esac
+ 
+ #
+diff --git a/contrib/src/ass/rules.mak b/contrib/src/ass/rules.mak
+index 364afbad17..fc6a90bb03 100644
+--- a/contrib/src/ass/rules.mak
++++ b/contrib/src/ass/rules.mak
+@@ -23,14 +23,8 @@ WITH_FONTCONFIG = 0
+ WITH_HARFBUZZ = 1
+ WITH_DWRITE = 1
+ else
+-ifdef HAVE_NACL
+ WITH_FONTCONFIG = 1
+ WITH_HARFBUZZ = 1
+-WITH_ASS_ASM = 0
+-else
+-WITH_FONTCONFIG = 1
+-WITH_HARFBUZZ = 1
+-endif
+ endif
+ endif
+ endif
+diff --git a/contrib/src/ffmpeg/rules.mak b/contrib/src/ffmpeg/rules.mak
+index 178a47656c..aa445154d6 100644
+--- a/contrib/src/ffmpeg/rules.mak
++++ b/contrib/src/ffmpeg/rules.mak
+@@ -209,10 +209,6 @@ endif
+ FFMPEGCONF += --target-os=sunos --enable-pic
+ endif
+ 
+-ifdef HAVE_NACL
+-FFMPEGCONF+=--disable-inline-asm --disable-asm --target-os=linux
+-endif
+-
+ # Build
+ PKGS += ffmpeg
+ ifeq ($(call need_pkg,"libavcodec >= $(FFMPEG_LAVC_MIN) libavformat >= 53.21.0 libswscale"),)
+diff --git a/contrib/src/fontconfig/rules.mak b/contrib/src/fontconfig/rules.mak
+index 08b6a04cc0..b761d44bd5 100644
+--- a/contrib/src/fontconfig/rules.mak
++++ b/contrib/src/fontconfig/rules.mak
+@@ -50,10 +50,6 @@ FONTCONFIG_ENV += LIBXML2_CFLAGS=`xml2-config --cflags`
+ FONTCONFIG_ENV += LIBXML2_LIBS=`xml2-config --libs`
+ endif
+ 
+-ifdef HAVE_NACL
+-FONTCONFIG_ENV += ac_cv_func_random=no
+-endif
+-
+ DEPS_fontconfig = freetype2 $(DEPS_freetype2) libxml2 $(DEPS_libxml2)
+ 
+ .fontconfig: fontconfig
+diff --git a/contrib/src/gcrypt/rules.mak b/contrib/src/gcrypt/rules.mak
+index e710f90e70..c9c9be3efa 100644
+--- a/contrib/src/gcrypt/rules.mak
++++ b/contrib/src/gcrypt/rules.mak
+@@ -72,12 +72,6 @@ ifeq ($(ARCH),aarch64)
+ GCRYPT_CONF += --disable-arm-crypto-support
+ endif
+ endif
+-ifdef HAVE_NACL
+-GCRYPT_CONF += --disable-asm --disable-aesni-support ac_cv_func_syslog=no --disable-sse41-support
+-GCRYPT_CONF += --disable-avx-support --disable-avx2-support --disable-padlock-support
+-GCRYPT_CONF += --disable-amd64-as-feature-detection --disable-drng-support
+-GCRYPT_CONF += --disable-pclmul-support
+-endif
+ 
+ .gcrypt: gcrypt
+ 	# Reconfiguring this requires a git repo to be available, to
+diff --git a/contrib/src/gmp/rules.mak b/contrib/src/gmp/rules.mak
+index de2ce20175..11fe8acdfa 100644
+--- a/contrib/src/gmp/rules.mak
++++ b/contrib/src/gmp/rules.mak
+@@ -13,11 +13,6 @@ ifeq ($(ARCH),mips64el)
+ GMP_CONF += --disable-assembly
+ endif
+ endif
+-ifdef HAVE_NACL
+-ifeq ($(ARCH),x86_64)
+-GMP_CONF += --disable-assembly
+-endif
+-endif
+ 
+ ifdef HAVE_WIN32
+ ifeq ($(ARCH),arm)
+diff --git a/contrib/src/gnutls/rules.mak b/contrib/src/gnutls/rules.mak
+index ae2b07afd0..363562c89d 100644
+--- a/contrib/src/gnutls/rules.mak
++++ b/contrib/src/gnutls/rules.mak
+@@ -75,10 +75,6 @@ ifeq ($(ARCH),aarch64)
+ endif
+ endif
+ 
+-ifdef HAVE_NACL
+-	GNUTLS_CONF += --disable-hardware-acceleration
+-endif
+-
+ .gnutls: gnutls
+ 	cd $< && $(GNUTLS_ENV) ./configure $(GNUTLS_CONF)
+ 	cd $< && $(MAKE) -C gl install
+diff --git a/contrib/src/gpg-error/rules.mak b/contrib/src/gpg-error/rules.mak
+index a22c778632..0efda5449b 100644
+--- a/contrib/src/gpg-error/rules.mak
++++ b/contrib/src/gpg-error/rules.mak
+@@ -34,15 +34,6 @@ else
+ 	cp $@/src/syscfg/lock-obj-pub.arm-unknown-linux-androideabi.h $@/src/syscfg/lock-obj-pub.linux-android.h
+ endif
+ endif
+-ifdef HAVE_NACL
+-ifeq ($(ARCH),i386) # 32bits intel
+-	cp $@/src/syscfg/lock-obj-pub.i686-pc-linux-gnu.h $@/src/syscfg/lock-obj-pub.nacl.h
+-else
+-ifeq ($(ARCH),x86_64)
+-	cp $@/src/syscfg/lock-obj-pub.x86_64-pc-linux-gnu.h $@/src/syscfg/lock-obj-pub.nacl.h
+-endif
+-endif
+-endif
+ 
+ GPGERROR_CONF := $(HOSTCONF) \
+ 	--disable-nls \
+diff --git a/contrib/src/mpg123/rules.mak b/contrib/src/mpg123/rules.mak
+index 7a9ce99c19..54f9891aa5 100644
+--- a/contrib/src/mpg123/rules.mak
++++ b/contrib/src/mpg123/rules.mak
+@@ -30,10 +30,6 @@ MPG123CONF += --with-cpu=generic_dither
+ endif
+ endif
+ 
+-ifdef HAVE_NACL
+-MPG123CONF += ac_cv_header_sys_select_h=no
+-endif
+-
+ $(TARBALLS)/mpg123-$(MPG123_VERSION).tar.bz2:
+ 	$(call download_pkg,$(MPG123_URL),mpg123)
+ 
+diff --git a/contrib/src/postproc/rules.mak b/contrib/src/postproc/rules.mak
+index 655acd5217..4ad433e8c4 100644
+--- a/contrib/src/postproc/rules.mak
++++ b/contrib/src/postproc/rules.mak
+@@ -103,10 +103,6 @@ ifdef HAVE_SOLARIS
+ POSTPROCCONF += --enable-pic
+ endif
+ 
+-ifdef HAVE_NACL
+-POSTPROCCONF += --target-os=linux
+-endif
+-
+ # Build
+ 
+ ifdef GPL
+diff --git a/include/vlc_fixups.h b/include/vlc_fixups.h
+index 9149c7519f..60dd6e9d27 100644
+--- a/include/vlc_fixups.h
++++ b/include/vlc_fixups.h
+@@ -33,7 +33,7 @@
+ 
+ /* C++11 says there's no need to define __STDC_*_MACROS when including
+  * inttypes.h and stdint.h. */
+-#if defined (__cplusplus) && (defined(__MINGW32__) || defined(__UCLIBC__) || defined(__native_client__))
++#if defined (__cplusplus) && (defined(__MINGW32__) || defined(__UCLIBC__))
+ # ifndef __STDC_FORMAT_MACROS
+ #  define __STDC_FORMAT_MACROS 1
+ # endif
+@@ -121,15 +121,6 @@ extern "C" {
+ # define VLC_NOTHROW
+ #endif
+ 
+-/* signal.h */
+-#if !defined(HAVE_SIGWAIT) && defined(__native_client__)
+-/* NaCl does not define sigwait in signal.h. We need to include it here to
+- * define sigwait, because sigset_t is allowed to be either an integral or a
+- * struct. */
+-#include <signal.h>
+-int sigwait(const sigset_t *set, int *sig);
+-#endif
+-
+ /* stddef.h */
+ #if !defined (__cplusplus) && !defined (HAVE_MAX_ALIGN_T)
+ typedef struct {
+@@ -269,10 +260,6 @@ pid_t getpid (void) VLC_NOTHROW;
+ int fsync (int fd);
+ #endif
+ 
+-#ifndef HAVE_PATHCONF
+-long pathconf (const char *path, int name);
+-#endif
+-
+ /* dirent.h */
+ #ifndef HAVE_DIRFD
+ int (dirfd) (DIR *);
+@@ -324,10 +311,6 @@ void *aligned_alloc(size_t, size_t);
+ #define aligned_free(ptr)  free(ptr)
+ #endif
+ 
+-#if defined(__native_client__) && defined(__cplusplus)
+-# define HAVE_USELOCALE
+-#endif
+-
+ #if !defined(HAVE_NEWLOCALE) && defined(HAVE_CXX_LOCALE_T) && defined(__cplusplus)
+ # include <locale>
+ # define HAVE_NEWLOCALE
+@@ -393,11 +376,6 @@ int inet_pton(int, const char *, void *);
+ const char *inet_ntop(int, const void *, char *, socklen_t);
+ #endif
+ 
+-/* NaCl has a broken netinet/tcp.h, so TCP_NODELAY is not set */
+-#if defined(__native_client__) && !defined( HAVE_NETINET_TCP_H )
+-#  define TCP_NODELAY 1
+-#endif
+-
+ #ifndef HAVE_STRUCT_POLLFD
+ enum
+ {
+diff --git a/m4/dolt.m4 b/m4/dolt.m4
+index ff28bef516..9bd7db6097 100644
+--- a/m4/dolt.m4
++++ b/m4/dolt.m4
+@@ -21,7 +21,7 @@ AS_IF([test x$GCC != xyes], [dolt_supported=no])
+ AS_CASE([$host],
+     [*-*-linux*|*-*-freebsd*], [pic_options='-fPIC'],
+     [*-apple-darwin*],         [pic_options='-fno-common'],
+-    [*mingw*|*nacl*],          [pic_options='']
++    [*mingw*],          [pic_options='']
+     [*],                       [dolt_supported=no]
+ )
+ AS_IF([test x$dolt_supported = xno], [
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 49947dc6be..ae580acc68 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -431,17 +431,6 @@ libvlccore_la_SOURCES += \
+ 	os2/thread.c
+ endif
+ 
+-if HAVE_NACL
+-libvlccore_la_SOURCES += \
+-	android/error.c \
+-	posix/dirs.c \
+-	posix/filesystem.c \
+-	posix/netconf.c \
+-	posix/rand.c \
+-	posix/specific.c \
+-	posix/timer.c
+-endif
+-
+ if HAVE_DARWIN
+ libvlccore_la_SOURCES += \
+ 	darwin/error.c \
+@@ -475,7 +464,6 @@ endif
+ 
+ if !HAVE_WIN32
+ if !HAVE_OS2
+-if !HAVE_NACL
+ libvlccore_la_SOURCES += \
+ 	posix/filesystem.c \
+ 	posix/plugin.c \
+@@ -508,7 +496,6 @@ endif
+ endif
+ endif
+ endif
+-endif
+ 
+ if ENABLE_SOUT
+ libvlccore_la_SOURCES += \
+diff --git a/src/network/getaddrinfo.c b/src/network/getaddrinfo.c
+index 14496d5b09..c592b884cc 100644
+--- a/src/network/getaddrinfo.c
++++ b/src/network/getaddrinfo.c
+@@ -120,8 +120,7 @@ int vlc_getaddrinfo (const char *node, unsigned port,
+ }
+ 
+ #if defined (_WIN32) || defined (__OS2__) \
+- || defined (__ANDROID__) || defined (__APPLE__) \
+- || defined (__native_client__)
++ || defined (__ANDROID__) || defined (__APPLE__)
+ #warning vlc_getaddrinfo_i11e() not implemented!
+ int vlc_getaddrinfo_i11e(const char *node, unsigned port,
+                          const struct addrinfo *hints, struct addrinfo **res)
+-- 
+2.31.1
+

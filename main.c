@@ -46,12 +46,12 @@ int main() {
 	 * If this thread stop, all proxyfied functions wont be called.
 	 */
   EM_ASM(Module['noExitRuntime']=true);
-  emscripten_set_element_css_size("#canvas", 720, 540);
   libvlc_media_t *m;
   char const *vlc_argv[] = {
 			    "-vvv",
 			    "--no-spu",
 			    "--no-osd",
+			    "--aout=emworklet_audio",
 			    "-Idummy",
 			    "--ignore-config",
   };
