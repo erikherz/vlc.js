@@ -17,11 +17,12 @@ checkfail()
 }
 WORK_DIR=$PWD
 
+EMSDK_VERSION="2.0.17"
 # Download the portable SDK and uncompress it
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
     git clone http://github.com/emscripten-core/emsdk.git emsdk
-    cd emsdk && ./emsdk update-tags && ./emsdk install tot-upstream && ./emsdk activate tot-upstream
+    cd emsdk && ./emsdk update-tags && ./emsdk install ${EMSDK_VERSION} && ./emsdk activate ${EMSDK_VERSION}
     checkfail "emsdk: fetch failed"
 fi
 
