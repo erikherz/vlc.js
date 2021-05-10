@@ -23,16 +23,18 @@ if [ ! -d vlc ]; then
     exit 1
 fi
 
-PROJECT_DIR=$(pwd)/vlc
+PATH_VLC=${PATH_VLC:=./vlc}
+SAMPLE=${SAMPLE:=./BigBuckBunny.mp4}
+PROJECT_DIR=${PROJECT_DIR:=./vlc/extras/package/wasm-emscripten/build}
 
-cd vlc/build-emscripten
 # for release, remove profiling-funcs and add -Os
-    -I $PROJECT_DIR/include/ -I $PROJECT_DIR/contrib/wasm32-unknown-emscripten/include/ main.c \
 emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
+    -I $PATH_VLC/include/ -I $PROJECT_DIR/wasm32-unknown-emscripten/include/ main.c \
     $PROJECT_DIR/build-emscripten/lib/.libs/libvlc.a \
-    vlc-modules.bc $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
-    $PROJECT_DIR/contrib/wasm32-unknown-emscripten/lib/*.a \
+    $PROJECT_DIR/build-emscripten/vlc-modules.bc \
+    $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
+    $PROJECT_DIR/wasm32-unknown-emscripten/lib/*.a \
     $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
     $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
-    -o ../../experimental.html --emrun --preload-file BigBuckBunny.mp4
+    -o experimental.html --preload-file ${SAMPLE}
