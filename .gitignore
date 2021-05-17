@@ -1,4 +1,5 @@
 # Ignore build dirs
+samples/
 vlc/
 emsdk/
 # and files

@@ -24,7 +24,7 @@ if [ ! -d vlc ]; then
 fi
 
 PATH_VLC=${PATH_VLC:=./vlc}
-SAMPLE=${SAMPLE:=./BigBuckBunny.mp4}
+SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 PROJECT_DIR=${PROJECT_DIR:=./vlc/extras/package/wasm-emscripten/build}
 
 # for release, remove profiling-funcs and add -Os
@@ -37,4 +37,4 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     $PROJECT_DIR/wasm32-unknown-emscripten/lib/*.a \
     $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
     $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
-    -o experimental.html --preload-file ${SAMPLE}
+    -o experimental.html --preload-file ${SAMPLE_DIR}
