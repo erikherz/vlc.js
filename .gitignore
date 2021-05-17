@@ -2,6 +2,8 @@
 samples/
 vlc/
 emsdk/
+tests/build/
+
 # and files
 experimental.data
 experimental.html
