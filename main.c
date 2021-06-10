@@ -52,11 +52,11 @@ int main() {
   return 0;
 }
 
-void* EMSCRIPTEN_KEEPALIVE get_media_player_buck_bunny() {
+void* EMSCRIPTEN_KEEPALIVE get_media_player(const char* path) {
   libvlc_media_player_t *media_player;
 
   libvlc_media_t *m;
-  m = libvlc_media_new_path( libvlc, "./samples/BigBuckBunny.mp4" );
+  m = libvlc_media_new_path( libvlc, path );
 
   if (m == NULL)
     {
