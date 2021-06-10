@@ -97,178 +97,37 @@
         ></canvas>
     </div>
 
-    <script type="text/javascript" src="./assets/module-loader.js"></script>
-    <script async type="text/javascript" src="./experimental.js"></script>
+    <script src="./lib/module-loader.js"></script>
+    <script src="./experimental.js"></script>
 
-    <script>
-      const central_play_icon = new Image(50, 50);
-      const overlay = document.getElementById("overlay");
-      const ctx = overlay.getContext("2d");
+    <script type="module">
+      import { update_overlay, on_overlay_click } from "./lib/overlay.js";
+      import { MediaPlayer } from "./lib/libvlc.js";
 
-      central_play_icon.onload = function() {
-        ctx.drawImage(
-          central_play_icon,
-          overlay.width / 2 - central_play_icon.width / 2,
-          overlay.height / 2 - central_play_icon.height / 2,
-          central_play_icon.width,
-          central_play_icon.height,
-        );
+      const Module = await VlcModule(VlcModuleExt);
+
+      Module.setStatus('Downloading...');
+      window.onerror = function(event) {
+        // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
+        Module.setStatus('Exception thrown, see JavaScript console');
+        spinnerElement.style.display = 'none';
+        Module.setStatus = function(text) {
+          if (text) Module.printErr('[post-exception status] ' + text);
+        };
       };
-      central_play_icon.src = "vlc/modules/gui/qt/pixmaps/play_button.svg";
 
-      const PROGRESS_BAR_COLOR = "#2a81d4";
-      const PROGRESS_BAR_BG_COLOR = "#2d2d2d";
-      const VOLUME_BAR_COLOR = "#4ad24a";
-      const VOLUME_BAR_MUTE_COLOR = "#4d704e";
-      const VOLUME_BAR_BG_COLOR = "#2d2d2d";
+      const overlay = document.getElementById("overlay");
+      const media_player = new MediaPlayer(Module);
 
-      const BUTTON_BG_COLOR = "#464646";
-      const GENERAL_BG_COLOR = "#353535";
-      const TEXT_COLOR = "#8d8d8c";
+      window.media_player = media_player;
+      window.on_overlay_click = on_overlay_click;
+      window.update_overlay = update_overlay;
 
-      const MENU_BAR_HEIGHT = 30;
-      const BUTTON_SIZE = 20;
-      const GAP_SIZE = 5;
-
-      const VOLUME_BAR_WIDTH = 100;
-      const VOLUME_BAR_HEIGHT = 20;
-
-      const PROGRESS_BAR_WIDTH = overlay.width -
-        (GAP_SIZE + BUTTON_SIZE + GAP_SIZE + GAP_SIZE + BUTTON_SIZE + GAP_SIZE + VOLUME_BAR_WIDTH + GAP_SIZE);
-      const PROGRESS_BAR_HEIGHT = 10;
-
-      const PLAY_BUTTON_X = GAP_SIZE;
-      const PROGRESS_BAR_X = PLAY_BUTTON_X + BUTTON_SIZE + GAP_SIZE;
-      const VOLUME_BUTTON_X = PROGRESS_BAR_X + PROGRESS_BAR_WIDTH + GAP_SIZE;
-      const VOLUME_BAR_X = VOLUME_BUTTON_X + BUTTON_SIZE + GAP_SIZE;
-
-      const play_button = new Image(BUTTON_SIZE, BUTTON_SIZE);
-      play_button.src = "vlc/modules/gui/qt/pixmaps/play.png";
-      const pause_button = new Image(BUTTON_SIZE, BUTTON_SIZE);
-      pause_button.src = "vlc/modules/gui/qt/pixmaps/pause.png";
-
-      const volume_button = new Image(BUTTON_SIZE, BUTTON_SIZE);
-      volume_button.src = "vlc/modules/gui/qt/pixmaps/toolbar/volume-medium.png";
-      const muted_button = new Image(BUTTON_SIZE, BUTTON_SIZE);
-      muted_button.src = "vlc/modules/gui/qt/pixmaps/toolbar/volume-muted.png";
-
-      function update_overlay() {
-        ctx.save();
-        ctx.clearRect(0, 0, overlay.width, overlay.height);
-
-        let is_paused = Module.is_paused();
-
-        if (is_paused) {
-          ctx.drawImage(
-            central_play_icon,
-            overlay.width / 2 - central_play_icon.width / 2,
-            overlay.height / 2 - central_play_icon.height / 2,
-            central_play_icon.width,
-            central_play_icon.height,
-          );
-        }
-
-        if (window.display_overlay) {
-          // -- PAINT BACKGROUND --
-          ctx.fillStyle = GENERAL_BG_COLOR;
-          ctx.fillRect(
-            0, overlay.height - MENU_BAR_HEIGHT,
-            overlay.width, MENU_BAR_HEIGHT
-          );
-
-          let y = overlay.height - MENU_BAR_HEIGHT;
-
-          // -- DRAW PLAY/PAUSE BUTTON --
-          ctx.drawImage(is_paused ? play_button : pause_button,
-            GAP_SIZE, y + (MENU_BAR_HEIGHT - BUTTON_SIZE) / 2,
-            BUTTON_SIZE, BUTTON_SIZE
-          );
-
-          // -- DRAW PROGRESS BAR --
-          let position = Module.get_position();
-
-          ctx.fillStyle = PROGRESS_BAR_BG_COLOR;
-          ctx.fillRect(
-            PROGRESS_BAR_X, y + (MENU_BAR_HEIGHT - PROGRESS_BAR_HEIGHT) / 2,
-            PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT
-          );
-          ctx.fillStyle = PROGRESS_BAR_COLOR;
-          ctx.fillRect(
-            PROGRESS_BAR_X, y + (MENU_BAR_HEIGHT - PROGRESS_BAR_HEIGHT) / 2,
-            PROGRESS_BAR_WIDTH * position, PROGRESS_BAR_HEIGHT
-          );
-
-          // -- DRAW VOLUME/MUTE BUTTON --
-          let is_muted = Module.get_mute();
-          ctx.drawImage(is_muted ? muted_button : volume_button,
-            VOLUME_BUTTON_X, y + (MENU_BAR_HEIGHT - BUTTON_SIZE) / 2,
-            BUTTON_SIZE, BUTTON_SIZE
-          );
-
-          // -- DRAW VOLUME BAR --
-          let volume = Module.get_volume() / 100;
-
-          ctx.fillStyle = VOLUME_BAR_BG_COLOR;
-          ctx.fillRect(
-            VOLUME_BAR_X, y + (MENU_BAR_HEIGHT - VOLUME_BAR_HEIGHT) / 2,
-            VOLUME_BAR_WIDTH, VOLUME_BAR_HEIGHT
-          );
-          ctx.fillStyle = is_muted ? VOLUME_BAR_MUTE_COLOR : VOLUME_BAR_COLOR;
-          ctx.fillRect(
-            VOLUME_BAR_X, y + (MENU_BAR_HEIGHT - VOLUME_BAR_HEIGHT) / 2,
-            VOLUME_BAR_WIDTH * volume, VOLUME_BAR_HEIGHT
-          );
-        }
-
-        ctx.restore();
-      }
-
-      function on_overlay_click(mouse_event) {
-        let canvas_rect = mouse_event.target.getBoundingClientRect();
-        let x = mouse_event.clientX - canvas_rect.left;
-        let y = mouse_event.clientY - canvas_rect.top;
-
-        // User clicked in menu bar
-        if (y > overlay.height - MENU_BAR_HEIGHT) {
-          // User clicked on play/pause button
-          if (x > PLAY_BUTTON_X && x < PLAY_BUTTON_X + BUTTON_SIZE) {
-            Module.play_video();
-            update_overlay();
-          }
-
-          // User clicked on progress bar
-          if (x > PROGRESS_BAR_X && x < PROGRESS_BAR_X + PROGRESS_BAR_WIDTH) {
-            let progress = (x - PROGRESS_BAR_X) / PROGRESS_BAR_WIDTH;
-            Module.set_position(progress);
-            update_overlay();
-          }
-
-          // User clicked on volume/mute button
-          if (x > VOLUME_BUTTON_X && x < VOLUME_BUTTON_X + BUTTON_SIZE) {
-            Module.toggle_mute();
-            update_overlay();
-          }
-
-          // User clicked on volume bar
-          if (x > VOLUME_BAR_X && x < VOLUME_BAR_X + VOLUME_BAR_WIDTH) {
-            let new_volume = (x - VOLUME_BAR_X) / VOLUME_BAR_WIDTH;
-            Module.set_volume(new_volume * 100);
-            // Unmute
-            Module.set_mute(0);
-            update_overlay();
-          }
-        }
-
-        // User clicked outside the menu bar
-        else {
-          if (Module.play_video)
-            Module.play_video();
-        }
-      }
+      update_overlay(overlay);
 
       addEventListener('worker_message', function(msg) {
         if (msg.detail === "on_position_changed") {
-          update_overlay();
+          update_overlay(overlay);
         }
       });
     </script>
