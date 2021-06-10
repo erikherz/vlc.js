@@ -13,6 +13,8 @@ libvlc_time_t t = -1;
 
 static void iter()
 {
+  if (!mp)
+    return;
 	if (libvlc_media_player_get_time(mp) == t) {
 		// when enable, the js does not respond.
 		//libvlc_media_player_release( mp );
@@ -20,6 +22,10 @@ static void iter()
 		emscripten_cancel_main_loop();
 	}
 	t = libvlc_media_player_get_time(mp);
+}
+
+void EMSCRIPTEN_KEEPALIVE set_global_media_player(libvlc_media_player_t *media_player) {
+  mp = media_player;
 }
 
 extern void update_overlay();
@@ -52,27 +58,7 @@ int main() {
   return 0;
 }
 
-void* EMSCRIPTEN_KEEPALIVE get_media_player(const char* path) {
-  libvlc_media_player_t *media_player;
-
-  libvlc_media_t *m;
-  m = libvlc_media_new_path( libvlc, path );
-
-  if (m == NULL)
-    {
-      fprintf(stderr, "unable to create media");
-      return NULL;
-    }
-  media_player = libvlc_media_player_new_from_media( m );
-  if (media_player == NULL)
-    {
-      fprintf(stderr, "unable to create media player");
-      return NULL;
-    }
-
-  libvlc_media_release( m );
-  m = libvlc_media_player_get_media(media_player);
-
+void EMSCRIPTEN_KEEPALIVE attach_update_events(libvlc_media_player_t *media_player) {
   libvlc_event_manager_t* event_manager = libvlc_media_player_event_manager(media_player);
   int res;
   res = libvlc_event_attach(
@@ -89,50 +75,18 @@ void* EMSCRIPTEN_KEEPALIVE get_media_player(const char* path) {
     NULL
   );
   assert(res == 0);
-
-  assert(media_player != NULL);
-  mp = media_player;
-
-  return media_player;
 }
 
+// ---
 
-int EMSCRIPTEN_KEEPALIVE play(libvlc_media_player_t *media_player) {
-  return libvlc_media_player_play(media_player);
+libvlc_media_t* EMSCRIPTEN_KEEPALIVE wasm_media_new_path(const char *path) {
+  return libvlc_media_new_path(libvlc, path);
 }
 
-void EMSCRIPTEN_KEEPALIVE pause_video(libvlc_media_player_t *media_player) {
-  libvlc_media_player_pause(media_player);
+void EMSCRIPTEN_KEEPALIVE wasm_media_retain( libvlc_media_t *media) {
+  libvlc_media_retain(media);
 }
 
-EM_BOOL EMSCRIPTEN_KEEPALIVE is_playing(libvlc_media_player_t *media_player) {
-  return libvlc_media_player_is_playing(media_player);
-}
-
-float EMSCRIPTEN_KEEPALIVE get_position(libvlc_media_player_t *media_player) {
-  return libvlc_media_player_get_position(media_player);
-}
-
-int EMSCRIPTEN_KEEPALIVE set_position(libvlc_media_player_t *media_player, float position, EM_BOOL fast) {
-  return libvlc_media_player_set_position(media_player, position, fast);
-}
-
-int EMSCRIPTEN_KEEPALIVE get_volume(libvlc_media_player_t *media_player) {
-  return libvlc_audio_get_volume(media_player);
-}
-
-int EMSCRIPTEN_KEEPALIVE set_volume(libvlc_media_player_t *media_player, int i_volume) {
-  return libvlc_audio_set_volume(media_player, i_volume);
-}
-
-void EMSCRIPTEN_KEEPALIVE toggle_mute(libvlc_media_player_t *media_player) {
-  libvlc_audio_toggle_mute(media_player);
-}
-
-EM_BOOL EMSCRIPTEN_KEEPALIVE get_mute(libvlc_media_player_t *media_player) {
-  return libvlc_audio_get_mute(media_player);
-}
-
-void EMSCRIPTEN_KEEPALIVE set_mute(libvlc_media_player_t *media_player, int i_status) {
-  libvlc_audio_set_mute(media_player, i_status);
+void EMSCRIPTEN_KEEPALIVE wasm_media_release( libvlc_media_t *media) {
+  libvlc_media_release(media);
 }
