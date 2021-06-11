@@ -27,13 +27,15 @@ PATH_VLC=${PATH_VLC:=./vlc}
 SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 PROJECT_DIR=${PROJECT_DIR:=./vlc/extras/package/wasm-emscripten/build}
 
-# for release, remove profiling-funcs and add -Os
+# For release builds, remove '--profiling-funcs' and add '-Os'
+# Note that we use '-s MODULARIZE', but no '-s EXPORT_ES6', which would
+# conflict with pthreads on Firefox.
 emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
     -s MODULARIZE=1 -s EXPORT_NAME="VlcModule" \
     -s EXTRA_EXPORTED_RUNTIME_METHODS="allocateUTF8" \
     -I $PATH_VLC/include/ -I $PROJECT_DIR/wasm32-unknown-emscripten/include/ \
-    exports_media_player.c main.c \
+    main.c exports_media_player.c exports_media.c \
     $PROJECT_DIR/build-emscripten/lib/.libs/libvlc.a \
     $PROJECT_DIR/build-emscripten/vlc-modules.bc \
     $PROJECT_DIR/build-emscripten/modules/.libs/*.a \

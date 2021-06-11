@@ -58,6 +58,8 @@ int main() {
   return 0;
 }
 
+// Used to make sure the UI (progress bar, play/pause button, etc) is
+// updated as the video is read.
 void EMSCRIPTEN_KEEPALIVE attach_update_events(libvlc_media_player_t *media_player) {
   libvlc_event_manager_t* event_manager = libvlc_media_player_event_manager(media_player);
   int res;
@@ -75,18 +77,4 @@ void EMSCRIPTEN_KEEPALIVE attach_update_events(libvlc_media_player_t *media_play
     NULL
   );
   assert(res == 0);
-}
-
-// ---
-
-libvlc_media_t* EMSCRIPTEN_KEEPALIVE wasm_media_new_path(const char *path) {
-  return libvlc_media_new_path(libvlc, path);
-}
-
-void EMSCRIPTEN_KEEPALIVE wasm_media_retain( libvlc_media_t *media) {
-  libvlc_media_retain(media);
-}
-
-void EMSCRIPTEN_KEEPALIVE wasm_media_release( libvlc_media_t *media) {
-  libvlc_media_release(media);
 }

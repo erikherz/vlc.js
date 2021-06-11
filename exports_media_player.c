@@ -1,12 +1,20 @@
+// Re-exports of functions defined in "include/vlc/libvlc/media/player.h"
+// We need to re-export these functions to make sure they're included as
+// symbols in the wasm binary.
+// Emscripten provides two ways to do that: EMSCRIPTEN_KEEPALIVE, and the
+// EXPORTED_FUNCTIONS argument. EXPORTED_FUNCTIONS is not reliable, because
+// symbols might be inlined in intermediary passes.
+// Also, some functions need some marshalling of arguments to be callabled
+// from JS.
+
 #include <vlc/vlc.h>
 #include <vlc_common.h>
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
+// Singleton, defined in main.c
 extern libvlc_instance_t *libvlc;
-
-// TODO - explain why we have to redefine everything
 
 libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new() {
   return libvlc_media_player_new(libvlc);
@@ -216,7 +224,6 @@ int EMSCRIPTEN_KEEPALIVE wasm_audio_get_delay(libvlc_media_player_t *media_playe
 int EMSCRIPTEN_KEEPALIVE wasm_audio_set_delay(libvlc_media_player_t *media_player, int delay) {
   return libvlc_audio_set_delay(media_player, delay);
 }
-
 
 // TODO - Export libvlc_media_player_role constants
 
