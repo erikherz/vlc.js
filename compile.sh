@@ -64,9 +64,12 @@ url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBun
 
 diagnostic "getting video"
 cd $WORK_DIR
-mkdir -p samples/
-if [ ! -f "./samples/BigBuckBunny.mp4" ]; then
-    curl ${url} -o samples/BigBuckBunny.mp4
+if [ ! -f "./BigBuckBunny.mp4" ]; then
+    curl ${url} -o BigBuckBunny1.mp4
+    ffmpeg -i BigBuckBunny1.mp4 -t 50 BigBuckBunny.mp4
 fi
 diagnostic "Generating executable"
 ./create_main.sh
+
+diagnostic "create build archive"
+zip build.zip assets/* lib/* experimental.* vlc.html 
