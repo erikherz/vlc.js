@@ -1,0 +1,52 @@
+From 7c3b7e7b64dd63107286ca2861f4d2381ade59c2 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 20 May 2020 01:31:35 +0000
+Subject: [PATCH 02/18] compat: add clock_nanosleep support for emscripten
+
+---
+ compat/clock_nanosleep.c | 9 +++++++--
+ configure.ac             | 1 +
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/compat/clock_nanosleep.c b/compat/clock_nanosleep.c
+index 494540b8b9..986d201e02 100644
+--- a/compat/clock_nanosleep.c
++++ b/compat/clock_nanosleep.c
+@@ -20,7 +20,7 @@
+  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+  *****************************************************************************/
+ 
+-#ifdef __APPLE__
++#if defined(__APPLE__) || defined (__EMSCRIPTEN__)
+ 
+ #ifdef HAVE_CONFIG_H
+ # include <config.h>
+@@ -32,7 +32,12 @@
+ #include <sys/types.h>
+ #include <sys/time.h>
+ #include <sys/sysctl.h>
+-#include <mach/clock_types.h>
++
++#ifdef __APPLE__
++# include <mach/clock_types.h>
++#else
++# define NSEC_PER_SEC 1000000000L
++#endif
+ 
+ int clock_nanosleep(clockid_t clock_id, int flags,
+         const struct timespec *rqtp, struct timespec *rmtp)
+diff --git a/configure.ac b/configure.ac
+index af0a57f774..946eeec99d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -380,6 +380,7 @@ case "${host_os}" in
+     ;;
+   *emscripten*)
+     SYS=emscripten
++    AC_LIBOBJ([clock_nanosleep])
+     # tdestroy() is a GNU extension
+     CFLAGS="${CFLAGS} -pthread -D_GNU_SOURCE"
+     CXXFLAGS="${CXXFLAGS} -pthread"
+-- 
+2.32.0
+

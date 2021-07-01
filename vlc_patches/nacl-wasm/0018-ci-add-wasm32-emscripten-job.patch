@@ -1,0 +1,59 @@
+From 65950997f1c6f24b1f5d31ddece20a7c45365596 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Thu, 29 Apr 2021 00:48:33 +0200
+Subject: [PATCH 18/18] ci : add wasm32-emscripten job
+
+---
+ extras/ci/gitlab-ci.yml | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/extras/ci/gitlab-ci.yml b/extras/ci/gitlab-ci.yml
+index a6f2273fae..7d46139e21 100644
+--- a/extras/ci/gitlab-ci.yml
++++ b/extras/ci/gitlab-ci.yml
+@@ -20,6 +20,7 @@ variables:
+     VLC_ANDROID_IMAGE: registry.videolan.org/vlc-debian-android:20200529135226
+     VLC_SNAP_IMAGE: registry.videolan.org/vlc-ubuntu-focal:20210611174203
+     VLC_RASPBIAN_IMAGE: registry.videolan.org/vlc-debian-raspbian:20200213203125
++    VLC_WASM_EMSCRIPTEN: registry.videolan.org/vlc-debian-wasm-emscripten:20210601090557
+ 
+ .variables-debian: &variables-debian
+         HOST_ARCH: x86_64
+@@ -102,6 +103,11 @@ variables:
+         ANDROID_ARCH: x86_64
+         TRIPLET: x86_64-linux-android
+ 
++.variables-emscripten-wasm32: &variables-emscripten-wasm32
++        HOST_ARCH: wasm32
++        TRIPLET: $HOST_ARCH-unknown-emscripten
++        EMSDK_VERSION: 2.0.23
++
+ # Common rules
+ .base-template:
+     stage: build
+@@ -457,6 +463,22 @@ android-x86_64:
+     extends: .android-common
+     variables: *variables-android-x86_64
+ 
++#
++# Webassembly
++#
++
++wasm32-emscripten-build :    
++    extends: .base-template
++    variables: *variables-emscripten-wasm32
++    tags:
++        - wasm32-emscripten-build
++    image:
++        name: $VLC_WASM_EMSCRIPTEN
++    script: 
++        - source $EMSCRIPTEN_SDK/emsdk_env.sh
++        - ./extras/package/wasm-emscripten/build.sh
++        - tar -cvjSf contrib/vlc-contrib-alpha.tar.bz2 ./extras/package/wasm-emscripten/build/wasm32-unknown-emscripten
++
+ #
+ # VLC Documentation
+ #
+-- 
+2.32.0
+

@@ -1,0 +1,348 @@
+From 54ced6dab58a718f4750c62c26d33fb2950fa52a Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 2 Jun 2021 00:53:12 +0200
+Subject: [PATCH 03/18] compat: remove nacl support
+
+Nacl is now deprecated :
+cf. https://blog.chromium.org/2020/08/changes-to-chrome-app-support-timeline.html
+
+The removed compat functions were tested and are part of the toolchain,
+and a stub for sigwait will land in the next emscripten release.
+
+cf. https://github.com/emscripten-core/emscripten/commit/3bb97f8a1818822f84b6962ede543e31bc3fa5cd
+---
+ compat/flockfile.c   | 11 ------
+ compat/getpid.c      |  2 --
+ compat/pathconf.c    |  9 +----
+ compat/recvmsg.c     | 79 --------------------------------------------
+ compat/sendmsg.c     | 61 ----------------------------------
+ compat/sigwait.c     | 49 ---------------------------
+ configure.ac         |  7 ----
+ include/vlc_fixups.h | 13 --------
+ 8 files changed, 1 insertion(+), 230 deletions(-)
+ delete mode 100644 compat/sigwait.c
+
+diff --git a/compat/flockfile.c b/compat/flockfile.c
+index 1db85a23a1..f3c4fff284 100644
+--- a/compat/flockfile.c
++++ b/compat/flockfile.c
+@@ -54,17 +54,6 @@ int putc_unlocked (int c, FILE *stream)
+ {
+     return _putc_nolock (c, stream);
+ }
+-
+-#elif defined __native_client__
+-void flockfile (FILE *stream)
+-{
+-    _flockfile(stream);
+-}
+-
+-void funlockfile (FILE *stream)
+-{
+-    _funlockfile(stream);
+-}
+ #else
+ # error flockfile not implemented on your platform!
+ #endif
+diff --git a/compat/getpid.c b/compat/getpid.c
+index d6275e7df3..5645d50bb4 100644
+--- a/compat/getpid.c
++++ b/compat/getpid.c
+@@ -31,8 +31,6 @@ pid_t getpid (void)
+ {
+ #if defined (_WIN32)
+     return (pid_t) GetCurrentProcessId ();
+-#elif defined (__native_client__)
+-    return 1;
+ #else
+ # error Unimplemented!
+ #endif
+diff --git a/compat/pathconf.c b/compat/pathconf.c
+index 34f990ab19..fb13e290c7 100644
+--- a/compat/pathconf.c
++++ b/compat/pathconf.c
+@@ -26,14 +26,7 @@
+ 
+ #include <vlc_common.h>
+ 
+-#ifdef __native_client__
+-long pathconf (const char *path, int name)
+-{
+-    VLC_UNUSED(path);
+-    VLC_UNUSED(name);
+-    return -1;
+-}
+-#elif defined(_WIN32)
++#if defined(_WIN32)
+ /* Windows does not have pathconf, but that is OK */
+ #else
+ # error pathconf not implemented on your platform!
+diff --git a/compat/recvmsg.c b/compat/recvmsg.c
+index 1c348fcee2..d110232f1e 100644
+--- a/compat/recvmsg.c
++++ b/compat/recvmsg.c
+@@ -83,85 +83,6 @@ ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
+     return -1;
+ }
+ 
+-#elif defined __native_client__
+-#include <errno.h>
+-#include <limits.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#ifdef HAVE_SYS_SOCKET_H
+-#include <sys/socket.h>
+-#endif
+-#ifdef HAVE_SYS_UIO_H
+-#include <sys/uio.h>
+-#endif
+-
+-ssize_t recvmsg(int fd, struct msghdr *msg, int flags)
+-{
+-    if (msg->msg_controllen != 0)
+-    {
+-        errno = ENOSYS;
+-        return -1;
+-    }
+-
+-    if ((msg->msg_iovlen <= 0) || (msg->msg_iovlen > IOV_MAX))
+-    {
+-        errno = EMSGSIZE;
+-        return -1;
+-    }
+-
+-    size_t full_size = 0;
+-    for (int i = 0; i < msg->msg_iovlen; ++i)
+-        full_size += msg->msg_iov[i].iov_len;
+-
+-    if (full_size > SSIZE_MAX) {
+-        errno = EINVAL;
+-        return -1;
+-    }
+-
+-    /**
+-     * We always allocate here, because whether recv/recvfrom allow NULL message
+-     * or not is unspecified.
+-     */
+-    char *data = malloc(full_size ? full_size : 1);
+-    if (!data) {
+-        errno = ENOMEM;
+-        return -1;
+-    }
+-
+-    ssize_t res;
+-    if (msg->msg_name)
+-        res = recvfrom(fd, data, full_size, flags, msg->msg_name, &msg->msg_namelen);
+-    else
+-        res = recv(fd, data, full_size, flags);
+-
+-    if (res > 0) {
+-        size_t left;
+-        if ((size_t)res <= full_size) {
+-            left = res;
+-            msg->msg_flags = 0;
+-        }
+-        else {
+-            left = full_size;
+-            msg->msg_flags = MSG_TRUNC;
+-        }
+-
+-        const char *src = data;
+-        for (int i = 0; (i < msg->msg_iovlen) && (left > 0); ++i)
+-        {
+-            size_t to_copy = msg->msg_iov[i].iov_len;
+-            if (to_copy > left)
+-                to_copy = left;
+-
+-            memcpy(msg->msg_iov[i].iov_base, src, to_copy);
+-            src += to_copy;
+-            left -= to_copy;
+-        }
+-    }
+-
+-    free(data);
+-    return res;
+-}
+-
+ #else
+ #error recvmsg not implemented on your platform!
+ #endif
+diff --git a/compat/sendmsg.c b/compat/sendmsg.c
+index 0b08ce0942..3b5a6c42fd 100644
+--- a/compat/sendmsg.c
++++ b/compat/sendmsg.c
+@@ -73,67 +73,6 @@ ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
+     return -1;
+ }
+ 
+-#elif defined __native_client__
+-#include <errno.h>
+-#include <limits.h>
+-#include <stdlib.h>
+-#include <string.h>
+-#ifdef HAVE_SYS_SOCKET_H
+-#include <sys/socket.h>
+-#endif
+-#ifdef HAVE_SYS_UIO_H
+-#include <sys/uio.h>
+-#endif
+-
+-ssize_t sendmsg(int fd, const struct msghdr *msg, int flags)
+-{
+-    if (msg->msg_controllen != 0)
+-    {
+-        errno = ENOSYS;
+-        return -1;
+-    }
+-
+-    if ((msg->msg_iovlen <= 0) || (msg->msg_iovlen > IOV_MAX))
+-    {
+-        errno = EMSGSIZE;
+-        return -1;
+-    }
+-
+-    size_t full_size = 0;
+-    for (int i = 0; i < msg->msg_iovlen; ++i)
+-        full_size += msg->msg_iov[i].iov_len;
+-
+-    if (full_size > SSIZE_MAX) {
+-        errno = EINVAL;
+-        return -1;
+-    }
+-
+-    /**
+-     * We always allocate here, because whether send/sento allow NULL message or
+-     * not is unspecified.
+-     */
+-    char *data = malloc(full_size ? full_size : 1);
+-    if (!data) {
+-        errno = ENOMEM;
+-        return -1;
+-    }
+-
+-    size_t tmp = 0;
+-    for (int i = 0; i < msg->msg_iovlen; ++i) {
+-        memcpy(data + tmp, msg->msg_iov[i].iov_base, msg->msg_iov[i].iov_len);
+-        tmp += msg->msg_iov[i].iov_len;
+-    }
+-
+-    ssize_t res;
+-    if (msg->msg_name)
+-        res = sendto(fd, data, full_size, flags, msg->msg_name, msg->msg_namelen);
+-    else
+-        res = send(fd, data, full_size, flags);
+-
+-    free(data);
+-    return res;
+-}
+-
+ #else
+ #error sendmsg not implemented on your platform!
+ #endif
+diff --git a/compat/sigwait.c b/compat/sigwait.c
+deleted file mode 100644
+index e5a082d2d6..0000000000
+--- a/compat/sigwait.c
++++ /dev/null
+@@ -1,49 +0,0 @@
+-/*****************************************************************************
+- * sigwait.c: POSIX sigwait() replacement
+- *****************************************************************************
+- * Copyright © 2017 VLC authors and VideoLAN
+- *
+- * Author: Julian Scheel <julian@jusst.de>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU Lesser General Public License as published by
+- * the Free Software Foundation; either version 2.1 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU Lesser General Public License for more details.
+- *
+- * You should have received a copy of the GNU Lesser General Public License
+- * along with this program; if not, write to the Free Software Foundation,
+- * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+- *****************************************************************************/
+-
+-#ifdef HAVE_CONFIG_H
+-# include <config.h>
+-#endif
+-
+-#ifdef __native_client__
+-/* NaCl has no working sigwait, but SIGPIPE, for which vlc uses sigwait
+- * currently, is never generated in NaCl. So for SIGPIPE it's safe to instantly
+- * return, for all others run into an assertion. */
+-
+-#include <assert.h>
+-#include <signal.h>
+-
+-int sigwait(const sigset_t *set, int *sig)
+-{
+-    sigset_t s = *set;
+-    if (sigemptyset(&s))
+-        return 0;
+-    assert(sigismember(&s, SIGPIPE));
+-    sigdelset(&s, SIGPIPE);
+-    assert(sigemptyset(&s));
+-
+-    *sig = SIGPIPE;
+-    return 0;
+-}
+-#else
+-# error sigwait not implemented on your platform!
+-#endif
+diff --git a/configure.ac b/configure.ac
+index 946eeec99d..25cf3d1b50 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -371,13 +371,6 @@ case "${host_os}" in
+     X86ASMFLAGS="-f aout"
+     X86ASMDEFS="-DARCH_X86_32=1 -DARCH_X86_64=0 -DPREFIX"
+     ;;
+-  *nacl*)
+-    SYS=nacl
+-    AC_DEFINE([_XOPEN_SOURCE], [700], [POSIX and XPG 7th edition])
+-    AC_LIBOBJ([sigwait])
+-    AC_LIBOBJ([recvmsg])
+-    AC_LIBOBJ([sendmsg])
+-    ;;
+   *emscripten*)
+     SYS=emscripten
+     AC_LIBOBJ([clock_nanosleep])
+diff --git a/include/vlc_fixups.h b/include/vlc_fixups.h
+index 9149c7519f..4263893420 100644
+--- a/include/vlc_fixups.h
++++ b/include/vlc_fixups.h
+@@ -121,15 +121,6 @@ extern "C" {
+ # define VLC_NOTHROW
+ #endif
+ 
+-/* signal.h */
+-#if !defined(HAVE_SIGWAIT) && defined(__native_client__)
+-/* NaCl does not define sigwait in signal.h. We need to include it here to
+- * define sigwait, because sigset_t is allowed to be either an integral or a
+- * struct. */
+-#include <signal.h>
+-int sigwait(const sigset_t *set, int *sig);
+-#endif
+-
+ /* stddef.h */
+ #if !defined (__cplusplus) && !defined (HAVE_MAX_ALIGN_T)
+ typedef struct {
+@@ -269,10 +260,6 @@ pid_t getpid (void) VLC_NOTHROW;
+ int fsync (int fd);
+ #endif
+ 
+-#ifndef HAVE_PATHCONF
+-long pathconf (const char *path, int name);
+-#endif
+-
+ /* dirent.h */
+ #ifndef HAVE_DIRFD
+ int (dirfd) (DIR *);
+-- 
+2.32.0
+

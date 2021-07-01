@@ -1,0 +1,357 @@
+From f77f89feafc1c88aee29671964344a84ded89238 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 18 Nov 2020 20:34:30 +0100
+Subject: [PATCH 1/1] vout: add offscreen canvas initial support
+
+The Webgl context cannot be shared between workers, we need to be able to have :
+- shader and program creation and linking
+- gl operations
+in the same worker.
+---
+ modules/video_output/emscripten.c | 185 ++++++++++++++++--------------
+ src/video_output/video_output.c   |  20 ++++
+ src/video_output/vout_private.h   |   1 +
+ src/video_output/vout_wrapper.c   |   3 +
+ 4 files changed, 125 insertions(+), 84 deletions(-)
+
+diff --git a/modules/video_output/emscripten.c b/modules/video_output/emscripten.c
+index f940738a03..988c8a7818 100644
+--- a/modules/video_output/emscripten.c
++++ b/modules/video_output/emscripten.c
+@@ -44,135 +44,152 @@
+ extern emscripten_GetProcAddress(char *name);
+ 
+ static const struct vout_window_operations ops = {
+-	//TODO: Implement canvas operations
+-	//vout_window_ReportSize() should be called from here
++       //TODO: Implement canvas operations
++       //vout_window_ReportSize() should be called from here
+ };
+ 
+ typedef struct gl_sys_t
+ {
+-	unsigned width;
+-	unsigned height;
++  unsigned width;
++  unsigned height;
+ 
+-	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
++  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
+ } gl_sys_t;
+ 
+ static int OpenWindow(vout_window_t *wnd)
+ {
+-	wnd->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
+-	wnd->ops = &ops;
++    wnd->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
++    wnd->ops = &ops;
+ 
+-	return VLC_SUCCESS;
++    return VLC_SUCCESS;
+ }
+ 
+ static void *GetProcAddress(vlc_gl_t *gl, const char *name)
+ {
+-	VLC_UNUSED(gl);
++  VLC_UNUSED(gl);
+ 
+-	return eglGetProcAddress(name);
++  return (void *)emscripten_GetProcAddress(name);
+ }
+ static int MakeCurrent(vlc_gl_t *gl)
+ {
+-	gl_sys_t *sys = gl->sys;
+-
+-	if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS)
+-        return VLC_EGENERIC;
+-	return VLC_SUCCESS;
++    VLC_UNUSED(gl);
++  /*
++    We don't need to MakeCurrent or ReleaseCurrent in a single threaded setting
++    cf : https://chromium.googlesource.com/chromium/src/+/9478e129bf1ab74b7629d2837b88189d234587b7/third_party/WebKit/Source/bindings/core/v8/serialization/V8ScriptValueSerializer.cpp#416
++    https://emscripten.org/docs/api_reference/html5.h.html#c.EmscriptenWebGLContextAttributes.proxyContextToMainThread
++    offscreen canvas means for now that all Webgl operations will happen in one thread
++  */ 
++
++  return VLC_SUCCESS;
+ }
+ 
+ static void ReleaseCurrent(vlc_gl_t *gl)
+ {
+-	VLC_UNUSED(gl);
+-	emscripten_webgl_make_context_current(0);
++  VLC_UNUSED(gl);
+ }
+ 
+ static void Swap(vlc_gl_t *gl)
+ {
+-	VLC_UNUSED(gl);
+-	emscripten_webgl_commit_frame();
++  VLC_UNUSED(gl);
++  EM_ASM({
++          // cf : vlc/extras/package/wasm-emscripten/assets/module-loader.js:postRun()
++          postMessage({ cmd: "objectTransfer", msg: { bitmap: self.Module.ctx.canvas.transferToImageBitmap()} });
++      }, 0);
+ }
+ 
+ static void Resize(vlc_gl_t *gl, unsigned w, unsigned h)
+ {
+-	VLC_UNUSED(gl);
+-	VLC_UNUSED(w);
+-	VLC_UNUSED(h);
++  // to implement
++  VLC_UNUSED(gl);
++  VLC_UNUSED(w);
++  VLC_UNUSED(h);
+ }
+ 
+ static void Close (vlc_gl_t *gl)
+ {
+-	free(gl->sys);
++  free(gl->sys);
+ }
+ 
+ static int Open (vlc_gl_t *gl, unsigned width, unsigned height)
+ {  
+-	VLC_UNUSED(width), VLC_UNUSED(height);
+-  
+-	EmscriptenWebGLContextAttributes attr;
+-
+-	emscripten_webgl_init_context_attributes(&attr);
+-	attr.majorVersion=2;
+-	attr.minorVersion=0;
+-	attr.explicitSwapControl = 1;
+-	
+-	vout_window_t *wnd = gl->surface;
++  VLC_UNUSED(width), VLC_UNUSED(height); // to implement
++    
++  vout_window_t *wnd = gl->surface;
+   
+-	if (wnd->type != VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
+-		goto error;
+-
+-	gl_sys_t *sys;
+-	
+-	gl->sys = sys = calloc(1, sizeof(*sys));
+-	if (!sys)
+-		return VLC_ENOMEM;
++  if (wnd->type != VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
++    goto error;
++
++  gl_sys_t *sys;
+   
+-	sys->context = emscripten_webgl_create_context("#canvas", &attr);  
+-	if (!sys->context) {
+-		msg_Err(gl, "Failed to make context current");
+-		goto error;
+-	}
+-
+-	// Check that the WebGL context is valid
+-	if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS) {
+-		emscripten_log(EM_LOG_CONSOLE, "failed to make context current");
+-		goto error;
+-	}
+-
+-	// Release the context
+-	emscripten_webgl_make_context_current(0);
+-	wnd->handle.em_context = sys->context;
+-
+-	// Implement egl routines: 
+-	gl->make_current = MakeCurrent;
+-	gl->release_current = ReleaseCurrent;
+-	gl->resize = Resize;
+-	gl->swap = Swap;
+-	gl->get_proc_address = GetProcAddress;
+-	gl->destroy = Close;
+-
+-	return VLC_SUCCESS;
++  gl->sys = sys = (gl_sys_t *)(calloc(1, sizeof(*sys)));
++
++  if (!sys)
++    return VLC_EGENERIC;
++    
++  EM_ASM({
++          const wdt = $0;
++          const hgt = $1;
++          
++          var canvas = new OffscreenCanvas(wdt, hgt);
++          // EM_ASM are constants, we need this to reuse the variable in another scope
++          // as long as we stay in the worker 
++          Module.canvas = canvas;
++          
++          // set attributes with overloads for the emscripten GL object
++          var attributes = {};
++          attributes.alpha = true;
++          attributes.depth = true;
++          attributes.stencil = false;
++          attributes.antialias = true;
++          attributes.premultipliedAlpha = true;
++          attributes.preserveDrawingBuffer = true;
++          attributes.powerPreference = "default";// default
++          attributes.failIfMajorPerformanceCaveat=false;
++          attributes.majorVersion=2;
++          attributes.minorVersion=0;
++          attributes.enableExtenisonsByDefault=true;
++          attributes.explicitSwapControl=true;
++          attributes.renderViaOffscreenBackBuffer=false;
++          attributes.proxyContextToMainThread = 0;
++
++          // Create the context and set it as current
++          self.GLctx = GL.createContext(canvas, attributes);
++          GL.currentContext = self.GLctx;
++          GL.makeContextCurrent(self.GLctx);
++      }, width, height);
++  wnd->handle.em_context = sys->context;
++
++  // Implement egl routines: 
++  gl->make_current = MakeCurrent;
++  gl->release_current = ReleaseCurrent;
++  gl->resize = Resize;
++  gl->swap = Swap;
++  gl->get_proc_address = GetProcAddress;
++  gl->destroy = Close;
++
++  return VLC_SUCCESS;
+ error:
+-	Close(gl);
+-	return VLC_EGENERIC;
++  Close(gl);
++  return VLC_EGENERIC;
+ }
+ 
+ /*
+  * Module descriptor
+  */
+ vlc_module_begin()
+-	set_shortname(N_("Emscripten Window"))
+-	set_description(N_("Emscripten drawing area"))
+-	set_category(CAT_VIDEO)
+-	set_subcategory(SUBCAT_VIDEO_VOUT)
+-	set_capability("vout window", 10)
+-	set_callbacks(OpenWindow, NULL)
+-
+-	add_submodule ()
+-	set_shortname("Emscripten GL")
+-	set_description(N_("Emscripten extension for OpenGL"))
+-	set_category(CAT_VIDEO)
+-	set_subcategory(SUBCAT_VIDEO_VOUT)
+-	set_capability("opengl es2", 50)
+-	set_callback(Open)
+-	add_shortcut("em_webgl")
++    set_shortname(N_("Emscripten Window"))
++    set_description(N_("Emscripten drawing area"))
++    set_category(CAT_VIDEO)
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++    set_capability("vout window", 10)
++    set_callbacks(OpenWindow, NULL)
++
++    add_submodule ()
++    set_shortname("Emscripten GL")
++    set_description(N_("Emscripten extension for OpenGL"))
++    set_category(CAT_VIDEO)
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++    set_capability("opengl es2", 50)
++    set_callback(Open)
++    add_shortcut("em_webgl")
+ vlc_module_end()
+-
+diff --git a/src/video_output/video_output.c b/src/video_output/video_output.c
+index 9a7f8f786d..28cbd30620 100644
+--- a/src/video_output/video_output.c
++++ b/src/video_output/video_output.c
+@@ -70,6 +70,9 @@ typedef struct vout_thread_sys_t
+ 
+     bool dummy;
+ 
++    vlc_video_context *my_ctx;
++    const vout_configuration_t *my_cfg;
++
+     /* Splitter module if used */
+     char            *splitter_name;
+ 
+@@ -166,6 +169,8 @@ typedef struct vout_thread_sys_t
+ 
+ } vout_thread_sys_t;
+ 
++static void vout_DisableWindow(vout_thread_sys_t *sys);
++
+ #define VOUT_THREAD_TO_SYS(vout) \
+     container_of(vout, vout_thread_sys_t, obj.obj)
+ 
+@@ -1777,6 +1782,14 @@ static void *Thread(void *object)
+     vout_thread_sys_t *vout = object;
+     vout_thread_sys_t *sys = vout;
+ 
++    if (vout_Start(vout, sys->my_ctx, sys->my_cfg))
++    {
++        msg_Err(sys->my_cfg->vout, "video output display creation failed");
++        video_format_Clean(&sys->original);
++        vout_DisableWindow(vout);
++        goto leave;
++    }
++
+     vlc_tick_t deadline = VLC_TICK_INVALID;
+     bool wait = false;
+ 
+@@ -1808,6 +1821,7 @@ static void *Thread(void *object)
+ 
+         vout_SetInterlacingState(&vout->obj, &sys->private, picture_interlaced);
+     }
++leave: (void *)0; // no-op
+     return NULL;
+ }
+ 
+@@ -1981,6 +1995,8 @@ vout_thread_t *vout_Create(vlc_object_t *object)
+     vout_thread_sys_t *sys = p_vout;
+     sys->dummy = false;
+ 
++    vlc_sem_init(&sys->private.my_sem, 0);
++
+     /* Register the VLC variable and callbacks. On the one hand, the variables
+      * must be ready early on because further initializations below depend on
+      * some of them. On the other hand, the callbacks depend on said
+@@ -2180,11 +2196,15 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
+         return -1;
+     }
+     atomic_store(&sys->control_is_terminated, false);
++    sys->my_ctx = vctx;
++    sys->my_cfg = cfg;
++    
+     if (vlc_clone(&sys->thread, Thread, vout, VLC_THREAD_PRIORITY_OUTPUT)) {
+         vout_ReleaseDisplay(vout);
+         vout_DisableWindow(vout);
+         return -1;
+     }
++    vlc_sem_wait(&sys->private.my_sem);
+ 
+     if (input != NULL && sys->spu)
+         spu_Attach(sys->spu, input);
+diff --git a/src/video_output/vout_private.h b/src/video_output/vout_private.h
+index 5e8c58dabe..24965748ed 100644
+--- a/src/video_output/vout_private.h
++++ b/src/video_output/vout_private.h
+@@ -41,6 +41,7 @@ struct vout_thread_private_t
+ 
+     picture_pool_t  *private_pool;
+     picture_pool_t  *display_pool;
++    vlc_sem_t my_sem;
+ };
+ 
+ /* */
+diff --git a/src/video_output/vout_wrapper.c b/src/video_output/vout_wrapper.c
+index 9d819f8a2d..9994aefc80 100644
+--- a/src/video_output/vout_wrapper.c
++++ b/src/video_output/vout_wrapper.c
+@@ -74,6 +74,9 @@ vout_display_t *vout_OpenWrapper(vout_thread_t *vout, vout_thread_private_t *sys
+         modlist = "splitter,none";
+ 
+     vd = vout_display_New(VLC_OBJECT(vout), fmt, vctx, cfg, modlist, &owner);
++
++    vlc_sem_post(&sys->my_sem);
++    
+     free(modlistbuf);
+ 
+     if (vd == NULL)
+-- 
+2.32.0
+

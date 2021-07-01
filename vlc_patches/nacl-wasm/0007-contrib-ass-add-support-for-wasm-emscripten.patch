@@ -1,0 +1,179 @@
+From dc694cbab1a8b17c3cc459395e58c72094ef518a Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Sun, 30 May 2021 19:22:31 +0200
+Subject: [PATCH 07/18] contrib: ass: add support for wasm-emscripten
+
+---
+ contrib/src/ass/rules.mak                     |   5 +
+ ...nitial-support-for-wasm32-emscripten.patch | 105 ++++++++++++++++++
+ contrib/src/fontconfig/rules.mak              |   4 +
+ contrib/src/harfbuzz/rules.mak                |   3 +-
+ 4 files changed, 116 insertions(+), 1 deletion(-)
+ create mode 100644 contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
+
+diff --git a/contrib/src/ass/rules.mak b/contrib/src/ass/rules.mak
+index 364afbad17..9068432908 100644
+--- a/contrib/src/ass/rules.mak
++++ b/contrib/src/ass/rules.mak
+@@ -27,6 +27,10 @@ ifdef HAVE_NACL
+ WITH_FONTCONFIG = 1
+ WITH_HARFBUZZ = 1
+ WITH_ASS_ASM = 0
++ifdef HAVE_EMSCRIPTEN
++WITH_FONTCONFIG = 1
++WITH_HARFBUZZ = 1
++WITH_ASS_ASM = 0
+ else
+ WITH_FONTCONFIG = 1
+ WITH_HARFBUZZ = 1
+@@ -34,6 +38,7 @@ endif
+ endif
+ endif
+ endif
++endif
+ 
+ $(TARBALLS)/libass-$(ASS_VERSION).tar.gz:
+ 	$(call download_pkg,$(ASS_URL),ass)
+diff --git a/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch b/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
+new file mode 100644
+index 0000000000..b1308fb19e
+--- /dev/null
++++ b/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
+@@ -0,0 +1,105 @@
++From b7f21ca85efd78c8034223c63786a0c01b8378fe Mon Sep 17 00:00:00 2001
++From: Mehdi Sabwat <mehdi@videolabs.io>
++Date: Wed, 9 Jun 2021 03:42:51 +0200
++Subject: [PATCH 1/1] add initial support for wasm32-emscripten
++
++This commit adds a check for uuid_generate_random which is not supported for now, and fixes a failing test.
++It also handles a case where F_FSTYPENAME field is not present in statfs struct.
++---
++ configure.ac               | 1 +
++ src/Makefile.am            | 1 +
++ src/fcint.h                | 5 +++++
++ src/fcstat.c               | 2 +-
++ src/uuid_generate_random.c | 9 +++++++++
++ test/test-hash.c           | 5 ++++-
++ 6 files changed, 21 insertions(+), 2 deletions(-)
++ create mode 100644 src/uuid_generate_random.c
++
++diff --git a/configure.ac b/configure.ac
++index fb8af46..018cfc1 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -171,2 +171,3 @@ AC_FUNC_VPRINTF
++ AC_FUNC_MMAP
++ AC_CHECK_FUNCS([link mkstemp mkostemp _mktemp_s mkdtemp getopt getopt_long getprogname getexecname rand random lrand48 random_r rand_r readlink fstatvfs fstatfs lstat strerror strerror_r]) 
+++AC_REPLACE_FUNCS([uuid_generate_random])
++
++ dnl AC_CHECK_FUNCS doesn't check for header files.
++ dnl posix_fadvise() may be not available in older libc.
++ AC_CHECK_SYMBOL([posix_fadvise], [fcntl.h], [fc_func_posix_fadvise=1], [fc_func_posix_fadvise=0])
++diff --git a/src/Makefile.am b/src/Makefile.am
++index 7b414df..de1d785 100644
++--- a/src/Makefile.am
+++++ b/src/Makefile.am
++@@ -127,6 +127,7 @@ EXTRA_DIST += \
++ 	fcobjshash.gperf.h
++ 
++ libfontconfig_la_SOURCES = \
+++	uuid_generate_random.c \
++ 	fcarch.h \
++ 	fcatomic.c \
++ 	fcatomic.h \
++diff --git a/src/fcint.h b/src/fcint.h
++index a9d075a..d8fdbfd 100644
++--- a/src/fcint.h
+++++ b/src/fcint.h
++@@ -598,6 +598,11 @@ struct _FcValuePromotionBuffer {
++ FcPrivate FcCache *
++ FcDirCacheScan (const FcChar8 *dir, FcConfig *config);
++ 
+++#ifndef HAVE_UUID_GENERATE_RANDOM
+++#include <uuid/uuid.h>
+++void uuid_generate_random(uuid_t out);
+++#endif
+++
++ FcPrivate FcCache *
++ FcDirCacheBuild (FcFontSet *set, const FcChar8 *dir, struct stat *dir_stat, FcStrSet *dirs);
++ 
++diff --git a/src/fcstat.c b/src/fcstat.c
++index 5aa1643..d1240c5 100644
++--- a/src/fcstat.c
+++++ b/src/fcstat.c
++@@ -384,7 +384,7 @@ FcFStatFs (int fd, FcStatFS *statb)
++ #  endif
++ #  if defined(HAVE_STRUCT_STATFS_F_FSTYPENAME)
++ 	p = buf.f_fstypename;
++-#  elif defined(__linux__)
+++#  elif defined(__linux__) || defined(__EMSCRIPTEN__)
++ 	switch (buf.f_type)
++ 	{
++ 	case 0x6969: /* nfs */
++diff --git a/src/uuid_generate_random.c b/src/uuid_generate_random.c
++new file mode 100644
++index 0000000..c17a58d
++--- /dev/null
+++++ b/src/uuid_generate_random.c
++@@ -0,0 +1,9 @@
+++// compat function for uuid_generate_random
+++#include "fcint.h"
+++
+++#ifndef HAVE_UUID_GENERATE_RANDOM
+++void uuid_generate_random(uuid_t out)
+++{
+++    uuid_generate(out);
+++}
+++#endif
++diff --git a/test/test-hash.c b/test/test-hash.c
++index 7530e82..221029d 100644
++--- a/test/test-hash.c
+++++ b/test/test-hash.c
++@@ -51,8 +51,11 @@ test_add (Test *test, FcChar8 *key, FcBool replace)
++     void *u;
++     FcBool (*hash_add) (FcHashTable *, void *, void *);
++     FcBool ret = FcFalse;
++-
+++#ifdef HAVE_UUID_GENERATE_RANDOM
++     uuid_generate_random (uuid);
+++#else
+++    uuid_generate(uuid);
+++#endif
++     if (replace)
++ 	hash_add = FcHashTableReplace;
++     else
++-- 
++2.32.0
++
+diff --git a/contrib/src/fontconfig/rules.mak b/contrib/src/fontconfig/rules.mak
+index 08b6a04cc0..f91e6f9f2e 100644
+--- a/contrib/src/fontconfig/rules.mak
++++ b/contrib/src/fontconfig/rules.mak
+@@ -23,6 +23,10 @@ ifdef HAVE_WIN32
+ endif
+ 	$(APPLY) $(SRC)/fontconfig/8208f99-fix-static-linking.patch
+ 	$(call pkg_static, "fontconfig.pc.in")
++ifdef HAVE_EMSCRIPTEN
++	$(APPLY) $(SRC)/fontconfig/add-initial-support-for-wasm32-emscripten.patch
++	$(UPDATE_AUTOCONFIG)
++endif
+ 	$(MOVE)
+ 
+ FONTCONFIG_CONF := $(HOSTCONF) \
+diff --git a/contrib/src/harfbuzz/rules.mak b/contrib/src/harfbuzz/rules.mak
+index 70a45ecaa2..e7c7c2b802 100644
+--- a/contrib/src/harfbuzz/rules.mak
++++ b/contrib/src/harfbuzz/rules.mak
+@@ -30,7 +30,8 @@ HARFBUZZ_CONF += --with-coretext
+ endif
+ 
+ .harfbuzz: harfbuzz
+-	$(RECONF)
++	# https://savannah.gnu.org/support/index.php?110503
++	export GTKDOCIZE=true && $(RECONF)
+ 	cd $< && $(HOSTVARS_PIC) ./configure $(HOSTCONF) $(HARFBUZZ_CONF) ICU_CONFIG=false
+ 	cd $< && $(MAKE) install
+ 	touch $@
+-- 
+2.32.0
+

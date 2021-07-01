@@ -1,0 +1,133 @@
+From 41b8eee8ed3097b452f454c57c6aa1f891c80cbf Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Sun, 30 May 2021 16:35:00 +0200
+Subject: [PATCH 16/18] nacl: remove deprecated platform
+
+Nacl is now deprecated :
+cf. https://blog.chromium.org/2020/08/changes-to-chrome-app-support-timeline.html
+
+This commit removes remaining conditional code for the Nacl platform.
+---
+ configure.ac              |  1 -
+ include/vlc_fixups.h      | 11 +----------
+ m4/dolt.m4                |  2 +-
+ src/Makefile.am           | 13 -------------
+ src/network/getaddrinfo.c |  3 +--
+ 5 files changed, 3 insertions(+), 27 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 74d42df6dc..eb55428e8b 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -427,7 +427,6 @@ AM_CONDITIONAL([HAVE_IOS],     [test "${HAVE_IOS}" = "1"])
+ AM_CONDITIONAL([HAVE_OSX],     [test "${HAVE_OSX}" = "1"])
+ AM_CONDITIONAL([HAVE_TVOS],    [test "${HAVE_TVOS}" = "1"])
+ 
+-AM_CONDITIONAL([HAVE_NACL],    [test "${SYS}" = "nacl"])
+ AM_CONDITIONAL([HAVE_LIBANL],  [test "${HAVE_LIBANL}" = "1"])
+ 
+ AM_CONDITIONAL([HAVE_WIN32],   [test "${SYS}" = "mingw32"])
+diff --git a/include/vlc_fixups.h b/include/vlc_fixups.h
+index 4263893420..60dd6e9d27 100644
+--- a/include/vlc_fixups.h
++++ b/include/vlc_fixups.h
+@@ -33,7 +33,7 @@
+ 
+ /* C++11 says there's no need to define __STDC_*_MACROS when including
+  * inttypes.h and stdint.h. */
+-#if defined (__cplusplus) && (defined(__MINGW32__) || defined(__UCLIBC__) || defined(__native_client__))
++#if defined (__cplusplus) && (defined(__MINGW32__) || defined(__UCLIBC__))
+ # ifndef __STDC_FORMAT_MACROS
+ #  define __STDC_FORMAT_MACROS 1
+ # endif
+@@ -311,10 +311,6 @@ void *aligned_alloc(size_t, size_t);
+ #define aligned_free(ptr)  free(ptr)
+ #endif
+ 
+-#if defined(__native_client__) && defined(__cplusplus)
+-# define HAVE_USELOCALE
+-#endif
+-
+ #if !defined(HAVE_NEWLOCALE) && defined(HAVE_CXX_LOCALE_T) && defined(__cplusplus)
+ # include <locale>
+ # define HAVE_NEWLOCALE
+@@ -380,11 +376,6 @@ int inet_pton(int, const char *, void *);
+ const char *inet_ntop(int, const void *, char *, socklen_t);
+ #endif
+ 
+-/* NaCl has a broken netinet/tcp.h, so TCP_NODELAY is not set */
+-#if defined(__native_client__) && !defined( HAVE_NETINET_TCP_H )
+-#  define TCP_NODELAY 1
+-#endif
+-
+ #ifndef HAVE_STRUCT_POLLFD
+ enum
+ {
+diff --git a/m4/dolt.m4 b/m4/dolt.m4
+index ff28bef516..0daae70ff7 100644
+--- a/m4/dolt.m4
++++ b/m4/dolt.m4
+@@ -21,7 +21,7 @@ AS_IF([test x$GCC != xyes], [dolt_supported=no])
+ AS_CASE([$host],
+     [*-*-linux*|*-*-freebsd*], [pic_options='-fPIC'],
+     [*-apple-darwin*],         [pic_options='-fno-common'],
+-    [*mingw*|*nacl*],          [pic_options='']
++    [*mingw*],                 [pic_options='']
+     [*],                       [dolt_supported=no]
+ )
+ AS_IF([test x$dolt_supported = xno], [
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 780c94446c..9b73288f7c 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -431,17 +431,6 @@ libvlccore_la_SOURCES += \
+ 	os2/thread.c
+ endif
+ 
+-if HAVE_NACL
+-libvlccore_la_SOURCES += \
+-	android/error.c \
+-	posix/dirs.c \
+-	posix/filesystem.c \
+-	posix/netconf.c \
+-	posix/rand.c \
+-	posix/specific.c \
+-	posix/timer.c
+-endif
+-
+ if HAVE_EMSCRIPTEN
+ libvlccore_la_SOURCES += \
+ 	posix/thread.c \
+@@ -488,7 +477,6 @@ endif
+ 
+ if !HAVE_WIN32
+ if !HAVE_OS2
+-if !HAVE_NACL
+ libvlccore_la_SOURCES += \
+ 	posix/filesystem.c \
+ 	posix/plugin.c \
+@@ -523,7 +511,6 @@ endif
+ endif
+ endif
+ endif
+-endif
+ 
+ if ENABLE_SOUT
+ libvlccore_la_SOURCES += \
+diff --git a/src/network/getaddrinfo.c b/src/network/getaddrinfo.c
+index 14496d5b09..c592b884cc 100644
+--- a/src/network/getaddrinfo.c
++++ b/src/network/getaddrinfo.c
+@@ -120,8 +120,7 @@ int vlc_getaddrinfo (const char *node, unsigned port,
+ }
+ 
+ #if defined (_WIN32) || defined (__OS2__) \
+- || defined (__ANDROID__) || defined (__APPLE__) \
+- || defined (__native_client__)
++ || defined (__ANDROID__) || defined (__APPLE__)
+ #warning vlc_getaddrinfo_i11e() not implemented!
+ int vlc_getaddrinfo_i11e(const char *node, unsigned port,
+                          const struct addrinfo *hints, struct addrinfo **res)
+-- 
+2.32.0
+

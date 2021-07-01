@@ -1,0 +1,92 @@
+From 6fb3ac22f0d18cc4c01a9536a8ee711643c4d539 Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Thu, 6 Jul 2017 14:50:28 +0200
+Subject: [PATCH 05/18] contrib: set wasm-emscripten toolchain variables
+
+- add meson_system_name for emscripten
+- add CMAKE_SYSTEM_NAME
+- add EMSCRIPTEN to toolchain.cmake to workaround the fact that it is not a valid
+CMAKE variable.
+- add RANLIB to toolchain.cmake file
+- add -pthread to CFLAGS/CXXFLAGS
+This is to enable bulk-memory and atomics in all objects. There is no
+downside to adding the option in objects that do not use the feature,
+but not adding it will disallow linking with shared-memory because
+clang relies on the presence of the feature to allow/prevent stripping
+atomic operations. (cf: https://code.videolan.org/-/snippets/1333)
+---
+ contrib/bootstrap    |  3 +++
+ contrib/src/main.mak | 16 ++++++++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/contrib/bootstrap b/contrib/bootstrap
+index e395a02652..6f83d310a2 100755
+--- a/contrib/bootstrap
++++ b/contrib/bootstrap
+@@ -358,6 +358,9 @@ case "${OS}" in
+ 	*nacl*)
+ 		add_make_enabled "HAVE_NACL"
+ 		;;
++	*emscripten*)
++	       add_make_enabled "HAVE_EMSCRIPTEN"
++	       ;;
+ esac
+ 
+ #
+diff --git a/contrib/src/main.mak b/contrib/src/main.mak
+index fb71479d68..5157593f68 100644
+--- a/contrib/src/main.mak
++++ b/contrib/src/main.mak
+@@ -129,6 +129,11 @@ EXTRA_CFLAGS += -fno-stack-check
+ XCODE_FLAGS += OTHER_CFLAGS=-fno-stack-check
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++CFLAGS="-pthread"
++CXXFLAGS="-pthread"
++endif
++
+ ifdef HAVE_MACOSX
+ EXTRA_CXXFLAGS += -stdlib=libc++
+ ifeq ($(ARCH),aarch64)
+@@ -564,6 +569,9 @@ endif
+ ifdef HAVE_DARWIN_OS
+ CMAKE_SYSTEM_NAME = Darwin
+ endif
++ifdef HAVE_EMSCRIPTEN
++CMAKE_SYSTEM_NAME = Emscripten
++endif
+ 
+ ifdef HAVE_ANDROID
+ CFLAGS += -DANDROID_NATIVE_API_LEVEL=$(ANDROID_API)
+@@ -618,6 +626,10 @@ ifdef HAVE_CROSS_COMPILE
+ 	echo "set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)" >> $@
+ 	echo "set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)" >> $@
+ endif
++ifdef HAVE_EMSCRIPTEN
++	# https://github.com/emscripten-core/emscripten/blob/main/cmake/Modules/Platform/Emscripten.cmake#L268
++	echo "set(EMSCRIPTEN 1)" >> $@
++endif
+ 
+ MESON_SYSTEM_NAME =
+ ifdef HAVE_WIN32
+@@ -632,12 +644,16 @@ else
+ ifdef HAVE_LINUX
+ 	# android has also system = linux and defines HAVE_LINUX
+ 	MESON_SYSTEM_NAME = linux
++else
++ifdef HAVE_EMSCRIPTEN
++	MESON_SYSTEM_NAME = emscripten
+ else
+ 	$(error "No meson system name known for this target")
+ endif
+ endif
+ endif
+ endif
++endif
+ 
+ crossfile.meson: $(SRC)/gen-meson-crossfile.py
+ 	$(HOSTVARS_MESON) \
+-- 
+2.32.0
+

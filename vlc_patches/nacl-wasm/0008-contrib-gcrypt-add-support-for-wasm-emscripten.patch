@@ -1,0 +1,93 @@
+From 9954c63c28eefac54c32ecd53751b6e2d237f3f1 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Sun, 30 May 2021 20:38:46 +0200
+Subject: [PATCH 08/18] contrib: gcrypt: add support for wasm-emscripten
+
+---
+ contrib/src/gcrypt/rules.mak           |  6 ++++
+ contrib/src/gpg-error/emscripten.patch | 43 ++++++++++++++++++++++++++
+ contrib/src/gpg-error/rules.mak        |  1 +
+ 3 files changed, 50 insertions(+)
+ create mode 100644 contrib/src/gpg-error/emscripten.patch
+
+diff --git a/contrib/src/gcrypt/rules.mak b/contrib/src/gcrypt/rules.mak
+index e710f90e70..3139c5e910 100644
+--- a/contrib/src/gcrypt/rules.mak
++++ b/contrib/src/gcrypt/rules.mak
+@@ -78,6 +78,12 @@ GCRYPT_CONF += --disable-avx-support --disable-avx2-support --disable-padlock-su
+ GCRYPT_CONF += --disable-amd64-as-feature-detection --disable-drng-support
+ GCRYPT_CONF += --disable-pclmul-support
+ endif
++ifdef HAVE_EMSCRIPTEN
++GCRYPT_CONF += --disable-asm --disable-aesni-support ac_cv_func_syslog=no --disable-sse41-support
++GCRYPT_CONF += --disable-avx-support --disable-avx2-support --disable-padlock-support
++GCRYPT_CONF += --disable-amd64-as-feature-detection --disable-drng-support
++GCRYPT_CONF += --disable-pclmul-support
++endif
+ 
+ .gcrypt: gcrypt
+ 	# Reconfiguring this requires a git repo to be available, to
+diff --git a/contrib/src/gpg-error/emscripten.patch b/contrib/src/gpg-error/emscripten.patch
+new file mode 100644
+index 0000000000..f60695c513
+--- /dev/null
++++ b/contrib/src/gpg-error/emscripten.patch
+@@ -0,0 +1,43 @@
++From 63aa1523659914acd6c84229fb31ff9b712fbf8b Mon Sep 17 00:00:00 2001
++From: Mehdi Sabwat <mehdi@videolabs.io>
++Date: Wed, 2 Jun 2021 11:42:46 +0200
++Subject: [PATCH 1/1] emscripten
++
++---
++ .../lock-obj-pub.wasm32-unknown-emscripten.h  | 24 +++++++++++++++++++
++ 1 file changed, 24 insertions(+)
++ create mode 100644 src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h
++
++diff --git a/src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h b/src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h
++new file mode 100644
++index 0000000..1651518
++--- /dev/null
+++++ b/src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h
++@@ -0,0 +1,24 @@
+++## lock-obj-pub.wasm32-unknown-emscripten.h
+++## File created by gen-posix-lock-obj - DO NOT EDIT
+++## To be included by mkheader into gpg-error.h
+++
+++typedef struct
+++{
+++  long _vers;
+++  union {
+++    volatile char _priv[28];
+++    long _x_align;
+++    long *_xp_align;
+++  } u;
+++} gpgrt_lock_t;
+++
+++#define GPGRT_LOCK_INITIALIZER {1,{{0,0,0,0,0,0,0,0, \
+++                                    0,0,0,0,0,0,0,0, \
+++                                    0,0,0,0,0,0,0,0, \
+++                                    0,0,0,0}}}
+++##
+++## Local Variables:
+++## mode: c
+++## buffer-read-only: t
+++## End:
+++##
++-- 
++2.31.1
++
+diff --git a/contrib/src/gpg-error/rules.mak b/contrib/src/gpg-error/rules.mak
+index a22c778632..68aa8dd1ff 100644
+--- a/contrib/src/gpg-error/rules.mak
++++ b/contrib/src/gpg-error/rules.mak
+@@ -25,6 +25,7 @@ endif
+ 	$(APPLY) $(SRC)/gpg-error/version-bump-gawk-5.patch
+ 	$(APPLY) $(SRC)/gpg-error/win32-extern-struct.patch
+ 	$(APPLY) $(SRC)/gpg-error/darwin-triplet.patch
++	$(APPLY) $(SRC)/gpg-error/emscripten.patch
+ 	$(MOVE)
+ ifdef HAVE_ANDROID
+ ifeq ($(ARCH),aarch64)
+-- 
+2.32.0
+

@@ -19,7 +19,7 @@ checkfail()
 SLOW_MODE=${SLOW_MODE:=1}
 WORK_DIR=$PWD
 
-EMSDK_VERSION="2.0.17"
+EMSDK_VERSION="2.0.25"
 # Download the portable SDK and uncompress it
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
@@ -29,7 +29,7 @@ if [ ! -d emsdk ]; then
 fi
 
 cd $WORK_DIR
-TESTED_HASH="ae406f9e6be4eb0b7d6b8db6edd51005d5af546f"
+TESTED_HASH="721cf129"
 # Go go go vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
@@ -40,7 +40,14 @@ if [ ! -d vlc ]; then
     # patching vlc
     if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
 	# core patches
-	git am -3 ../vlc_patches/upstream-core/*.patch
+	git am -3 ../vlc_patches/0001-configure-improve-testing-unsupported-GL-functions-f.patch
+	git am -3 ../vlc_patches/0001-contrib-set-RANLIB-for-toolchain.cmake.patch
+	git am -3 ../vlc_patches/0001-modules-disable-libvlc_json-and-ytbdl-vlc.js-17.patch
+	git am -3 ../vlc_patches/nacl-wasm/00*.patch
+	git am -3 ../vlc_patches/audio_output/00*.patch
+	git am -3 ../vlc_patches/video_output/00*.patch
+	git am -3 ../vlc_patches/logger/00*.patch
+	# git am -3 ../vlc_patches/filesystem/*.patch
     fi
     checkfail "vlc source: git clone failed"
 fi
