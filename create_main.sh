@@ -31,7 +31,7 @@ PROJECT_DIR=${PROJECT_DIR:=./vlc/extras/package/wasm-emscripten/build}
 # Note that we use '-s MODULARIZE', but no '-s EXPORT_ES6', which would
 # conflict with pthreads on Firefox.
 emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
-    -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
+    -s OFFSCREENCANVAS_SUPPORT=1 -s USE_WEBGL2=1 --profiling-funcs \
     -s MODULARIZE=1 -s EXPORT_NAME="VlcModule" \
     -s EXTRA_EXPORTED_RUNTIME_METHODS="allocateUTF8" \
     -I $PATH_VLC/include/ -I $PROJECT_DIR/wasm32-unknown-emscripten/include/ \

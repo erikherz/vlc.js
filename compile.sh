@@ -46,6 +46,7 @@ if [ ! -d vlc ]; then
 	git am -3 ../vlc_patches/nacl-wasm/00*.patch
 	git am -3 ../vlc_patches/audio_output/00*.patch
 	git am -3 ../vlc_patches/video_output/00*.patch
+	git am -3 ../vlc_patches/video_output/offscreen-canvas.patch
 	git am -3 ../vlc_patches/logger/00*.patch
 	# git am -3 ../vlc_patches/filesystem/*.patch
     fi

@@ -131,11 +131,16 @@
       window.update_overlay = update_overlay;
 
       update_overlay(overlay);
+      var bitmapcontext = document.getElementById("canvas").getContext("bitmaprenderer");
 
       addEventListener('worker_message', function(msg) {
         if (msg.detail === "on_position_changed") {
           update_overlay(overlay);
         }
+	else if (msg.detail.msg === "transferToImageBitmap") {
+	    var bitmap = msg.detail.bitmap;
+	    bitmapcontext.transferFromImageBitmap(bitmap);
+	}
       });
     </script>
 
