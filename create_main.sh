@@ -25,22 +25,55 @@ fi
 
 PATH_VLC=${PATH_VLC:=./vlc}
 SAMPLE_DIR=${SAMPLE_DIR:=./samples}
-PROJECT_DIR=${PROJECT_DIR:=./vlc/extras/package/wasm-emscripten/build}
 
 # For release builds, remove '--profiling-funcs' and add '-Os'
 # Note that we use '-s MODULARIZE', but no '-s EXPORT_ES6', which would
 # conflict with pthreads on Firefox.
-emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
-    -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
-    -s MODULARIZE=1 -s EXPORT_NAME="VlcModule" \
-    -s EXTRA_EXPORTED_RUNTIME_METHODS="allocateUTF8" \
-    -I $PATH_VLC/include/ -I $PROJECT_DIR/wasm32-unknown-emscripten/include/ \
+
+#    -s TRACE_WEBGL_CALLS=1 \
+
+# -s ASYNCIFY_IMPORTS="['init_js_file', 'getVoutMessagePort', 'bindVideoFrame', 'CopyFrameToBuffer', 'probeConfig', 'initDecoderWorkerMessagePort', 'flushAsync', 'initDecoderJS']"
+
+
+emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=25 \
+    -s OFFSCREEN_FRAMEBUFFER=1  \
+    -s USE_WEBGL2=1 \
+    --profiling-funcs \
+    -s OFFSCREENCANVAS_SUPPORT=1 \
+    -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
+    -s EXTRA_EXPORTED_RUNTIME_METHODS="[allocateUTF8, writeAsciiToMemory]" \
+    -s ASYNCIFY=1 -O3 \
+    -s EXIT_RUNTIME=1 -s ASSERTIONS=1 \
+    -I $PATH_VLC/include/ \
     main.c exports_media_player.c exports_media.c \
-    $PROJECT_DIR/build-emscripten/lib/.libs/libvlc.a \
-    $PROJECT_DIR/build-emscripten/vlc-modules.bc \
-    $PROJECT_DIR/build-emscripten/modules/.libs/*.a \
-    $PROJECT_DIR/wasm32-unknown-emscripten/lib/*.a \
-    $PROJECT_DIR/build-emscripten/src/.libs/libvlccore.a \
-    $PROJECT_DIR/build-emscripten/compat/.libs/libcompat.a \
-     --js-library lib/wasm-imports.js \
-    -o experimental.js --preload-file ${SAMPLE_DIR}
+    -s EXPORTED_FUNCTIONS=@libvlc_wasm.sym \
+    $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
+    $PATH_VLC/build-emscripten/vlc-modules.bc \
+    $PATH_VLC/build-emscripten/modules/.libs/*.a \
+    $PATH_VLC/contrib/wasm32-unknown-emscripten/lib/*.a \
+    $PATH_VLC/build-emscripten/src/.libs/libvlccore.a \
+    $PATH_VLC/build-emscripten/compat/.libs/libcompat.a \
+    --js-library lib/wasm-imports.js \
+    -o experimental.js
+
+
+#em++ --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
+#    -s OFFSCREEN_FRAMEBUFFER=1\
+#    -s USE_WEBGL2=1 \
+#    --profiling-funcs \
+#    -s OFFSCREENCANVAS_SUPPORT=1 \
+#    -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
+#    -s EXTRA_EXPORTED_RUNTIME_METHODS="[allocateUTF8]" \
+#    -s ASYNCIFY=1 -O3 \
+#    -s GL_ASSERTIONS=1 \
+#    -s GL_TRACK_ERRORS=1 \
+#    -I $PATH_VLC/include/ \
+#    main_opengl.cpp \
+#    $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
+#    $PATH_VLC/build-emscripten/vlc-modules.bc \
+#    $PATH_VLC/build-emscripten/modules/.libs/*.a \
+#    $PATH_VLC/contrib/wasm32-unknown-emscripten/lib/*.a \
+#    $PATH_VLC/build-emscripten/src/.libs/libvlccore.a \
+#    $PATH_VLC/build-emscripten/compat/.libs/libcompat.a \
+#    --js-library lib/wasm-imports.js \
+#    -o opengl.js --preload-file ${SAMPLE_DIR}

@@ -79,7 +79,11 @@
     <label for="opts">Enter libvlc options here:</label>
     <input type="text" size=60 id="opts" name="opts" value="--codec=webcodec --aout=emworklet_audio -vvv"></input>
     <button id="vlc_init">Start libvlc</button>
-    <button id="vlc_stop">stop</button>
+    <button id="vlc_select">Select Files</button>
+    <button id="vlc_play">Play</button>
+    <button id="vlc_next">Next</button>
+    <button id="vlc_prev">Previous</button>
+    <button id="vlc_stop">Stop</button>
     <br></br>
     <div id="stack">
         <canvas
@@ -123,48 +127,122 @@
       const overlay = document.getElementById("overlay");
       let inputElement = document.getElementById("fpicker_btn");
       let init_elem = document.getElementById("vlc_init");
+      let select_elem = document.getElementById("vlc_select");
+      let play_elem = document.getElementById("vlc_play");
+      let next_elem = document.getElementById("vlc_next");
+      let prev_elem = document.getElementById("vlc_prev");
       let stop_elem = document.getElementById("vlc_stop");
       let options_input = document.getElementById("opts");
+
+      var ml_ptr = undefined;
+      var mlp_ptr = undefined;
+      var flag = 0;
+      var counter = 0;
+
+      select_elem.addEventListener("click", function () {
+	  inputElement.click();
+      });
+
+      var playing = -1;
+      play_elem.addEventListener("click", function () {
+	  if (mlp_ptr === undefined) {
+	      mlp_ptr = Module._wasm_media_list_player_new();
+	  }
+	  if (ml_ptr === undefined) {
+	      console.error("bad !");
+	      return ;
+	  }
+	  if (Module._libvlc_media_list_count(ml_ptr) === 0) {
+	      console.error("nope, media list is empty... come back later!");
+	  }
+	  if (playing === -1) {
+	      Module._libvlc_media_list_player_set_media_list(mlp_ptr, ml_ptr);
+	      Module._libvlc_media_list_player_play(mlp_ptr);
+	      playing = 1
+	  }
+	  else if (playing === 1) {
+	      Module._libvlc_media_list_player_pause(mlp_ptr);
+	  }
+	  else {
+	      Module._libvlc_media_list_player_play(mlp_ptr);
+	  }
+      });
+
+      stop_elem.addEventListener("click", function () {
+	  Module._libvlc_media_list_player_stop_async(mlp_ptr);
+      });
+
+      next_elem.addEventListener("click", function () {
+	  Module._libvlc_media_list_player_next(mlp_ptr);
+      });
+      prev_elem.addEventListener("click", function () {
+	  Module._libvlc_media_list_player_previous(mlp_ptr);	  
+      });
+      // iterator in case the user selected multiple files.
+      let id = 1;
+      
       function handleFiles() {
-	  // iterator in case the user selected multiple files.
+	  if (ml_ptr === undefined) {
+	      console.abort("bad !");
+	      return;
+	  }
 	  for (var i=0; i < this.files.length; i++) {
 	      var name = this.files.item(i).name;
 	      console.log("opened file: ", name);
-	      Module['vlc_access_file'][1] = this.files.item(i);
+	      Module['vlc_access_file'][id] = this.files.item(i);
+	      // acquire lock
+	      Module._libvlc_media_list_lock(ml_ptr);
+	      // add_media, check if return value is 0
+	      var path_ptr = Module.allocateUTF8("emjsfile://"+ id);
+	      var media_ptr = Module._wasm_media_new_location(path_ptr);
+	      var ret = Module._libvlc_media_list_add_media(ml_ptr, media_ptr);
+	      console.assert(ret == 0);
+	      // release lock
+	      Module._libvlc_media_list_unlock(ml_ptr);
+	      Module._free(path_ptr);
+	      counter += 1;
+	      id++;
 	  }
       }
 
-      inputElement.addEventListener("change", handleFiles, false);  
-      var media_player;
+      inputElement.addEventListener("change", handleFiles, false);
+            
       function handleStart() {
-	  vlc_options = options_input.value;
-	  console.log("vlc.js: starting vlc.js with : " + vlc_options);
-	  let vlc_opts_array = vlc_options.split(' ');
-
-
-	  let vlc_opts_size = 0;
-	  for (let i in vlc_opts_array) {
-	      vlc_opts_size += vlc_opts_array[i].length + 1;
+	  if (flag === 0) {
+	      vlc_options = options_input.value;
+	      console.log("vlc.js: starting vlc.js with : " + vlc_options);
+	      let vlc_opts_array = vlc_options.split(' ');	      
+	      let vlc_opts_size = 0;
+	      for (let i in vlc_opts_array) {
+		  vlc_opts_size += vlc_opts_array[i].length + 1;
+	      }
+	      var buffer = Module._malloc(vlc_opts_size);
+	      var wrote_size = 0;
+	      for (let i in vlc_opts_array) {
+		  Module.writeAsciiToMemory(vlc_opts_array[i], buffer + wrote_size, true);
+		  wrote_size += vlc_opts_array[i].length + 1;
+	      }
+	      var vlc_argv = Module._malloc(vlc_opts_array.length * 4 + 4);
+	      var view_vlc_argv = new Uint32Array(
+		  Module.wasmMemory.buffer,
+		  vlc_argv,
+		  vlc_opts_array.length
+	      );
+	      wrote_size = 0;
+	      for (let i in vlc_opts_array) {
+		  view_vlc_argv[i] = buffer + wrote_size;
+		  wrote_size += vlc_opts_array[i].length + 1;
+	      }
+	      Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
+	      ml_ptr = Module._libvlc_media_list_new();
+	      flag = 1;
 	  }
-	  var buffer = Module._malloc(vlc_opts_size);
-	  var wrote_size = 0;
-	  for (let i in vlc_opts_array) {
-	      Module.writeAsciiToMemory(vlc_opts_array[i], buffer + wrote_size, true);
-	      wrote_size += vlc_opts_array[i].length + 1;
+	  // libvlc + media_list setup: OK
+	  else {
+	      console.error("multiple instances not supported yet!, please reload the page");
 	  }
-	  var vlc_argv = Module._malloc(vlc_opts_array.length * 4 + 4);
-	  var view_vlc_argv = new Uint32Array(
-	      Module.wasmMemory.buffer,
-	      vlc_argv,
-	      vlc_opts_array.length
-	  );
-	  wrote_size = 0;
-	  for (let i in vlc_opts_array) {
-	      view_vlc_argv[i] = buffer + wrote_size;
-	      wrote_size += vlc_opts_array[i].length + 1;
-	  }
-	  Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
-	  media_player = new MediaPlayer(Module, "emjsfile://1");
+	  /*
+	  const media_player = new MediaPlayer(Module, "emjsfile:///mediafile");
 	  media_player.set_volume(80);
 	  
 	  Module._set_global_media_player(media_player.media_player_ptr);
@@ -172,12 +250,10 @@
 	  window.on_overlay_click = on_overlay_click;
 	  window.update_overlay = update_overlay;      
 	  update_overlay(overlay);
-      }
-      function handleStop() {
-	  media_player.stop();
+	  */
       }
       init_elem.addEventListener("click", handleStart, false);
-      stop_elem.addEventListener("click", handleStop, false);
+
     </script>
 
 

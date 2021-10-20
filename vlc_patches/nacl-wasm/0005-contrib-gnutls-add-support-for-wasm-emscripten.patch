@@ -1,28 +1,29 @@
-From 5287ed34bd7a660aa4141b8056d0c4e25e99f5ea Mon Sep 17 00:00:00 2001
+From 1627322eb7b9a485ce5380978e4db1fd5b331ee5 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Mon, 31 May 2021 00:18:18 +0200
-Subject: [PATCH 11/18] contrib: gnutls: add support for wasm-emscripten
+Subject: [PATCH 5/5] contrib: gnutls: add support for wasm-emscripten
 
 the contrib is temporarily disabled until this pr is merged:
 https://github.com/emscripten-core/emscripten/pull/14352
 ---
- contrib/src/gnutls/rules.mak | 3 +++
- 1 file changed, 3 insertions(+)
+ contrib/src/gnutls/rules.mak | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/contrib/src/gnutls/rules.mak b/contrib/src/gnutls/rules.mak
-index ae2b07afd0..c0b61a07bd 100644
+index a5431693c1..012384d65b 100644
 --- a/contrib/src/gnutls/rules.mak
 +++ b/contrib/src/gnutls/rules.mak
-@@ -78,6 +78,9 @@ endif
- ifdef HAVE_NACL
- 	GNUTLS_CONF += --disable-hardware-acceleration
+@@ -78,6 +78,10 @@ ifeq ($(ARCH),aarch64)
  endif
+ endif
+ 
 +ifdef HAVE_EMSCRIPTEN
 +	GNUTLS_CONF += --disable-hardware-acceleration
 +endif
- 
++
  .gnutls: gnutls
  	cd $< && $(GNUTLS_ENV) ./configure $(GNUTLS_CONF)
+ 	cd $< && $(MAKE) -C gl install
 -- 
-2.32.0
+2.30.2
 

@@ -11,7 +11,11 @@
 extern libvlc_instance_t *libvlc;
 
 libvlc_media_t* EMSCRIPTEN_KEEPALIVE wasm_media_new_path(const char *path) {
-  return libvlc_media_new_path(libvlc, path);
+    return libvlc_media_new_path(libvlc, path);
+}
+
+libvlc_media_t* EMSCRIPTEN_KEEPALIVE wasm_media_new_location(const char *path) {
+    return libvlc_media_new_location(libvlc, path);
 }
 
 void EMSCRIPTEN_KEEPALIVE wasm_media_retain( libvlc_media_t *media) {

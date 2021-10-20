@@ -20,8 +20,12 @@ libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new() {
   return libvlc_media_player_new(libvlc);
 }
 
+libvlc_media_list_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_list_player_new() {
+  return libvlc_media_list_player_new(libvlc);
+}
+
 libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new_from_media(libvlc_media_t* media) {
-  return libvlc_media_player_new_from_media(media);
+    return libvlc_media_player_new_from_media(media);
 }
 
 void EMSCRIPTEN_KEEPALIVE wasm_media_player_release(libvlc_media_player_t *media_player) {
@@ -58,6 +62,12 @@ void EMSCRIPTEN_KEEPALIVE wasm_media_player_set_pause(libvlc_media_player_t *med
 void EMSCRIPTEN_KEEPALIVE wasm_media_player_pause(libvlc_media_player_t *media_player) {
   libvlc_media_player_pause(media_player);
 }
+
+void EMSCRIPTEN_KEEPALIVE wasm_media_player_stop(libvlc_media_player_t *media_play\
+er) {
+  libvlc_media_player_stop_async(media_player);
+}
+
 
 // TODO
 // LIBVLC_API int libvlc_media_player_stop_async ( libvlc_media_player_t *p_mi );
@@ -233,4 +243,25 @@ int EMSCRIPTEN_KEEPALIVE wasm_media_player_get_role(libvlc_media_player_t *media
 
 int EMSCRIPTEN_KEEPALIVE wasm_media_player_set_role(libvlc_media_player_t *media_player, unsigned role) {
   return libvlc_media_player_set_role(media_player, role);
+}
+
+int EMSCRIPTEN_KEEPALIVE wasm_libvlc_init(size_t size, char const *argv[]) {
+    /*
+    char const *vlc_argv[] = {
+        "-vvv",
+        "--no-spu",
+        "--no-osd",
+        "--aout=emworklet_audio",
+        "--codec=avcodec",
+        "-Idummy",
+        "--ignore-config",
+    };
+    */
+    libvlc = libvlc_new( size, argv );
+    if (libvlc == NULL)
+    {
+        fprintf( stderr, "unable to create libvlc instance" );
+        return -1;
+    }
+    return 0;
 }

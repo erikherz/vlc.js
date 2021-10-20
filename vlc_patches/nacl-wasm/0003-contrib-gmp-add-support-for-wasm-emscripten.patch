@@ -1,17 +1,17 @@
-From e4ca45f25ef467e54246dd61fb83e23d8b4a7209 Mon Sep 17 00:00:00 2001
+From cc28db23a9fc0fc2b116c33a26d72abf2dad7a4f Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Sun, 30 May 2021 21:22:40 +0200
-Subject: [PATCH 09/18] contrib: gmp: add support for wasm-emscripten
+Subject: [PATCH 3/5] contrib: gmp: add support for wasm-emscripten
 
 ---
  contrib/src/gmp/rules.mak | 3 +++
  1 file changed, 3 insertions(+)
 
 diff --git a/contrib/src/gmp/rules.mak b/contrib/src/gmp/rules.mak
-index de2ce20175..809d8b0edc 100644
+index 11fe8acdfa..d6cd702ce0 100644
 --- a/contrib/src/gmp/rules.mak
 +++ b/contrib/src/gmp/rules.mak
-@@ -18,6 +18,9 @@ ifeq ($(ARCH),x86_64)
+@@ -13,6 +13,9 @@ ifeq ($(ARCH),mips64el)
  GMP_CONF += --disable-assembly
  endif
  endif
@@ -22,5 +22,5 @@ index de2ce20175..809d8b0edc 100644
  ifdef HAVE_WIN32
  ifeq ($(ARCH),arm)
 -- 
-2.32.0
+2.30.2
 

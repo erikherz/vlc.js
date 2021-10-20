@@ -1,0 +1,58 @@
+From 87fd1198e89d810ccc06dc4784481761bc028db0 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Tue, 4 Jan 2022 08:30:59 +0100
+Subject: [PATCH 1/1] vlc.js modules: remove category
+
+---
+ modules/audio_output/emscripten.cpp | 1 -
+ modules/logger/emscripten.c         | 1 -
+ modules/video_output/emscripten.c   | 2 --
+ 3 files changed, 4 deletions(-)
+
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+index d63c690c7e..b0207b3adf 100644
+--- a/modules/audio_output/emscripten.cpp
++++ b/modules/audio_output/emscripten.cpp
+@@ -420,7 +420,6 @@ vlc_module_begin ()
+ 	set_description( N_("Emscripten Worklet audio output") )
+ 	set_shortname( "emworklet" )
+ 	set_capability( "audio output", 100 )
+-	set_category( CAT_AUDIO )
+ 	set_subcategory( SUBCAT_AUDIO_AOUT )
+ 	set_callbacks( Open, Close )
+ vlc_module_end ()
+diff --git a/modules/logger/emscripten.c b/modules/logger/emscripten.c
+index 85fdedb0d6..3a3c4af54e 100644
+--- a/modules/logger/emscripten.c
++++ b/modules/logger/emscripten.c
+@@ -85,7 +85,6 @@ static const struct vlc_logger_operations *Open(vlc_object_t *obj, void **sysp)
+ vlc_module_begin()
+ 	set_shortname(N_("emlog"))
+ 	set_description(N_("Emscripten loggger"))
+-	set_category(CAT_ADVANCED)
+ 	set_subcategory(SUBCAT_ADVANCED_MISC)
+ 	set_capability("logger", 30)
+ 	set_callbacks(Open, NULL)
+diff --git a/modules/video_output/emscripten.c b/modules/video_output/emscripten.c
+index f940738a03..05c17d3179 100644
+--- a/modules/video_output/emscripten.c
++++ b/modules/video_output/emscripten.c
+@@ -161,7 +161,6 @@ error:
+ vlc_module_begin()
+ 	set_shortname(N_("Emscripten Window"))
+ 	set_description(N_("Emscripten drawing area"))
+-	set_category(CAT_VIDEO)
+ 	set_subcategory(SUBCAT_VIDEO_VOUT)
+ 	set_capability("vout window", 10)
+ 	set_callbacks(OpenWindow, NULL)
+@@ -169,7 +168,6 @@ vlc_module_begin()
+ 	add_submodule ()
+ 	set_shortname("Emscripten GL")
+ 	set_description(N_("Emscripten extension for OpenGL"))
+-	set_category(CAT_VIDEO)
+ 	set_subcategory(SUBCAT_VIDEO_VOUT)
+ 	set_capability("opengl es2", 50)
+ 	set_callback(Open)
+-- 
+2.34.1
+
