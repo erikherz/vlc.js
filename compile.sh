@@ -54,7 +54,7 @@ fi
 
 cd $WORK_DIR
 diagnostic "Setting the environment"
-source emsdk/emsdk_env.sh
+. emsdk/emsdk_env.sh
 
 diagnostic "build libvlc"
 cd ./vlc/extras/package/wasm-emscripten/
