@@ -29,7 +29,7 @@ if [ ! -d emsdk ]; then
 fi
 
 cd $WORK_DIR
-TESTED_HASH="721cf129"
+TESTED_HASH="3379c7bdba42984d56d311fcdc9810308b3a08b7"
 # Go go go vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
@@ -41,7 +41,6 @@ if [ ! -d vlc ]; then
     if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
 	# core patches
 	git am -3 ../vlc_patches/0001-configure-improve-testing-unsupported-GL-functions-f.patch
-	git am -3 ../vlc_patches/0001-contrib-set-RANLIB-for-toolchain.cmake.patch
 	git am -3 ../vlc_patches/0001-modules-disable-libvlc_json-and-ytbdl-vlc.js-17.patch
 	git am -3 ../vlc_patches/nacl-wasm/00*.patch
 	git am -3 ../vlc_patches/audio_output/00*.patch

@@ -1,7 +1,7 @@
-From a51bb9046ce9670a1ad6636f2f0d1f85b3f342a5 Mon Sep 17 00:00:00 2001
+From 58c9af72a3cc04f39700369fbeb5579c0c384221 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Mon, 9 Nov 2020 22:35:32 +0100
-Subject: [PATCH 1/1] logger: add emscripten module
+Subject: [PATCH] logger: add emscripten module
 
 ---
  modules/logger/Makefile.am  |  6 +++
@@ -10,13 +10,13 @@ Subject: [PATCH 1/1] logger: add emscripten module
  create mode 100644 modules/logger/emscripten.c
 
 diff --git a/modules/logger/Makefile.am b/modules/logger/Makefile.am
-index 4addf6dcfd..87c675abaf 100644
+index 8ab485c8fe..1d10a6e3a4 100644
 --- a/modules/logger/Makefile.am
 +++ b/modules/logger/Makefile.am
-@@ -22,3 +22,9 @@ libandroid_logger_plugin_la_LIBADD = -llog
- if HAVE_ANDROID
- logger_LTLIBRARIES += libandroid_logger_plugin.la
- endif
+@@ -25,3 +25,9 @@ endif
+ 
+ libjson_tracer_plugin_la_SOURCES = logger/json.c
+ logger_LTLIBRARIES += libjson_tracer_plugin.la
 +
 +libemscripten_logger_plugin_la_SOURCES = logger/emscripten.c
 +
@@ -122,5 +122,5 @@ index 0000000000..85fdedb0d6
 +	set_callbacks(Open, NULL)
 +vlc_module_end ()
 -- 
-2.32.0
+2.30.2
 

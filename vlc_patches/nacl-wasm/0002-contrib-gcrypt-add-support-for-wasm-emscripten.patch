@@ -1,7 +1,7 @@
-From 9954c63c28eefac54c32ecd53751b6e2d237f3f1 Mon Sep 17 00:00:00 2001
+From ca88c8936b94312f6bfe844c9dacb310d7fee957 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Sun, 30 May 2021 20:38:46 +0200
-Subject: [PATCH 08/18] contrib: gcrypt: add support for wasm-emscripten
+Subject: [PATCH 2/5] contrib: gcrypt: add support for wasm-emscripten
 
 ---
  contrib/src/gcrypt/rules.mak           |  6 ++++
@@ -11,12 +11,12 @@ Subject: [PATCH 08/18] contrib: gcrypt: add support for wasm-emscripten
  create mode 100644 contrib/src/gpg-error/emscripten.patch
 
 diff --git a/contrib/src/gcrypt/rules.mak b/contrib/src/gcrypt/rules.mak
-index e710f90e70..3139c5e910 100644
+index c9c9be3efa..0275e21fe8 100644
 --- a/contrib/src/gcrypt/rules.mak
 +++ b/contrib/src/gcrypt/rules.mak
-@@ -78,6 +78,12 @@ GCRYPT_CONF += --disable-avx-support --disable-avx2-support --disable-padlock-su
- GCRYPT_CONF += --disable-amd64-as-feature-detection --disable-drng-support
- GCRYPT_CONF += --disable-pclmul-support
+@@ -72,6 +72,12 @@ ifeq ($(ARCH),aarch64)
+ GCRYPT_CONF += --disable-arm-crypto-support
+ endif
  endif
 +ifdef HAVE_EMSCRIPTEN
 +GCRYPT_CONF += --disable-asm --disable-aesni-support ac_cv_func_syslog=no --disable-sse41-support
@@ -77,7 +77,7 @@ index 0000000000..f60695c513
 +2.31.1
 +
 diff --git a/contrib/src/gpg-error/rules.mak b/contrib/src/gpg-error/rules.mak
-index a22c778632..68aa8dd1ff 100644
+index 4e283c77cb..0f1053587d 100644
 --- a/contrib/src/gpg-error/rules.mak
 +++ b/contrib/src/gpg-error/rules.mak
 @@ -25,6 +25,7 @@ endif
@@ -89,5 +89,5 @@ index a22c778632..68aa8dd1ff 100644
  ifdef HAVE_ANDROID
  ifeq ($(ARCH),aarch64)
 -- 
-2.32.0
+2.30.2
 

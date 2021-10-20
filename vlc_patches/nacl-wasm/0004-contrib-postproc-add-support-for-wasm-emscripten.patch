@@ -1,0 +1,27 @@
+From 1e1459946fce7442ec6ca942d27227c8b19ff9ef Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Sun, 30 May 2021 22:00:12 +0200
+Subject: [PATCH 4/5] contrib: postproc: add support for wasm-emscripten
+
+---
+ contrib/src/postproc/rules.mak | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/contrib/src/postproc/rules.mak b/contrib/src/postproc/rules.mak
+index 252d6b384d..8a008f6ad2 100644
+--- a/contrib/src/postproc/rules.mak
++++ b/contrib/src/postproc/rules.mak
+@@ -103,6 +103,10 @@ ifdef HAVE_SOLARIS
+ POSTPROCCONF += --enable-pic
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++POSTPROCCONF += --arch=wasm32 --target-os=linux
++endif
++
+ # Build
+ 
+ ifdef GPL
+-- 
+2.30.2
+
