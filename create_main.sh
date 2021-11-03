@@ -32,8 +32,8 @@ SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
     -s MODULARIZE=1 -s EXPORT_NAME="VlcModule" \
-    -s EXTRA_EXPORTED_RUNTIME_METHODS="allocateUTF8" \
-    -I $PATH_VLC/include/ -I $PATH_VLC/wasm32-unknown-emscripten/include/ \
+    -s EXPORTED_RUNTIME_METHODS="allocateUTF8" \
+    -I $PATH_VLC/include/ \
     main.c exports_media_player.c exports_media.c \
     $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
     $PATH_VLC/build-emscripten/vlc-modules.bc \
