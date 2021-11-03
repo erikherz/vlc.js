@@ -19,7 +19,7 @@ checkfail()
 SLOW_MODE=${SLOW_MODE:=1}
 WORK_DIR=$PWD
 
-EMSDK_VERSION="2.0.25"
+EMSDK_VERSION="2.0.33"
 # Download the portable SDK and uncompress it
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
@@ -29,7 +29,7 @@ if [ ! -d emsdk ]; then
 fi
 
 cd $WORK_DIR
-TESTED_HASH="3379c7bdba42984d56d311fcdc9810308b3a08b7"
+TESTED_HASH="abbe7f3b"
 # Go go go vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
