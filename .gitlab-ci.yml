@@ -1,13 +1,9 @@
 image:
-  name: registry.videolan.org/vlc-debian-wasm-emscripten:20210601090557
+  name: registry.videolan.org/vlc-debian-wasm-emscripten:20211104155236
   entrypoint: [] # See issue : https://gitlab.com/gitlab-org/gitlab-runner/-/issues/1170
 
 stages:
   - build
-
-before_script:
-  - git config --global user.email "test@test.test" # DIRTY, Forced to have git credentials
-  - git config --global user.name "Test"
 
 compile-job:
   stage: build
