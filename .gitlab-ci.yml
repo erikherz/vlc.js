@@ -1,0 +1,28 @@
+image:
+  name: registry.videolan.org/vlc-debian-wasm-emscripten:20210601090557
+  entrypoint: [] # See issue : https://gitlab.com/gitlab-org/gitlab-runner/-/issues/1170
+
+stages:
+  - build
+
+before_script:
+  - git config --global user.email "test@test.test" # DIRTY, Forced to have git credentials
+  - git config --global user.name "Test"
+
+compile-job:
+  stage: build
+  tags:
+    - docker
+    - amd64
+  script:
+    - bash compile.sh              # Compilation
+
+  only:
+    - incoming
+  artifacts:
+    paths:                  ## PATHS FOR ARTIFACTS
+      - experimental*       # worker.js, wasm file and js file, data...
+      - assets/             # Assets for logos etc...
+      - vlc.html            # HTML page
+      - lib/*               # libvlc.js, module-loader.js, overlay.js, wasm-imports.js
+    expire_in: 1 week       # Expiration date
