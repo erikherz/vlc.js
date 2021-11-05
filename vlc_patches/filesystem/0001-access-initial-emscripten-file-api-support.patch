@@ -1,4 +1,4 @@
-From ffa3b9e16691a72b744715564f63b34ea57ab414 Mon Sep 17 00:00:00 2001
+From 25bd77c040850f105e6286e9274b3e111e7028d5 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Wed, 18 Nov 2020 17:50:39 +0100
 Subject: [PATCH 1/1] access: initial emscripten file api support
@@ -10,13 +10,13 @@ Subject: [PATCH 1/1] access: initial emscripten file api support
  create mode 100644 modules/access/emscripten.cpp
 
 diff --git a/modules/access/Makefile.am b/modules/access/Makefile.am
-index 9cd3098fc2..331de24f82 100644
+index fc227a6e43..fd3b3ba1c3 100644
 --- a/modules/access/Makefile.am
 +++ b/modules/access/Makefile.am
-@@ -454,3 +454,11 @@ librist_plugin_la_LIBADD = $(SOCKET_LIBS)
- if HAVE_BITSTREAM
- access_LTLIBRARIES += librist_plugin.la
- endif
+@@ -454,3 +454,11 @@ librist_plugin_la_LIBADD = $(RIST_LIBS) $(SOCKET_LIBS) $(LIBPTHREAD)
+ librist_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(accessdir)'
+ access_LTLIBRARIES += $(LTLIBrist)
+ EXTRA_LTLIBRARIES += librist_plugin.la
 +
 +### EMSCRIPTEN ###
 +
@@ -201,5 +201,5 @@ index 0000000000..f3162574f9
 +    set_callbacks( FileOpen, FileClose )
 +vlc_module_end ()
 -- 
-2.32.0
+2.33.0
 
