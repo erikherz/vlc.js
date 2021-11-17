@@ -1,0 +1,33 @@
+From 36bd27066bb2e159abbaecfef02b9ef34e2de71b Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Fri, 12 Nov 2021 16:17:00 +0100
+Subject: [PATCH 1/1] aout: fix leak of js object
+
+---
+ modules/audio_output/emscripten.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+index 6acea387e3..deaa32fbfa 100644
+--- a/modules/audio_output/emscripten.cpp
++++ b/modules/audio_output/emscripten.cpp
+@@ -272,7 +272,7 @@ namespace {
+ 		audio_output_t *aout = (audio_output_t *)obj;
+ 		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
+ 
+-    // FIXME
++		EM_ASM({ Module.to_free.delete() });
+ 		delete sys->awn_inst;
+ 		free(sys->sab);
+ 		free(sys);
+@@ -400,6 +400,7 @@ registerProcessor('worklet-processor', Processor);";
+ 		cb_caller.set("context", val(webaudio_context));
+ 		cb_caller.set("sab_ptr", val(reinterpret_cast<uintptr_t>(sys->sab)));
+ 		cb_caller.set("channels", val(AUDIO_WORKLET_NB_CHANNELS));
++		EM_ASM({ Module.to_free = Emval.toValue($0); }, cb_caller.as_handle());
+ 		val awn_caller = cb_caller["awn_call"];
+ 		val awn_cb = awn_caller.call<val>("bind", cb_caller);
+ 
+-- 
+2.33.0
+
