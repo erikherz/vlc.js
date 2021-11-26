@@ -131,12 +131,6 @@
       window.update_overlay = update_overlay;
 
       update_overlay(overlay);
-
-      addEventListener('worker_message', function(msg) {
-        if (msg.detail === "on_position_changed") {
-          update_overlay(overlay);
-        }
-      });
     </script>
 
 
