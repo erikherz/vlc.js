@@ -19,7 +19,7 @@ checkfail()
 SLOW_MODE=${SLOW_MODE:=1}
 WORK_DIR=$PWD
 
-EMSDK_VERSION="2.0.33"
+EMSDK_VERSION="3.0.0"
 # Download the portable SDK and uncompress it
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
@@ -29,7 +29,7 @@ if [ ! -d emsdk ]; then
 fi
 
 cd $WORK_DIR
-TESTED_HASH="abbe7f3b"
+TESTED_HASH="271d3552"
 # Go go go vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"
@@ -46,6 +46,7 @@ if [ ! -d vlc ]; then
 	git am -3 ../vlc_patches/audio_output/00*.patch
 	git am -3 ../vlc_patches/video_output/00*.patch
 	git am -3 ../vlc_patches/logger/00*.patch
+	git am -3 ../vlc_patches/0001-vlc.js-modules-remove-category.patch
 	# git am -3 ../vlc_patches/filesystem/*.patch
     fi
     checkfail "vlc source: git clone failed"
