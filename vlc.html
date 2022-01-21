@@ -123,9 +123,9 @@
       const overlay = document.getElementById("overlay");
       const media_player = new MediaPlayer(Module, "./samples/BigBuckBunny.mp4");
 
+      media_player.set_volume(80);
       // FIXME
       Module._set_global_media_player(media_player.media_player_ptr);
-
       window.media_player = media_player;
       window.on_overlay_click = on_overlay_click;
       window.update_overlay = update_overlay;
