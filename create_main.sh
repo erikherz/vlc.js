@@ -29,10 +29,20 @@ SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 # For release builds, remove '--profiling-funcs' and add '-Os'
 # Note that we use '-s MODULARIZE', but no '-s EXPORT_ES6', which would
 # conflict with pthreads on Firefox.
-emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
-    -s OFFSCREEN_FRAMEBUFFER=1 -s USE_WEBGL2=1 --profiling-funcs \
-    -s MODULARIZE=1 -s EXPORT_NAME="VlcModule" \
-    -s EXPORTED_RUNTIME_METHODS="allocateUTF8" \
+
+#    -s TRACE_WEBGL_CALLS=1 \
+
+emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
+    -s OFFSCREEN_FRAMEBUFFER=1\
+    -s USE_WEBGL2=1 \
+    --profiling-funcs \
+    -s OFFSCREENCANVAS_SUPPORT=1 \
+    -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
+    -s EXTRA_EXPORTED_RUNTIME_METHODS="[allocateUTF8]" \
+    -s ASYNCIFY=1 -O3 \
+    -s GL_DEBUG=1 \
+    -s GL_ASSERTIONS=1 \
+    -s GL_TRACK_ERRORS=1 \
     -I $PATH_VLC/include/ \
     main.c exports_media_player.c exports_media.c \
     -s EXPORTED_FUNCTIONS=@libvlc_wasm.sym \
