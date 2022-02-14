@@ -1,12 +1,12 @@
-From 8a260cf413c6d5df3f70bbe0830c858853f393a1 Mon Sep 17 00:00:00 2001
+From 8616dbdcb2035c2d1d724b27fb7c7bc0258f5b71 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Wed, 18 Nov 2020 17:50:39 +0100
-Subject: [PATCH 1/1] access: initial emscripten nativefs support
+Subject: [PATCH 1/2] access: initial emscripten nativefs support
 
 ---
  modules/access/Makefile.am    |   8 ++
- modules/access/emscripten.cpp | 148 ++++++++++++++++++++++++++++++++++
- 2 files changed, 156 insertions(+)
+ modules/access/emscripten.cpp | 154 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 162 insertions(+)
  create mode 100644 modules/access/emscripten.cpp
 
 diff --git a/modules/access/Makefile.am b/modules/access/Makefile.am
@@ -27,10 +27,10 @@ index 2f5af78202..0c6d48f778 100644
 +endif
 diff --git a/modules/access/emscripten.cpp b/modules/access/emscripten.cpp
 new file mode 100644
-index 0000000000..88ac5bad4b
+index 0000000000..2b0f3c833b
 --- /dev/null
 +++ b/modules/access/emscripten.cpp
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,154 @@
 +/*****************************************************************************
 + * emscripten.cpp: emscripten file system access plugin
 + *****************************************************************************
@@ -81,7 +81,10 @@ index 0000000000..88ac5bad4b
 +    stream_t     *p_access = reinterpret_cast<stream_t *>(p_this);
 +
 +    /* Open file */
-+    int fd = 3; // not implemented for now: only one file
++    /*
++      Setting the default fd to 3, the first valid file descriptor.
++    */
++    int fd = 3; 
 +    access_sys_t *p_sys = reinterpret_cast<access_sys_t *>(vlc_obj_malloc(p_this, sizeof (*p_sys)));
 +    if (unlikely(p_sys == NULL))
 +        goto error;
@@ -106,15 +109,14 @@ index 0000000000..88ac5bad4b
 +    stream_t     *p_access = reinterpret_cast<stream_t *>(p_this);
 +
 +    access_sys_t *sys = reinterpret_cast<access_sys_t *>(p_access->p_sys);
-+    (void)sys;
-+    nativefs_seek(3, 0, NATIVEFS_SEEK_SET);
++    nativefs_seek(sys->fd, 0, NATIVEFS_SEEK_SET);
 +}
 +
 +static ssize_t Read (stream_t *p_access, void *p_buffer, size_t i_len)
 +{
 +    access_sys_t *sys = reinterpret_cast<access_sys_t *>(p_access->p_sys);
 +
-+    size_t size = nativefs_read(3, p_buffer, i_len);
++    size_t size = nativefs_read(sys->fd, p_buffer, i_len);
 +    return size;
 +}
 +
@@ -125,7 +127,7 @@ index 0000000000..88ac5bad4b
 +{
 +    access_sys_t *sys = reinterpret_cast<access_sys_t *>(p_access->p_sys);
 +
-+    nativefs_seek(3, (size_t)i_pos, NATIVEFS_SEEK_SET);
++    nativefs_seek(sys->fd, (size_t)i_pos, NATIVEFS_SEEK_SET);
 +    return VLC_SUCCESS;
 +}
 +
@@ -152,9 +154,13 @@ index 0000000000..88ac5bad4b
 +            break;
 +        case STREAM_GET_SIZE:
 +        {
++            /*
++              sys->fd - 3 because the table that holds the files starts
++              at 0
++            */
 +            size_t size = (size_t) MAIN_THREAD_EM_ASM_INT({
 +                    return NATIVEFS.files[0].fileSize;
-+                });
++                }, sys->fd - 3);
 +            *va_arg( args, uint64_t * ) = size;
 +            break;
 +        }
