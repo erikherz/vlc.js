@@ -34,7 +34,7 @@ index 0000000000..88ac5bad4b
 +/*****************************************************************************
 + * emscripten.cpp: emscripten file system access plugin
 + *****************************************************************************
-+ * Copyright (C) 2001-2020 VLC authors and VideoLAN
++ * Copyright (C) 2022 VLC authors, VideoLAN and Videolabs
 + *
 + *
 + * This program is free software; you can redistribute it and/or modify it
