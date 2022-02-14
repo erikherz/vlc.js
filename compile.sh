@@ -47,8 +47,8 @@ if [ ! -d vlc ]; then
 	git am -3 ../vlc_patches/video_output/00*.patch
 	git am -3 ../vlc_patches/logger/00*.patch
 	git am -3 ../vlc_patches/0001-vlc.js-modules-remove-category.patch
+	git am -3 ../vlc_patches/filesystem/0001-access-initial-emscripten-nativefs-support.patch
 	git am -3 ../vlc_patches/audio_output/new_aout.patch
-	# git am -3 ../vlc_patches/filesystem/*.patch
     fi
     checkfail "vlc source: git clone failed"
 fi

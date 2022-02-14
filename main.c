@@ -6,6 +6,7 @@
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <emscripten/nativefs.h>
 
 libvlc_media_player_t *mp;
 libvlc_instance_t *libvlc;
@@ -47,6 +48,7 @@ int main() {
 	 * If this thread stop, all proxyfied functions wont be called.
 	 */
   EM_ASM(Module['noExitRuntime']=true);
+  nativefs_init(1, "#btn");
   char const *vlc_argv[] = {
 			    "-vvv",
 			    "--no-spu",

@@ -1,0 +1,184 @@
+From 8a260cf413c6d5df3f70bbe0830c858853f393a1 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 18 Nov 2020 17:50:39 +0100
+Subject: [PATCH 1/1] access: initial emscripten nativefs support
+
+---
+ modules/access/Makefile.am    |   8 ++
+ modules/access/emscripten.cpp | 148 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 156 insertions(+)
+ create mode 100644 modules/access/emscripten.cpp
+
+diff --git a/modules/access/Makefile.am b/modules/access/Makefile.am
+index 2f5af78202..0c6d48f778 100644
+--- a/modules/access/Makefile.am
++++ b/modules/access/Makefile.am
+@@ -463,3 +463,11 @@ librist_plugin_la_LIBADD = $(RIST_LIBS) $(SOCKET_LIBS) $(LIBPTHREAD)
+ librist_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(accessdir)'
+ access_LTLIBRARIES += $(LTLIBrist)
+ EXTRA_LTLIBRARIES += librist_plugin.la
++
++### EMSCRIPTEN ###
++
++libemscriptenfs_plugin_la_SOURCES = access/emscripten.cpp
++libemscriptenfs_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
++if HAVE_EMSCRIPTEN
++access_LTLIBRARIES += libemscriptenfs_plugin.la
++endif
+diff --git a/modules/access/emscripten.cpp b/modules/access/emscripten.cpp
+new file mode 100644
+index 0000000000..88ac5bad4b
+--- /dev/null
++++ b/modules/access/emscripten.cpp
+@@ -0,0 +1,148 @@
++/*****************************************************************************
++ * emscripten.cpp: emscripten file system access plugin
++ *****************************************************************************
++ * Copyright (C) 2001-2020 VLC authors and VideoLAN
++ *
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include<vlc_stream.h>
++#include <emscripten.h>
++#include <emscripten/nativefs.h>
++
++static ssize_t Read (stream_t *, void *, size_t);
++static int FileSeek (stream_t *, uint64_t);
++static int FileControl (stream_t *, int, va_list);
++
++typedef struct
++{
++    int fd;
++
++    bool b_pace_control;
++} access_sys_t;
++
++/*****************************************************************************
++ * FileOpen: open the file
++ *****************************************************************************/
++int FileOpen( vlc_object_t *p_this )
++{
++    stream_t     *p_access = reinterpret_cast<stream_t *>(p_this);
++
++    /* Open file */
++    int fd = 3; // not implemented for now: only one file
++    access_sys_t *p_sys = reinterpret_cast<access_sys_t *>(vlc_obj_malloc(p_this, sizeof (*p_sys)));
++    if (unlikely(p_sys == NULL))
++        goto error;
++    p_access->pf_read = Read;
++    p_access->pf_block = NULL;
++    p_access->pf_control = FileControl;
++    p_access->p_sys = p_sys;
++    p_sys->fd = fd;
++    p_access->pf_seek = FileSeek;
++    p_sys->b_pace_control = strcasecmp (p_access->psz_name, "stream");
++
++    // FIX ME: calling this from the main application for now
++    // nativefs_init(1, "#btn");
++    
++    return VLC_SUCCESS;
++error:
++    return VLC_EGENERIC;
++}
++
++void FileClose (vlc_object_t * p_this)
++{
++    stream_t     *p_access = reinterpret_cast<stream_t *>(p_this);
++
++    access_sys_t *sys = reinterpret_cast<access_sys_t *>(p_access->p_sys);
++    (void)sys;
++    nativefs_seek(3, 0, NATIVEFS_SEEK_SET);
++}
++
++static ssize_t Read (stream_t *p_access, void *p_buffer, size_t i_len)
++{
++    access_sys_t *sys = reinterpret_cast<access_sys_t *>(p_access->p_sys);
++
++    size_t size = nativefs_read(3, p_buffer, i_len);
++    return size;
++}
++
++/*****************************************************************************
++ * Seek: seek to a specific location in a file
++ *****************************************************************************/
++static int FileSeek (stream_t *p_access, uint64_t i_pos)
++{
++    access_sys_t *sys = reinterpret_cast<access_sys_t *>(p_access->p_sys);
++
++    nativefs_seek(3, (size_t)i_pos, NATIVEFS_SEEK_SET);
++    return VLC_SUCCESS;
++}
++
++/*****************************************************************************
++ * Control:
++ *****************************************************************************/
++static int FileControl( stream_t *p_access, int i_query, va_list args )
++{
++    access_sys_t *sys = reinterpret_cast<access_sys_t *>(p_access->p_sys);
++    bool    *pb_bool;
++    vlc_tick_t *pi_64;
++    
++    switch( i_query )
++    {
++        case STREAM_CAN_SEEK:
++        case STREAM_CAN_FASTSEEK:
++            pb_bool = va_arg( args, bool * );
++            *pb_bool = false;
++            break;
++        case STREAM_CAN_PAUSE:
++        case STREAM_CAN_CONTROL_PACE:
++            pb_bool = va_arg( args, bool * );
++            *pb_bool = sys->b_pace_control;
++            break;
++        case STREAM_GET_SIZE:
++        {
++            size_t size = (size_t) MAIN_THREAD_EM_ASM_INT({
++                    return NATIVEFS.files[0].fileSize;
++                });
++            *va_arg( args, uint64_t * ) = size;
++            break;
++        }
++        case STREAM_GET_PTS_DELAY:
++            pi_64 = va_arg( args, vlc_tick_t * );
++            // network caching for later
++            *pi_64 = VLC_TICK_FROM_MS(
++                var_InheritInteger (p_access, "file-caching") );
++            break;
++        default:
++            return VLC_EGENERIC;
++
++    }
++    return VLC_SUCCESS;
++}
++
++vlc_module_begin ()
++    set_description( N_("File input") )
++    set_shortname( N_("emscriptenfs") )
++    set_subcategory( SUBCAT_INPUT_ACCESS )
++    set_capability( "access", 50 )
++    add_shortcut( "emscriptenfs" )
++    set_callbacks( FileOpen, FileClose )
++vlc_module_end ()
+-- 
+2.34.1
+

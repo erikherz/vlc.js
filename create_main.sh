@@ -34,6 +34,7 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     -s MODULARIZE=1 -s EXPORT_NAME="VlcModule" \
     -s EXPORTED_RUNTIME_METHODS="allocateUTF8" \
     -I $PATH_VLC/include/ \
+    -s EMSCRIPTEN_NATIVE_FS=1 \
     main.c exports_media_player.c exports_media.c \
     $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
     $PATH_VLC/build-emscripten/vlc-modules.bc \
@@ -43,4 +44,4 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     $PATH_VLC/build-emscripten/compat/.libs/libcompat.a \
     --js-library lib/wasm-imports.js \
     --js-library vlc/modules/audio_output/webaudio/webaudio.js \
-    -o experimental.js --preload-file ${SAMPLE_DIR}
+    -o experimental.js

@@ -96,7 +96,7 @@
           width=1280 height=720
         ></canvas>
     </div>
-
+    <button id="btn">Press Me</button>
     <script src="./lib/module-loader.js"></script>
     <script src="./experimental.js"></script>
 
@@ -121,7 +121,7 @@
       };
 
       const overlay = document.getElementById("overlay");
-      const media_player = new MediaPlayer(Module, "./samples/BigBuckBunny.mp4");
+      const media_player = new MediaPlayer(Module, "emscriptenfs:///mediafile");
 
       media_player.set_volume(80);
       // FIXME

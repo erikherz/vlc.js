@@ -11,3 +11,4 @@ experimental.js
 experimental.wasm
 experimental.wasm.map
 experimental.worker.js
+experimental.nativefs_worker.js
