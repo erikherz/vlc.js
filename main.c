@@ -48,7 +48,7 @@ int main() {
 	 * If this thread stop, all proxyfied functions wont be called.
 	 */
   EM_ASM(Module['noExitRuntime']=true);
-  nativefs_init(1, "#btn");
+  nativefs_init("#btn");
   char const *vlc_argv[] = {
 			    "-vvv",
 			    "--no-spu",
