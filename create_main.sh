@@ -35,6 +35,7 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=1GB -s PTHREAD_POOL_SIZE=15 \
     -s EXPORTED_RUNTIME_METHODS="allocateUTF8" \
     -I $PATH_VLC/include/ \
     main.c exports_media_player.c exports_media.c \
+    -s EXPORTED_FUNCTIONS=@libvlc_wasm.sym \
     $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
     $PATH_VLC/build-emscripten/vlc-modules.bc \
     $PATH_VLC/build-emscripten/modules/.libs/*.a \
