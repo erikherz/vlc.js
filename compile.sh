@@ -60,6 +60,8 @@ diagnostic "Setting the environment"
 diagnostic "build libvlc"
 cd ./vlc/extras/package/wasm-emscripten/
 ./build.sh --mode=${SLOW_MODE}
+cd $WORK_DIR
+sed -e 's/^/_/' ./vlc/lib/libvlc.sym > libvlc_wasm.sym
 
 url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 
