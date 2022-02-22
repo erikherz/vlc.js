@@ -19,14 +19,15 @@ checkfail()
 SLOW_MODE=${SLOW_MODE:=1}
 WORK_DIR=$PWD
 
-EMSDK_VERSION="3.0.0"
-# Download the portable SDK and uncompress it
-if [ ! -d emsdk ]; then
-    diagnostic "emsdk not found. Fetching it"
-    git clone http://github.com/emscripten-core/emsdk.git emsdk
-    cd emsdk && ./emsdk update-tags && ./emsdk install ${EMSDK_VERSION} && ./emsdk activate ${EMSDK_VERSION}
-    checkfail "emsdk: fetch failed"
-fi
+#EMSDK_VERSION="3.0.0"
+## Download the portable SDK and uncompress it
+#if [ ! -d emsdk ]; then
+#    diagnostic "emsdk not found. Fetching it"
+#    git clone http://github.com/emscripten-core/emsdk.git emsdk
+#    cd emsdk && ./emsdk update-tags && ./emsdk install ${EMSDK_VERSION} && ./emsdk activate ${EMSDK_VERSION}
+#    checkfail "emsdk: fetch failed"
+#fi
+export PATH="${PATH}:/home/janniaux/Projects/videolabs/emscripten/"
 
 cd $WORK_DIR
 TESTED_HASH="271d3552"
@@ -54,8 +55,8 @@ if [ ! -d vlc ]; then
 fi
 
 cd $WORK_DIR
-diagnostic "Setting the environment"
-. emsdk/emsdk_env.sh
+# diagnostic "Setting the environment"
+# . emsdk/emsdk_env.sh
 
 diagnostic "build libvlc"
 cd ./vlc/extras/package/wasm-emscripten/
