@@ -115,9 +115,12 @@
             console.log('Received custom message');
             console.log(msg);
               if (msg.customCmd == 'getCanvas') {
-                  console.log('Replying to getCanvas');
+                 let name = 'canvas';
+                 if (msg.canvasId != undefined)
+                   name = msg.canvasId
+                  console.log('Replying to getCanvas("'+name+'")');
                   let w = Module.PThread.pthreads[msg.threadId].worker;
-                  let canvas = document.getElementById('canvas');
+                  let canvas = document.getElementById(name);
                   let offscreen = canvas.transferControlToOffscreen();
                   // Ensure emscripten won't try to re-transfer canvas control
                   // to offscreen
