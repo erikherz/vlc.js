@@ -57,7 +57,7 @@ SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 #     -o experimental.js --preload-file ${SAMPLE_DIR}
 
 
-emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
+em++ --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
     -s OFFSCREEN_FRAMEBUFFER=1\
     -s USE_WEBGL2=1 \
     --profiling-funcs \
@@ -69,7 +69,7 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
     -s GL_ASSERTIONS=1 \
     -s GL_TRACK_ERRORS=1 \
     -I $PATH_VLC/include/ \
-    main_opengl.c \
+    main_opengl.cpp \
     $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
     $PATH_VLC/build-emscripten/vlc-modules.bc \
     $PATH_VLC/build-emscripten/modules/.libs/*.a \
