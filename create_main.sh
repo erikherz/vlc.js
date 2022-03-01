@@ -16,7 +16,7 @@ checkfail()
     fi
 }
 
-#source emsdk/emsdk_env.sh
+source emsdk/emsdk_env.sh
 
 if [ ! -d vlc ]; then
     diagnostic "vlc must exists. Execute compile.sh"
