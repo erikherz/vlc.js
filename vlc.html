@@ -110,44 +110,8 @@
       // VlcModuleExt is an object defined in 'lib/module-loader.js' with a
       // bunch of options; also, all the fields of VlcModuleExt are added to
       // the returned Module.
-      const defaultModule = {
-          'onCustomMessage': function(msg) {
-            console.log('Received custom message');
-            console.log(msg);
-              if (msg.customCmd == 'getCanvas') {
-                 let name = 'canvas';
-                 if (msg.canvasId != undefined)
-                   name = msg.canvasId
-                  console.log('Replying to getCanvas("'+name+'")');
-                  let w = Module.PThread.pthreads[msg.threadId].worker;
-                  let canvas = document.getElementById(name);
-                  let offscreen = canvas.transferControlToOffscreen();
-                  // Ensure emscripten won't try to re-transfer canvas control
-                  // to offscreen
-                  console.log(offscreen);
-                  offscreen.controlTransferredOffscreen = true;
-                  w.postMessage({
-                      cmd: 'custom',
-                      customCmd: 'getCanvasResult',
-                      canvas: offscreen
-                  }, [offscreen]);
-              }
-          }
-      };
-      globalThis.Module = await initModule(defaultModule);
-//      globalThis.Module.postRun += [
-//        function() {
-//            // This should run after the wasm module is instantiated
-//            // before, the Pthread object won't be available
-//            PThread.receiveObjectTransfer = function (data) {
-//              // Transfer messages from worker threads to the main window.
-//              let event = new CustomEvent('worker_message', {
-//                detail: data.msg
-//              });
-//              window.dispatchEvent(event);
-//            };
-//        }];
 
+      globalThis.Module = await initModule();
 
       window.onerror = function(event) {
         // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
