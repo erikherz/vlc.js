@@ -111,7 +111,7 @@
       // bunch of options; also, all the fields of VlcModuleExt are added to
       // the returned Module.
 
-      globalThis.Module = await initModule();
+      globalThis.Module = await initModule(VlcModuleExt);
 
       window.onerror = function(event) {
         // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
