@@ -55,23 +55,23 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
     -o experimental.js --preload-file ${SAMPLE_DIR}
 
 
-em++ --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
-    -s OFFSCREEN_FRAMEBUFFER=1\
-    -s USE_WEBGL2=1 \
-    --profiling-funcs \
-    -s OFFSCREENCANVAS_SUPPORT=1 \
-    -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
-    -s EXTRA_EXPORTED_RUNTIME_METHODS="[allocateUTF8]" \
-    -s ASYNCIFY=1 -O3 \
-    -s GL_ASSERTIONS=1 \
-    -s GL_TRACK_ERRORS=1 \
-    -I $PATH_VLC/include/ \
-    main_opengl.cpp \
-    $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
-    $PATH_VLC/build-emscripten/vlc-modules.bc \
-    $PATH_VLC/build-emscripten/modules/.libs/*.a \
-    $PATH_VLC/contrib/wasm32-unknown-emscripten/lib/*.a \
-    $PATH_VLC/build-emscripten/src/.libs/libvlccore.a \
-    $PATH_VLC/build-emscripten/compat/.libs/libcompat.a \
-    --js-library lib/wasm-imports.js \
-    -o opengl.js --preload-file ${SAMPLE_DIR}
+#em++ --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
+#    -s OFFSCREEN_FRAMEBUFFER=1\
+#    -s USE_WEBGL2=1 \
+#    --profiling-funcs \
+#    -s OFFSCREENCANVAS_SUPPORT=1 \
+#    -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
+#    -s EXTRA_EXPORTED_RUNTIME_METHODS="[allocateUTF8]" \
+#    -s ASYNCIFY=1 -O3 \
+#    -s GL_ASSERTIONS=1 \
+#    -s GL_TRACK_ERRORS=1 \
+#    -I $PATH_VLC/include/ \
+#    main_opengl.cpp \
+#    $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
+#    $PATH_VLC/build-emscripten/vlc-modules.bc \
+#    $PATH_VLC/build-emscripten/modules/.libs/*.a \
+#    $PATH_VLC/contrib/wasm32-unknown-emscripten/lib/*.a \
+#    $PATH_VLC/build-emscripten/src/.libs/libvlccore.a \
+#    $PATH_VLC/build-emscripten/compat/.libs/libcompat.a \
+#    --js-library lib/wasm-imports.js \
+#    -o opengl.js --preload-file ${SAMPLE_DIR}
