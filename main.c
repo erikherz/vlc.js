@@ -62,8 +62,8 @@ int main() {
         return -1;
     }
 
-    emscripten_set_main_loop(iter, 1, 1);
-
+    emscripten_set_main_loop(iter, 1, 0);
+    emscripten_exit_with_live_runtime();
     return 0;
 }
 
