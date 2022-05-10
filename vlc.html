@@ -123,7 +123,16 @@
       };
 
       const overlay = document.getElementById("overlay");
-      const media_player = new MediaPlayer(Module, "./samples/BigBuckBunny.mp4");
+      let inputElement = document.getElementById("fpicker_btn");
+      function handleFiles() {
+          Module["wasmFSFpickerHandles"] = this.files;
+          console.log("COUCOU ?");
+          // let backend = _wasmfs_get_backend_by_path("/fpicker_file");
+          // _wasmfs_create_file("/mediafile", 0777, backend);
+      }
+      inputElement.addEventListener("change", handleFiles, false);  
+
+      const media_player = new MediaPlayer(Module, "file:///mediafile");
 
       media_player.set_volume(80);
       // FIXME

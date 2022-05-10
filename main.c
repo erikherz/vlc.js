@@ -6,6 +6,7 @@
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <emscripten/wasmfs.h>
 
 libvlc_media_player_t *mp;
 libvlc_instance_t *libvlc;
@@ -55,6 +56,17 @@ int main() {
         "--ignore-config",
     };
 
+    /*
+
+    */
+    backend_t backend = wasmfs_create_fpicker_backend("");
+    assert(backend);
+    //int fd = wasmfs_create_file("/fpicker_file", 0777, backend);
+    int fd = wasmfs_create_file("/mediafile", 0777, backend);
+    assert(fd != -1);
+
+    // emscripten_fpicker_init("");
+    // emscripten_performance_now();
     libvlc = libvlc_new( ARRAY_SIZE( vlc_argv ), vlc_argv );
     if (libvlc == NULL)
     {

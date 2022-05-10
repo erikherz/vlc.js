@@ -35,7 +35,7 @@ SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 
 emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
     -s OFFSCREEN_FRAMEBUFFER=1\
-    -s USE_WEBGL2=1 \
+    -s USE_WEBGL2=1 -s WASMFS=1 \
     --profiling-funcs \
     -s OFFSCREENCANVAS_SUPPORT=1 \
     -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
@@ -53,7 +53,7 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
     $PATH_VLC/build-emscripten/src/.libs/libvlccore.a \
     $PATH_VLC/build-emscripten/compat/.libs/libcompat.a \
     --js-library lib/wasm-imports.js \
-    -o experimental.js --preload-file ${SAMPLE_DIR}
+    -o experimental.js
 
 
 #em++ --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
