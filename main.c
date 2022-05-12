@@ -59,14 +59,18 @@ int main() {
     /*
 
     */
-    backend_t backend = wasmfs_create_fpicker_backend("");
+    backend_t backend = wasmfs_create_fpicker_backend("fpicker_btn");
     assert(backend);
-    //int fd = wasmfs_create_file("/fpicker_file", 0777, backend);
-    int fd = wasmfs_create_file("/mediafile", 0777, backend);
-    assert(fd != -1);
+    // the hack below does not work, so putting the backend into a global
+    EM_ASM( {Module.MywasmfsBackend = $0} , backend);
+    //int dummy_fd = wasmfs_create_file("/fpicker_file", 0777, backend);
+    //assert(dummy_fd != -1);
 
-    // emscripten_fpicker_init("");
-    // emscripten_performance_now();
+    /* 
+    // this is an empty file that will allow us to get the backend with its path 
+    int dummy_fd = wasmfs_create_file("/fpicker_file", 0777, backend);
+    assert(dummy_fd != -1);
+    */
     libvlc = libvlc_new( ARRAY_SIZE( vlc_argv ), vlc_argv );
     if (libvlc == NULL)
     {
