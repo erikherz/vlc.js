@@ -125,15 +125,20 @@
       const overlay = document.getElementById("overlay");
       let inputElement = document.getElementById("fpicker_btn");
       function handleFiles() {
-          Module["wasmFSFpickerHandles"] = this.files;
-          console.log("COUCOU ?");
-          // let backend = _wasmfs_get_backend_by_path("/fpicker_file");
-          // _wasmfs_create_file("/mediafile", 0777, backend);
+          // Module["wasmFSFpickerHandle"] = this.files;
+	  // 2/ add new_location to playlist:
+	  /* 
+	     here, the access will send a message to the main thread, 
+	     requesting the handle, and setting it to undefined
+	  */
       }
       inputElement.addEventListener("change", handleFiles, false);  
 
-      const media_player = new MediaPlayer(Module, "file:///mediafile");
-
+      // setup onmessage handler waiting for input thread message
+      // { tid: xxxx }
+      // => send the file handle to the thread (tid)
+      // => set the file to undefined
+      const media_player = new MediaPlayer(Module, "emfs:///mediafile");
       media_player.set_volume(80);
       // FIXME
       Module._set_global_media_player(media_player.media_player_ptr);
