@@ -124,26 +124,15 @@
 
       const overlay = document.getElementById("overlay");
       let inputElement = document.getElementById("fpicker_btn");
-
-      const media_player = new MediaPlayer(Module, null);
-
       function handleFiles() {
-          Module["wasmFSFpickerHandle"] = this.files[0];
-	  // let backend = globalThis.Module._wasmfs_get_backend_by_path( "/fpicker_file" );
-	  let backend = globalThis.Module.MywasmfsBackend;
-	  console.assert(backend);
-	  //var readMode = 292/*{{{ cDefine("S_IRUGO") }}}*/ | 73/*{{{ cDefine("S_IXUGO") }}}*/;
-	  // var mode = 511;/*"S_IRWXUGO" */
-	  // var mode = 7; //S_IRWXO
-	  let path = globalThis.Module.allocateUTF8("/mediafile");
-	  let fd = globalThis.Module._wasmfs_create_file(path, 511, backend);
-	  console.assert(fd);
-	  // new_location here:
-	  let path_ptr =  globalThis.Module.allocateUTF8('file:///mediafile');
-	  var media = globalThis.Module._wasm_media_new_location(path_ptr);
-	  globalThis.Module._wasm_media_player_set_media(media_player.media_player_ptr, media);
+          Module["wasmFSFpickerHandles"] = this.files;
+          console.log("COUCOU ?");
+          // let backend = _wasmfs_get_backend_by_path("/fpicker_file");
+          // _wasmfs_create_file("/mediafile", 0777, backend);
       }
       inputElement.addEventListener("change", handleFiles, false);  
+
+      const media_player = new MediaPlayer(Module, "file:///mediafile");
 
       media_player.set_volume(80);
       // FIXME
