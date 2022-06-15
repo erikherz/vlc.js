@@ -126,6 +126,7 @@
       let inputElement = document.getElementById("fpicker_btn");
       function handleFiles() {
           // Module["wasmFSFpickerHandle"] = this.files;
+	  Module['vlc_access_file'] = this.files[0];	
 	  // 2/ add new_location to playlist:
 	  /* 
 	     here, the access will send a message to the main thread, 
