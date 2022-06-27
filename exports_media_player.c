@@ -59,6 +59,12 @@ void EMSCRIPTEN_KEEPALIVE wasm_media_player_pause(libvlc_media_player_t *media_p
   libvlc_media_player_pause(media_player);
 }
 
+void EMSCRIPTEN_KEEPALIVE wasm_media_player_stop(libvlc_media_player_t *media_play\
+er) {
+  libvlc_media_player_stop_async(media_player);
+}
+
+
 // TODO
 // LIBVLC_API int libvlc_media_player_stop_async ( libvlc_media_player_t *p_mi );
 
