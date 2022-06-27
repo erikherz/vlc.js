@@ -12,6 +12,7 @@ compile-job:
 
   only:
     - incoming
+    - ci
   artifacts:
     paths:                  ## PATHS FOR ARTIFACTS
       - experimental*       # worker.js, wasm file and js file, data...
