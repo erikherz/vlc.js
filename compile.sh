@@ -40,15 +40,16 @@ if [ ! -d vlc ]; then
     # patching vlc
     if [ -d ../vlc_patches ] && [ "$(ls -A ../vlc_patches)" ]; then
 	# core patches
-	git am -3 ../vlc_patches/0001-configure-improve-testing-unsupported-GL-functions-f.patch
-	git am -3 ../vlc_patches/0001-modules-disable-libvlc_json-and-ytbdl-vlc.js-17.patch
-	git am -3 ../vlc_patches/nacl-wasm/00*.patch
-	git am -3 ../vlc_patches/audio_output/00*.patch
-	git am -3 ../vlc_patches/video_output/00*.patch
-	git am -3 ../vlc_patches/logger/00*.patch
-	git am -3 ../vlc_patches/0001-vlc.js-modules-remove-category.patch
-	git am -3 ../vlc_patches/audio_output/new_aout.patch
-	# git am -3 ../vlc_patches/filesystem/*.patch
+	#git am -3 ../vlc_patches/0001-configure-improve-testing-unsupported-GL-functions-f.patch
+	#git am -3 ../vlc_patches/0001-modules-disable-libvlc_json-and-ytbdl-vlc.js-17.patch
+	#git am -3 ../vlc_patches/nacl-wasm/00*.patch
+	#git am -3 ../vlc_patches/audio_output/00*.patch
+	#git am -3 ../vlc_patches/video_output/00*.patch
+	#git am -3 ../vlc_patches/logger/00*.patch
+	#git am -3 ../vlc_patches/0001-vlc.js-modules-remove-category.patch
+	#git am -3 ../vlc_patches/audio_output/new_aout.patch
+	#git am -3 ../vlc_patches/filesystem/*.patch
+	git am -3 ../vlc_patches/demo_alpha/*
     fi
     checkfail "vlc source: git clone failed"
 fi

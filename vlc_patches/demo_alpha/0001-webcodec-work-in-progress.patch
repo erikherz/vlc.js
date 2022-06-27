@@ -1,0 +1,3000 @@
+From 5516b764daa2aa7636095c5226999cbbe066c8ae Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Tue, 27 Apr 2021 15:34:23 +0200
+Subject: [PATCH 1/2] webcodec: work in progress
+
+(squashed)
+---
+ configure.ac                                  |  10 +-
+ contrib/src/aribb24/rules.mak                 |   4 +
+ contrib/src/ass/rules.mak                     |   5 +
+ ...nitial-support-for-wasm32-emscripten.patch | 105 ++++
+ contrib/src/fontconfig/rules.mak              |   4 +
+ contrib/src/gcrypt/rules.mak                  |   6 +
+ contrib/src/gme/rules.mak                     |   2 +-
+ contrib/src/gmp/rules.mak                     |   3 +
+ contrib/src/gnutls/rules.mak                  |   4 +
+ contrib/src/gpg-error/emscripten.patch        |  43 ++
+ contrib/src/gpg-error/rules.mak               |   1 +
+ contrib/src/png/rules.mak                     |   4 +
+ contrib/src/zlib/rules.mak                    |   4 +
+ extras/package/wasm-emscripten/build.sh       |   5 +
+ include/vlc_codec.h                           |   1 +
+ include/vlc_fourcc.h                          |   3 +
+ include/vlc_opengl_filter.h                   | 157 ++++++
+ include/vlc_picture.h                         |   1 +
+ include/vlc_vout_display.h                    |   2 +
+ include/vlc_vout_window.h                     |   3 +
+ modules/Makefile.am                           |   1 +
+ modules/audio_output/Makefile.am              |   5 +
+ modules/audio_output/emscripten.cpp           | 421 ++++++++++++++
+ modules/codec/Makefile.am                     |   6 +
+ modules/codec/webcodec.cpp                    | 518 ++++++++++++++++++
+ modules/demux/Makefile.am                     |   2 +
+ modules/hw/emscripten/Makefile.am             |  10 +
+ modules/hw/emscripten/converter.cpp           | 137 +++++
+ modules/video_output/Makefile.am              |  14 +
+ modules/video_output/emscripten.cpp           | 253 +++++++++
+ modules/video_output/emscripten/common.cpp    |  82 +++
+ modules/video_output/emscripten/common.h      |  57 ++
+ modules/video_output/opengl/Makefile.am       |   6 +
+ .../video_output/opengl/egl_display_generic.c |   4 +-
+ modules/video_output/opengl/filter.c          |   1 +
+ modules/video_output/opengl/filter.h          | 137 +----
+ modules/video_output/opengl/filter_mock.c     |   5 +
+ modules/video_output/opengl/filter_priv.h     |   1 +
+ modules/video_output/opengl/filters.c         |   1 +
+ .../opengl/interop_emscripten.cpp             | 287 ++++++++++
+ modules/video_output/opengl/renderer.c        |   1 +
+ modules/video_output/opengl/sampler.c         |  27 +-
+ modules/video_output/opengl/sampler.h         |   9 +
+ src/misc/fourcc.c                             |   2 +
+ src/video_output/display.c                    |   2 +-
+ src/video_output/video_output.c               |  31 +-
+ 46 files changed, 2231 insertions(+), 156 deletions(-)
+ create mode 100644 contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
+ create mode 100644 contrib/src/gpg-error/emscripten.patch
+ create mode 100644 include/vlc_opengl_filter.h
+ create mode 100644 modules/audio_output/emscripten.cpp
+ create mode 100644 modules/codec/webcodec.cpp
+ create mode 100644 modules/hw/emscripten/Makefile.am
+ create mode 100644 modules/hw/emscripten/converter.cpp
+ create mode 100644 modules/video_output/emscripten.cpp
+ create mode 100644 modules/video_output/emscripten/common.cpp
+ create mode 100644 modules/video_output/emscripten/common.h
+ create mode 100644 modules/video_output/opengl/interop_emscripten.cpp
+
+diff --git a/configure.ac b/configure.ac
+index a5771e36f4..5bde060fb7 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3140,13 +3140,17 @@ have_gl="no"
+ PKG_CHECK_MODULES([GL], [gl], [
+   have_gl="yes"
+ ], [
+-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
++  AC_MSG_CHECKING([for OpenGL])
++  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+ #ifdef _WIN32
+ # include <GL/glew.h>
+ #endif
+ #include <GL/gl.h>
+-]], [
+-    [int t0 = GL_TEXTURE0;]])
++]], [[
++	int t0 = GL_TEXTURE0;
++	// glColorMaterial is unavailable in webgl, and emscripten
++	glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
++	]])
+   ], [
+     GL_CFLAGS=""
+     AS_IF([test "${SYS}" != "mingw32"], [
+diff --git a/contrib/src/aribb24/rules.mak b/contrib/src/aribb24/rules.mak
+index 0c0ba9ff91..ba8a70b6d5 100644
+--- a/contrib/src/aribb24/rules.mak
++++ b/contrib/src/aribb24/rules.mak
+@@ -25,6 +25,10 @@ aribb24: aribb24-$(ARIBB24_VERSION).tar.gz .sum-aribb24
+ 
+ DEPS_aribb24 = png
+ 
++ifdef HAVE_EMSCRIPTEN
++CFLAGS+="-pthread"
++endif
++
+ .aribb24: aribb24
+ 	$(REQUIRE_GPL)
+ 	$(REQUIRE_GNUV3)
+diff --git a/contrib/src/ass/rules.mak b/contrib/src/ass/rules.mak
+index 05c7679896..be465bf409 100644
+--- a/contrib/src/ass/rules.mak
++++ b/contrib/src/ass/rules.mak
+@@ -25,6 +25,11 @@ WITH_DWRITE = 1
+ else
+ WITH_FONTCONFIG = 1
+ WITH_HARFBUZZ = 1
++ifdef HAVE_EMSCRIPTEN
++WITH_FONTCONFIG = 1
++WITH_HARFBUZZ = 1
++WITH_ASS_ASM = 0
++endif
+ endif
+ endif
+ endif
+diff --git a/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch b/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
+new file mode 100644
+index 0000000000..b1308fb19e
+--- /dev/null
++++ b/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
+@@ -0,0 +1,105 @@
++From b7f21ca85efd78c8034223c63786a0c01b8378fe Mon Sep 17 00:00:00 2001
++From: Mehdi Sabwat <mehdi@videolabs.io>
++Date: Wed, 9 Jun 2021 03:42:51 +0200
++Subject: [PATCH 1/1] add initial support for wasm32-emscripten
++
++This commit adds a check for uuid_generate_random which is not supported for now, and fixes a failing test.
++It also handles a case where F_FSTYPENAME field is not present in statfs struct.
++---
++ configure.ac               | 1 +
++ src/Makefile.am            | 1 +
++ src/fcint.h                | 5 +++++
++ src/fcstat.c               | 2 +-
++ src/uuid_generate_random.c | 9 +++++++++
++ test/test-hash.c           | 5 ++++-
++ 6 files changed, 21 insertions(+), 2 deletions(-)
++ create mode 100644 src/uuid_generate_random.c
++
++diff --git a/configure.ac b/configure.ac
++index fb8af46..018cfc1 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -171,2 +171,3 @@ AC_FUNC_VPRINTF
++ AC_FUNC_MMAP
++ AC_CHECK_FUNCS([link mkstemp mkostemp _mktemp_s mkdtemp getopt getopt_long getprogname getexecname rand random lrand48 random_r rand_r readlink fstatvfs fstatfs lstat strerror strerror_r]) 
+++AC_REPLACE_FUNCS([uuid_generate_random])
++
++ dnl AC_CHECK_FUNCS doesn't check for header files.
++ dnl posix_fadvise() may be not available in older libc.
++ AC_CHECK_SYMBOL([posix_fadvise], [fcntl.h], [fc_func_posix_fadvise=1], [fc_func_posix_fadvise=0])
++diff --git a/src/Makefile.am b/src/Makefile.am
++index 7b414df..de1d785 100644
++--- a/src/Makefile.am
+++++ b/src/Makefile.am
++@@ -127,6 +127,7 @@ EXTRA_DIST += \
++ 	fcobjshash.gperf.h
++ 
++ libfontconfig_la_SOURCES = \
+++	uuid_generate_random.c \
++ 	fcarch.h \
++ 	fcatomic.c \
++ 	fcatomic.h \
++diff --git a/src/fcint.h b/src/fcint.h
++index a9d075a..d8fdbfd 100644
++--- a/src/fcint.h
+++++ b/src/fcint.h
++@@ -598,6 +598,11 @@ struct _FcValuePromotionBuffer {
++ FcPrivate FcCache *
++ FcDirCacheScan (const FcChar8 *dir, FcConfig *config);
++ 
+++#ifndef HAVE_UUID_GENERATE_RANDOM
+++#include <uuid/uuid.h>
+++void uuid_generate_random(uuid_t out);
+++#endif
+++
++ FcPrivate FcCache *
++ FcDirCacheBuild (FcFontSet *set, const FcChar8 *dir, struct stat *dir_stat, FcStrSet *dirs);
++ 
++diff --git a/src/fcstat.c b/src/fcstat.c
++index 5aa1643..d1240c5 100644
++--- a/src/fcstat.c
+++++ b/src/fcstat.c
++@@ -384,7 +384,7 @@ FcFStatFs (int fd, FcStatFS *statb)
++ #  endif
++ #  if defined(HAVE_STRUCT_STATFS_F_FSTYPENAME)
++ 	p = buf.f_fstypename;
++-#  elif defined(__linux__)
+++#  elif defined(__linux__) || defined(__EMSCRIPTEN__)
++ 	switch (buf.f_type)
++ 	{
++ 	case 0x6969: /* nfs */
++diff --git a/src/uuid_generate_random.c b/src/uuid_generate_random.c
++new file mode 100644
++index 0000000..c17a58d
++--- /dev/null
+++++ b/src/uuid_generate_random.c
++@@ -0,0 +1,9 @@
+++// compat function for uuid_generate_random
+++#include "fcint.h"
+++
+++#ifndef HAVE_UUID_GENERATE_RANDOM
+++void uuid_generate_random(uuid_t out)
+++{
+++    uuid_generate(out);
+++}
+++#endif
++diff --git a/test/test-hash.c b/test/test-hash.c
++index 7530e82..221029d 100644
++--- a/test/test-hash.c
+++++ b/test/test-hash.c
++@@ -51,8 +51,11 @@ test_add (Test *test, FcChar8 *key, FcBool replace)
++     void *u;
++     FcBool (*hash_add) (FcHashTable *, void *, void *);
++     FcBool ret = FcFalse;
++-
+++#ifdef HAVE_UUID_GENERATE_RANDOM
++     uuid_generate_random (uuid);
+++#else
+++    uuid_generate(uuid);
+++#endif
++     if (replace)
++ 	hash_add = FcHashTableReplace;
++     else
++-- 
++2.32.0
++
+diff --git a/contrib/src/fontconfig/rules.mak b/contrib/src/fontconfig/rules.mak
+index ae4b218fd2..5b4b15ca34 100644
+--- a/contrib/src/fontconfig/rules.mak
++++ b/contrib/src/fontconfig/rules.mak
+@@ -23,6 +23,10 @@ ifdef HAVE_WIN32
+ endif
+ 	$(RM) $(UNPACK_DIR)/src/fcobjshash.gperf
+ 	$(call pkg_static, "fontconfig.pc.in")
++ifdef HAVE_EMSCRIPTEN
++	$(APPLY) $(SRC)/fontconfig/add-initial-support-for-wasm32-emscripten.patch
++	$(UPDATE_AUTOCONFIG)
++endif
+ 	$(MOVE)
+ 
+ FONTCONFIG_CONF := $(HOSTCONF) \
+diff --git a/contrib/src/gcrypt/rules.mak b/contrib/src/gcrypt/rules.mak
+index c9c9be3efa..0275e21fe8 100644
+--- a/contrib/src/gcrypt/rules.mak
++++ b/contrib/src/gcrypt/rules.mak
+@@ -72,6 +72,12 @@ ifeq ($(ARCH),aarch64)
+ GCRYPT_CONF += --disable-arm-crypto-support
+ endif
+ endif
++ifdef HAVE_EMSCRIPTEN
++GCRYPT_CONF += --disable-asm --disable-aesni-support ac_cv_func_syslog=no --disable-sse41-support
++GCRYPT_CONF += --disable-avx-support --disable-avx2-support --disable-padlock-support
++GCRYPT_CONF += --disable-amd64-as-feature-detection --disable-drng-support
++GCRYPT_CONF += --disable-pclmul-support
++endif
+ 
+ .gcrypt: gcrypt
+ 	# Reconfiguring this requires a git repo to be available, to
+diff --git a/contrib/src/gme/rules.mak b/contrib/src/gme/rules.mak
+index b0acdb8ca4..411b83fb24 100644
+--- a/contrib/src/gme/rules.mak
++++ b/contrib/src/gme/rules.mak
+@@ -16,6 +16,6 @@ game-music-emu: game-music-emu-$(GME_VERSION).tar.xz .sum-gme
+ 	$(MOVE)
+ 
+ .gme: game-music-emu toolchain.cmake
+-	cd $< && $(HOSTVARS_PIC) $(CMAKE) .
++	cd $< && $(HOSTVARS_PIC) $(CMAKE) . -DENABLE_UBSAN=OFF
+ 	+$(CMAKEBUILD) $< --target install
+ 	touch $@
+diff --git a/contrib/src/gmp/rules.mak b/contrib/src/gmp/rules.mak
+index 11fe8acdfa..d6cd702ce0 100644
+--- a/contrib/src/gmp/rules.mak
++++ b/contrib/src/gmp/rules.mak
+@@ -13,6 +13,9 @@ ifeq ($(ARCH),mips64el)
+ GMP_CONF += --disable-assembly
+ endif
+ endif
++ifdef HAVE_EMSCRIPTEN
++GMP_CONF += --disable-assembly
++endif
+ 
+ ifdef HAVE_WIN32
+ ifeq ($(ARCH),arm)
+diff --git a/contrib/src/gnutls/rules.mak b/contrib/src/gnutls/rules.mak
+index edec0ad9ee..fb372f9da1 100644
+--- a/contrib/src/gnutls/rules.mak
++++ b/contrib/src/gnutls/rules.mak
+@@ -82,6 +82,10 @@ ifeq ($(ARCH),aarch64)
+ endif
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++	GNUTLS_CONF += --disable-hardware-acceleration
++endif
++
+ .gnutls: gnutls
+ 	cd $< && $(GNUTLS_ENV) ./configure $(GNUTLS_CONF)
+ 	$(call pkg_static,"lib/gnutls.pc")
+diff --git a/contrib/src/gpg-error/emscripten.patch b/contrib/src/gpg-error/emscripten.patch
+new file mode 100644
+index 0000000000..f60695c513
+--- /dev/null
++++ b/contrib/src/gpg-error/emscripten.patch
+@@ -0,0 +1,43 @@
++From 63aa1523659914acd6c84229fb31ff9b712fbf8b Mon Sep 17 00:00:00 2001
++From: Mehdi Sabwat <mehdi@videolabs.io>
++Date: Wed, 2 Jun 2021 11:42:46 +0200
++Subject: [PATCH 1/1] emscripten
++
++---
++ .../lock-obj-pub.wasm32-unknown-emscripten.h  | 24 +++++++++++++++++++
++ 1 file changed, 24 insertions(+)
++ create mode 100644 src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h
++
++diff --git a/src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h b/src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h
++new file mode 100644
++index 0000000..1651518
++--- /dev/null
+++++ b/src/syscfg/lock-obj-pub.wasm32-unknown-emscripten.h
++@@ -0,0 +1,24 @@
+++## lock-obj-pub.wasm32-unknown-emscripten.h
+++## File created by gen-posix-lock-obj - DO NOT EDIT
+++## To be included by mkheader into gpg-error.h
+++
+++typedef struct
+++{
+++  long _vers;
+++  union {
+++    volatile char _priv[28];
+++    long _x_align;
+++    long *_xp_align;
+++  } u;
+++} gpgrt_lock_t;
+++
+++#define GPGRT_LOCK_INITIALIZER {1,{{0,0,0,0,0,0,0,0, \
+++                                    0,0,0,0,0,0,0,0, \
+++                                    0,0,0,0,0,0,0,0, \
+++                                    0,0,0,0}}}
+++##
+++## Local Variables:
+++## mode: c
+++## buffer-read-only: t
+++## End:
+++##
++-- 
++2.31.1
++
+diff --git a/contrib/src/gpg-error/rules.mak b/contrib/src/gpg-error/rules.mak
+index 0ceb75d7a3..5d4236b77f 100644
+--- a/contrib/src/gpg-error/rules.mak
++++ b/contrib/src/gpg-error/rules.mak
+@@ -25,6 +25,7 @@ endif
+ 	$(APPLY) $(SRC)/gpg-error/version-bump-gawk-5.patch
+ 	$(APPLY) $(SRC)/gpg-error/win32-extern-struct.patch
+ 	$(APPLY) $(SRC)/gpg-error/darwin-triplet.patch
++	$(APPLY) $(SRC)/gpg-error/emscripten.patch
+ ifndef HAVE_WIN32
+ 	cp -f -- "$(SRC)/gpg-error/lock-obj-pub.posix.h" \
+ 		"$(UNPACK_DIR)/src/lock-obj-pub.native.h"
+diff --git a/contrib/src/png/rules.mak b/contrib/src/png/rules.mak
+index 7a8db11d5a..f1c93b835b 100644
+--- a/contrib/src/png/rules.mak
++++ b/contrib/src/png/rules.mak
+@@ -7,6 +7,10 @@ ifeq ($(call need_pkg,"libpng >= 1.5.4"),)
+ PKGS_FOUND += png
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++HOSTVARS += CFLAGS="$(CFLAGS) -pthread"
++endif
++
+ $(TARBALLS)/libpng-$(PNG_VERSION).tar.xz:
+ 	$(call download_pkg,$(PNG_URL),png)
+ 
+diff --git a/contrib/src/zlib/rules.mak b/contrib/src/zlib/rules.mak
+index 4f7fc7397a..166d6b528a 100644
+--- a/contrib/src/zlib/rules.mak
++++ b/contrib/src/zlib/rules.mak
+@@ -7,6 +7,10 @@ ifeq ($(call need_pkg,"zlib"),)
+ PKGS_FOUND += zlib
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++CFLAGS+="-pthread"
++endif
++
+ ifeq ($(shell uname),Darwin) # zlib tries to use libtool on Darwin
+ ifdef HAVE_CROSS_COMPILE
+ ZLIB_CONFIG_VARS=CHOST=$(HOST)
+diff --git a/extras/package/wasm-emscripten/build.sh b/extras/package/wasm-emscripten/build.sh
+index 69d6b98c47..acd74591fc 100755
+--- a/extras/package/wasm-emscripten/build.sh
++++ b/extras/package/wasm-emscripten/build.sh
+@@ -164,6 +164,11 @@ if [ $BUILD_MODE -eq 1 ]; then
+                         --disable-sout --disable-vlm --disable-a52 --disable-xcb --disable-lua \
+                         --disable-addonmanagermodules --disable-ssp --disable-nls \
+                         --enable-gles2 \
++                        ac_cv_func_if_nameindex=yes ac_cv_header_sys_shm_h=no \
++                        ac_cv_func_accept4=no \
++                        ac_cv_func_pipe2=no \
++                        --enable-gles2 \
++                        --disable-nvdec \
+                         --with-contrib="$VLC_SRCPATH"/contrib/wasm32-unknown-emscripten
+ fi
+ 
+diff --git a/include/vlc_codec.h b/include/vlc_codec.h
+index ff707e73a3..7460d03ed6 100644
+--- a/include/vlc_codec.h
++++ b/include/vlc_codec.h
+@@ -583,6 +583,7 @@ enum vlc_decoder_device_type
+     VLC_DECODER_DEVICE_AWINDOW,
+     VLC_DECODER_DEVICE_NVDEC,
+     VLC_DECODER_DEVICE_MMAL,
++    VLC_DECODER_DEVICE_WEBCODEC,
+ };
+ 
+ struct vlc_decoder_device_operations
+diff --git a/include/vlc_fourcc.h b/include/vlc_fourcc.h
+index 176028e351..4c7f35d4ff 100644
+--- a/include/vlc_fourcc.h
++++ b/include/vlc_fourcc.h
+@@ -440,6 +440,9 @@
+ #define VLC_CODEC_CVPX_BGRA       VLC_FOURCC('C','V','P','B')
+ #define VLC_CODEC_CVPX_P010       VLC_FOURCC('C','V','P','P')
+ 
++/* Webcodec opaque VideoFrame types */
++#define VLC_CODEC_WEBCODEC_OPAQUE VLC_FOURCC('W','C','O','P')
++
+ /* Image codec (video) */
+ #define VLC_CODEC_PNG             VLC_FOURCC('p','n','g',' ')
+ #define VLC_CODEC_PPM             VLC_FOURCC('p','p','m',' ')
+diff --git a/include/vlc_opengl_filter.h b/include/vlc_opengl_filter.h
+new file mode 100644
+index 0000000000..3a1f18197d
+--- /dev/null
++++ b/include/vlc_opengl_filter.h
+@@ -0,0 +1,157 @@
++/*****************************************************************************
++ * vlc_opengl_filter.h
++ *****************************************************************************
++ * Copyright (C) 2020 VLC authors and VideoLAN
++ * Copyright (C) 2020 Videolabs
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifndef VLC_OPENGL_FILTER_H
++#define VLC_OPENGL_FILTER_H
++
++#include <vlc_tick.h>
++
++struct vlc_gl_filter;
++struct vlc_gl_picture;
++struct vlc_gl_format;
++
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++
++struct vlc_gl_tex_size {
++    unsigned width;
++    unsigned height;
++};
++
++struct vlc_gl_input_meta {
++    vlc_tick_t pts;
++    unsigned plane;
++};
++
++typedef int
++vlc_gl_filter_open_fn(struct vlc_gl_filter *filter,
++                      const config_chain_t *config,
++                      const struct vlc_gl_format *glfmt,
++                      struct vlc_gl_tex_size *size_out);
++
++#define set_callback_opengl_filter(open) \
++    { \
++        vlc_gl_filter_open_fn *fn = open; \
++        (void) fn; \
++        set_callback(fn); \
++    }
++
++struct vlc_gl_filter_ops {
++    /**
++     * Draw the result of the filter to the current framebuffer
++     */
++    int (*draw)(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
++                const struct vlc_gl_input_meta *meta);
++
++    /**
++     * Free filter resources
++     */
++    void (*close)(struct vlc_gl_filter *filter);
++
++    /**
++     * Request a (responsive) filter to adapt its output size (optional)
++     *
++     * A responsive filter is a filter for which the size of the produced
++     * pictures depends on the output (e.g. display) size rather than the
++     * input. This is for example the case for a renderer.
++     *
++     * A new output size is requested (size_out). The filter is authorized to
++     * change the size_out to enforce its own constraints.
++     *
++     * In addition, it may request to the previous filter (if any) an optimal
++     * size it wants to receive. If set to non-zero value, this previous filter
++     * will receive this size as its requested size (and so on).
++     *
++     * \retval true if the resize is accepted (possibly with a modified
++     *              size_out)
++     * \retval false if the resize is rejected (included on error)
++     */
++    int (*request_output_size)(struct vlc_gl_filter *filter,
++                               struct vlc_gl_tex_size *size_out,
++                               struct vlc_gl_tex_size *optimal_in);
++
++    /**
++     * Callback to notify input size changes
++     *
++     * When a filter changes its output size as a result of
++     * request_output_size(), the next filter is notified by this callback.
++     */
++    void (*on_input_size_change)(struct vlc_gl_filter *filter,
++                                 const struct vlc_gl_tex_size *size);
++};
++
++/**
++ * OpenGL filter, in charge of a rendering pass.
++ */
++struct vlc_gl_filter {
++    vlc_object_t obj;
++    module_t *module;
++
++    struct vlc_gl_t *gl;
++    const struct vlc_gl_api *api;
++    const struct vlc_gl_format *glfmt_in;
++
++    struct {
++        /**
++         * An OpenGL filter may either operate on the input RGBA picture, or on
++         * individual input planes (without chroma conversion) separately.
++         *
++         * In practice, this is useful for deinterlace filters.
++         *
++         * This flag must be set by the filter module (default is false).
++         */
++        bool filter_planes;
++
++        /**
++         * A blend filter draws over the input picture (without reading it).
++         *
++         * Meaningless if filter_planes is true.
++         *
++         * This flag must be set by the filter module (default is false).
++         */
++        bool blend;
++
++        /**
++         * Request MSAA level.
++         *
++         * This value must be set by the filter module (default is 0, which
++         * means disabled).
++         *
++         * Meaningless if filter_planes is true.
++         *
++         * The actual MSAA level may be overwritten to 0 if multisampling is
++         * not supported, or to a higher value if another filter rendering on
++         * the same framebuffer requested a higher MSAA level.
++         */
++        unsigned msaa_level;
++    } config;
++
++    const struct vlc_gl_filter_ops *ops;
++    void *sys;
++};
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/include/vlc_picture.h b/include/vlc_picture.h
+index 5aece95120..fa62e307bd 100644
+--- a/include/vlc_picture.h
++++ b/include/vlc_picture.h
+@@ -98,6 +98,7 @@ enum vlc_video_context_type
+     VLC_VIDEO_CONTEXT_NVDEC,     //!< empty
+     VLC_VIDEO_CONTEXT_CVPX,      //!< private: cvpx_video_context*
+     VLC_VIDEO_CONTEXT_MMAL,      //!< empty
++    VLC_VIDEO_CONTEXT_WEBCODEC,
+ };
+ 
+ VLC_API vlc_video_context * vlc_video_context_Create(vlc_decoder_device *,
+diff --git a/include/vlc_vout_display.h b/include/vlc_vout_display.h
+index 6b11c4066c..64dd64581b 100644
+--- a/include/vlc_vout_display.h
++++ b/include/vlc_vout_display.h
+@@ -375,6 +375,8 @@ vout_display_t *vout_display_New(vlc_object_t *,
+     const video_format_t *, vlc_video_context *,
+     const vout_display_cfg_t *, const char *module,
+     const vout_display_owner_t *);
++#define vout_display_New(O, ...) \
++    (vout_display_New)(VLC_OBJECT(O), __VA_ARGS__)
+ 
+ /**
+  * Destroys a video output display.
+diff --git a/include/vlc_vout_window.h b/include/vlc_vout_window.h
+index a3dfd1bfca..0803e65b78 100644
+--- a/include/vlc_vout_window.h
++++ b/include/vlc_vout_window.h
+@@ -65,6 +65,7 @@ enum vout_window_type {
+     VOUT_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
+     VOUT_WINDOW_TYPE_DCOMP /**< Win32 DirectComposition */,
+     VOUT_WINDOW_TYPE_KMS /**< DRM KMS CRTC */,
++    VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL /**< Emscripten surface */,
+ };
+ 
+ /**
+@@ -385,6 +386,8 @@ typedef struct vout_window_t {
+         struct wl_surface *wl;   /**< Wayland surface (client pointer) */
+         void     *dcomp_visual;  /**<  Win32 direct composition visual */
+         uint32_t crtc;           /**< KMS CRTC identifier */
++        uint32_t em_context;     /* Emscripten webgl context */
++        const char *canvas;
+     } handle;
+ 
+     /** Display server (mandatory)
+diff --git a/modules/Makefile.am b/modules/Makefile.am
+index 333acb0586..0c931d51ca 100644
+--- a/modules/Makefile.am
++++ b/modules/Makefile.am
+@@ -31,6 +31,7 @@ include hw/d3d11/Makefile.am
+ include hw/vaapi/Makefile.am
+ include hw/vdpau/Makefile.am
+ include hw/mmal/Makefile.am
++include hw/emscripten/Makefile.am
+ include isa/aarch64/Makefile.am
+ include isa/arm/Makefile.am
+ include isa/riscv/Makefile.am
+diff --git a/modules/audio_output/Makefile.am b/modules/audio_output/Makefile.am
+index 24c05429d0..dc91f3cd7e 100644
+--- a/modules/audio_output/Makefile.am
++++ b/modules/audio_output/Makefile.am
+@@ -117,3 +117,8 @@ endif
+ if HAVE_TVOS
+ aout_LTLIBRARIES += libaudiounit_ios_plugin.la
+ endif
++
++libemworklet_audio_plugin_la_SOURCES = audio_output/emscripten.cpp
++if HAVE_EMSCRIPTEN
++aout_LTLIBRARIES += libemworklet_audio_plugin.la
++endif
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+new file mode 100644
+index 0000000000..a7e9fb0d4d
+--- /dev/null
++++ b/modules/audio_output/emscripten.cpp
+@@ -0,0 +1,421 @@
++/*****************************************************************************
++ * emscripten.c: audio output module using audio worklets
++ *****************************************************************************
++ * Copyright © 2020 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <atomic>
++
++#include <assert.h>
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_aout.h>
++
++#include <emscripten.h>
++#include <emscripten/val.h>
++#include <emscripten/bind.h>
++#include <emscripten/html5.h>
++
++#include <cstdint>
++#include <stdlib.h>
++
++#define STORAGE_SIZE 1024 * 1024
++// Sample rate might change, and it would be good to be able to change it during playback.
++#define AUDIO_WORKLET_SAMPLE_RATE 44100
++// Don't know any way to get the browser's supported number of channels.
++#define AUDIO_WORKLET_NB_CHANNELS 2
++
++using namespace emscripten;
++namespace {
++	EM_BOOL requestAnimationFrame_cb( double time, void *userData );
++
++	typedef struct sound_buffer_t
++	{
++    // TODO - should be bool?
++    std::atomic<uint32_t> is_paused;
++    std::atomic<uint32_t> head;
++    std::atomic<uint32_t> tail;
++    std::atomic<uint32_t> can_write;
++    std::atomic<uint32_t> volume;
++    std::atomic<uint32_t> is_muted;
++    int8_t storage[STORAGE_SIZE];
++
++	} sound_buffer_t;
++
++	class AWNodeWrapper {
++	public:
++		val context = val::undefined();
++		val getCtx() const { return context; };
++		void setCtx(val v_context) { context = v_context; };
++
++		uintptr_t sab_ptr;
++		uintptr_t getSabPtr() const { return sab_ptr; };
++		void setSabPtr(uintptr_t p_sab) { sab_ptr = p_sab; };
++
++		int8_t channels;
++		int8_t getChannels() const { return channels; };
++		void setChannels(int8_t chan) { channels = chan; };
++
++		AWNodeWrapper(int sample_rate) {
++			// Prepare audio context options
++			val audio_ctx_options = val::object();
++			audio_ctx_options.set("sampleRate", sample_rate);
++
++			context = val::global("AudioContext").new_(audio_ctx_options);
++			context.call<void>("suspend");
++		}
++
++		val operator()( val undefined_promise_argument ) {
++			(val)undefined_promise_argument;
++
++			// Prepare AWN Options
++			val awn_options = val::object();
++			val awn_opt_outputChannelCount = val::array();
++			awn_opt_outputChannelCount.call<val>("push", channels);
++			awn_options.set("outputChannelCount", awn_opt_outputChannelCount);
++			awn_options.set("numberOfInputs", 0);
++			awn_options.set("numberOfOutputs", 1);
++
++			val AudioNode = val::global("AudioWorkletNode").new_(context, std::string("worklet-processor"), awn_options);
++			AudioNode.set("channelCount", channels);
++
++      val Uint32Array = val::global("Uint32Array");
++      val Int32Array = val::global("Int32Array");
++      val Float32Array = val::global("Float32Array");
++
++      auto wasm_mem = val::module_property("wasmMemory")["buffer"];
++
++			//Prepare postMessage message
++			val msg = val::object();
++			msg.set("type", std::string("recv-audio-queue"));
++
++      msg.set("is_paused",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, is_paused), 1));
++      msg.set("head",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, head), 1));
++      msg.set("tail",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, tail), 1));
++      msg.set("can_write",
++        Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, can_write), 1));
++      msg.set("volume",
++        Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, volume), 1));
++      msg.set("is_muted",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, is_muted), 1));
++
++      uint32_t storage_capacity = STORAGE_SIZE / 4;
++      msg.set("storage",
++        Float32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, storage), storage_capacity));
++
++			AudioNode["port"].call<val>("postMessage", msg);
++			AudioNode.call<val>("connect", context["destination"]);
++
++			emscripten_request_animation_frame_loop(requestAnimationFrame_cb, this);
++
++			return val::undefined();
++		}
++	};
++
++	EMSCRIPTEN_BINDINGS(AWWSCOPE) {
++		class_<AWNodeWrapper>("awn_cb_wrapper")
++			.constructor<int>()
++			.property("context", &AWNodeWrapper::getCtx, &AWNodeWrapper::setCtx)
++			.property("sab_ptr", &AWNodeWrapper::getSabPtr, &AWNodeWrapper::setSabPtr)
++			.property("channels", &AWNodeWrapper::getChannels, &AWNodeWrapper::setChannels)
++			.function("awn_call", &AWNodeWrapper::operator());
++	};
++
++	typedef struct aout_sys_t
++	{
++		sound_buffer_t *sab; // TODO - rename to sound_buff
++		AWNodeWrapper *awn_inst;
++
++	} aout_sys_t;
++
++	EM_BOOL requestAnimationFrame_cb( double time, void *userData ) {
++		VLC_UNUSED(time);
++    // FIXME - this function seems to mix two different views on the
++    // same memory, not sure why
++		AWNodeWrapper *inst = reinterpret_cast<AWNodeWrapper *>(userData);
++		uint32_t *sab = reinterpret_cast<uint32_t *>(inst->getSabPtr());
++		val view = val(typed_memory_view(sizeof(sound_buffer_t), sab));
++		val context = inst->getCtx();
++		if ( view[0].as<int>() == 1 ) {
++			context.call<val>("resume");
++			sab[0] = 0;
++			return EM_FALSE;
++		}
++		return EM_TRUE;
++	}
++
++	// careful when calling this, you cannot wait on any index
++	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/wait
++	void js_index_wait(sound_buffer_t *sab_ptr, int8_t index) {
++		int32_t *buffer_view = reinterpret_cast<int32_t *>(sab_ptr);
++		val buffer = val(typed_memory_view(STORAGE_SIZE, buffer_view));
++
++		val::global("Atomics").call<val>("wait", buffer, index, 0);
++	}
++
++	void Flush( audio_output_t *aout )
++	{
++		aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++		bzero(&sys->sab->storage, sizeof(sys->sab->storage));
++	}
++
++	int Start( audio_output_t *aout, audio_sample_format_t *restrict fmt )
++	{
++		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++		unsigned nbChannels = aout_FormatNbChannels(fmt);
++
++		if (( nbChannels == 0 ) || !AOUT_FMT_LINEAR(fmt))
++			return VLC_EGENERIC;
++		fmt->i_format = VLC_CODEC_FL32;
++		fmt->i_channels = AUDIO_WORKLET_NB_CHANNELS;
++		fmt->i_rate = AUDIO_WORKLET_SAMPLE_RATE;
++
++		// resume audio context (first start, it is paused when initialized)
++		sys->sab->is_paused.store(1);
++
++		return VLC_SUCCESS;
++	}
++
++	void Stop (audio_output_t *aout)
++	{
++		Flush(aout);
++	}
++
++	int audio_worklet_push (audio_output_t *aout, const int8_t *data, uint32_t data_size) {
++		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++		int8_t *sab_view = sys->sab->storage;
++		uint32_t head = sys->sab->head.load();
++
++		// TODO: check that we do not write on unconsumed data.
++		if (head + data_size > STORAGE_SIZE) {
++			// Copy the part of the data at the buffer end
++			unsigned data_size_copy_end = STORAGE_SIZE - head;
++			memcpy(sab_view + head, data, data_size_copy_end);
++			head = 0;
++
++			// Copy the part of the data at the buffer start
++			unsigned data_size_copy_start = data_size - data_size_copy_end;
++			memcpy(sab_view + head, data, data_size_copy_start);
++			head = data_size_copy_start;
++		}
++		else {
++			memcpy(sab_view + head, data, data_size);
++			head += data_size;
++		}
++		sys->sab->head.store(head);
++		return 0;  // return success to indicate successful push.
++	}
++
++	void Play( audio_output_t *aout, block_t *block, vlc_tick_t date)
++	{
++		VLC_UNUSED(date);
++		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++		const int8_t* data = (int8_t *)block->p_buffer;
++		size_t data_size = block->i_buffer;
++
++		uint32_t head = sys->sab->head.load();
++		uint32_t tail = sys->sab->tail.load();
++		uint32_t new_head = (head + data_size) % STORAGE_SIZE;
++		if (new_head > tail)
++		{
++			// the worklet processor keeps rendering  until tail matches head
++			// it will be notified by an Atomics.notify() from the process() callback
++			// FIXME - This is layout-dependent, which isn't ideal
++			js_index_wait(sys->sab, 3);
++		}
++
++		audio_worklet_push(aout, data, data_size);
++		block_Release(block);
++	}
++
++	void Pause( audio_output_t *aout, bool paused, vlc_tick_t date )
++	{
++		VLC_UNUSED(date);
++		aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
++		if (paused == false) {
++			sys->sab->is_paused.store(0);
++		}
++		else {
++			sys->sab->is_paused.store(1);
++		}
++		Flush(aout);
++	}
++
++	int Time_Get( audio_output_t *aout, vlc_tick_t *delay)
++	{
++		return aout_TimeGetDefault(aout, delay);
++	}
++
++	void Close( vlc_object_t *obj )
++	{
++		audio_output_t *aout = (audio_output_t *)obj;
++		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
++
++    // FIXME
++		delete sys->awn_inst;
++		free(sys->sab);
++		free(sys);
++	}
++
++	int Volume_Set( audio_output_t *aout, float volume)
++	{
++		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
++
++		if (volume > 1.0f)
++			volume = 1.0f;
++		else if (volume < 0.0f)
++			volume = 0.0f;
++		// TODO: implement gain
++		// Note: We store volume as an integer between 0..100 because
++		// for some reason Float32Array doesn't allow atomic operations
++		sys->sab->volume.store((int)(volume * 100));
++		aout_VolumeReport(aout, volume);
++
++		return 0;
++	}
++
++	int Mute_Set( audio_output_t *aout, bool mute)
++	{
++		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
++
++		sys->sab->is_muted.store(mute);
++		aout_MuteReport(aout, mute);
++
++		return 0;
++	}
++
++
++	int Open( vlc_object_t *obj )
++	{
++		audio_output_t * aout = (audio_output_t *) obj;
++
++		/* Allocate structures */
++		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(malloc( sizeof( *sys ) ));
++		if( unlikely(sys == NULL) )
++			return VLC_ENOMEM;
++
++		aout->sys = sys;
++		aout->start = Start;
++		aout->stop = Stop;
++		aout->play = Play;
++		aout->pause = Pause;
++		aout->flush = Flush;
++		aout->time_get = Time_Get;
++		aout->volume_set = Volume_Set;
++		aout->mute_set = Mute_Set;
++
++		sys->awn_inst = new AWNodeWrapper(AUDIO_WORKLET_SAMPLE_RATE);
++		sys->sab = (sound_buffer_t*)malloc(sizeof(sound_buffer_t));
++
++		if ( unlikely(sys->sab == NULL) )
++			return VLC_ENOMEM;
++		bzero(sys->sab, sizeof(sound_buffer_t));
++		sys->sab->volume = 100;
++
++		val webaudio_context = sys->awn_inst->getCtx();
++
++		// Prepare audioWorkletProcessor blob
++		val document = val::global("document");
++		val script = document.call<val>("createElement", std::string("SCRIPT"));
++		script.set("type", std::string("worklet"));
++		std::string processorStr = "class Processor extends AudioWorkletProcessor { \
++	constructor() { \
++		super(); \
++		this.port.onmessage = e => { \
++			if (e.data.type === 'recv-audio-queue') { \
++				this.is_paused = e.data.is_paused; \
++				this.head = e.data.head; \
++				this.tail = e.data.tail; \
++				this.can_write = e.data.can_write; \
++				this.volume = e.data.volume; \
++				this.is_muted = e.data.is_muted; \
++				this.storage = e.data.storage; \
++			} else { \
++				throw 'unexpected.'; \
++			} \
++		}; \
++	} \
++	process(inputs, outputs, parameters) { \
++		const output = outputs[0]; \
++		const nbChannels = output.length; \
++		const nbSamples = output[0].length; \
++		if (this.head.buffer.byteLength == 0) { \
++			throw new Error('wasmMemory grew'); \
++		} \
++		var head = Atomics.load(this.head, 0) / 4; \
++		var tail = Atomics.load(this.tail, 0) / 4; \
++		var i = 0; \
++		var volume = Atomics.load(this.volume, 0) / 100; \
++		if (Atomics.load(this.is_paused, 0) != 0 || Atomics.load(this.is_muted, 0) != 0) { \
++			volume = 0; \
++		} \
++		while (tail != head && i < nbSamples) \
++		{ \
++			for (let c = 0; c < nbChannels; ++c) { \
++				output[c][i] = this.storage[tail] * volume; \
++				tail++; \
++				if (tail == this.storage.length) { \
++					tail = 0; \
++				} \
++			} \
++			i++; \
++		} \
++		Atomics.store(this.tail, 0, tail * 4); \
++		Atomics.store(this.can_write, 0, 1); \
++		Atomics.notify(this.can_write, 0);   \
++		return true; \
++	} \
++} \
++registerProcessor('worklet-processor', Processor);";
++		script.set("innerText", processorStr);
++		val ProcessorTextArray = val::array();
++		ProcessorTextArray.call<val>("push", script["innerText"]);
++		val BlobObject = val::object();
++		BlobObject.set("type", std::string("application/javascript"));
++		val WorkletModuleUrl = val::global("URL").call<val>("createObjectURL", val::global("Blob").new_(ProcessorTextArray, BlobObject));
++
++		// Prepare audioWorkletProcessor callback
++		val cb_caller = val::module_property("awn_cb_wrapper").new_(AUDIO_WORKLET_SAMPLE_RATE);
++		cb_caller.set("context", val(webaudio_context));
++		cb_caller.set("sab_ptr", val(reinterpret_cast<uintptr_t>(sys->sab)));
++		cb_caller.set("channels", val(AUDIO_WORKLET_NB_CHANNELS));
++		val awn_caller = cb_caller["awn_call"];
++		val awn_cb = awn_caller.call<val>("bind", cb_caller);
++
++		// start audio worklet (since the context is suspended, sound won't start now
++		// Since the WebAudio Context cannot be created in a worker, we create
++		// it in the main_thread and use the SAB to signal it when we want it to start
++		webaudio_context["audioWorklet"].call<val>("addModule", WorkletModuleUrl).call<val>("then", awn_cb);
++
++		return VLC_SUCCESS;
++	}
++}
++
++vlc_module_begin ()
++	set_description( N_("Emscripten Worklet audio output") )
++	set_shortname( "emworklet" )
++	set_capability( "audio output", 100 )
++	set_subcategory( SUBCAT_AUDIO_AOUT )
++	set_callbacks( Open, Close )
++vlc_module_end ()
+diff --git a/modules/codec/Makefile.am b/modules/codec/Makefile.am
+index 6bdc40b491..59079ebce6 100644
+--- a/modules/codec/Makefile.am
++++ b/modules/codec/Makefile.am
+@@ -644,3 +644,9 @@ noinst_LTLIBRARIES += libhxxxhelper_testdec_plugin.la
+ libvlc_vtutils_la_SOURCES = codec/vt_utils.c codec/vt_utils.h
+ libvlc_vtutils_la_LDFLAGS = -static -no-undefined
+ EXTRA_LTLIBRARIES += libvlc_vtutils.la
++
++libwebcodec_plugin_la_SOURCES = codec/webcodec.cpp video_output/emscripten/common.cpp
++libwebcodec_plugin_la_LDFLAGS = $(AM_LDFLAGS)
++if HAVE_EMSCRIPTEN
++codec_LTLIBRARIES += libwebcodec_plugin.la
++endif
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+new file mode 100644
+index 0000000000..07b3690dab
+--- /dev/null
++++ b/modules/codec/webcodec.cpp
+@@ -0,0 +1,518 @@
++/*****************************************************************************
++ * webcodec.cpp: Decoder module using browser provided codec implementations
++ *****************************************************************************
++ * Copyright © 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_codec.h>
++#include <vlc_threads.h>
++#include <vlc_cxx_helpers.hpp>
++#include <vlc_block.h>
++#include <vlc_tick.h>
++#include <vlc_picture.h>
++
++#include "../video_output/emscripten/common.h"
++
++#include <emscripten/emscripten.h>
++#include <emscripten/val.h>
++#include <emscripten/bind.h>
++#include <emscripten/em_js.h>
++#include <emscripten/wire.h>
++#include <memory>
++#include <functional>
++#include <cstdint>
++#include <queue>
++
++using emval = emscripten::val;
++
++struct decoder_sys_t
++{
++    vlc_thread_t th;
++    std::queue<block_t*> blocks;
++    vlc::threads::mutex mutex;
++
++    vlc_video_context* vctx;
++};
++
++extern "C"
++{
++EMSCRIPTEN_KEEPALIVE picture_t* tryGetPictureFromPool(decoder_t* dec)
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    auto vctx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC) );
++    return picture_pool_Get(vctx->pool);
++}
++
++EMSCRIPTEN_KEEPALIVE bool updateVideoOutput(decoder_t* dec)
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    if ( decoder_UpdateVideoOutput( dec, sys->vctx ) )
++    {
++        msg_Err( dec, "Failure during UpdateVideoOutput! FIXME" );
++        return false;
++    }
++    return true;
++}
++
++EMSCRIPTEN_KEEPALIVE int32_t queuePicture(void* ctx, picture_t* pic, int64_t timestamp)
++{
++    auto dec = static_cast<decoder_t*>(ctx);
++    pic->date = VLC_TICK_FROM_US(timestamp);
++    pic->b_progressive = true;
++    decoder_QueueVideo(dec, pic);
++    return PictureContextPrivate(pic->context)->pictureIdx;
++}
++
++EMSCRIPTEN_KEEPALIVE pthread_t getVlcDecoderWorkerThread(decoder_t* dec)
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    return sys->th.handle;
++}
++
++EMSCRIPTEN_KEEPALIVE void releaseBlock( block_t* block )
++{
++    block_Release( block );
++}
++
++EMSCRIPTEN_KEEPALIVE void decodeBlock( block_t* block )
++{
++    auto chunkType = emval::global("EncodedVideoChunk");
++    auto chunkCfg = emval::object();
++
++    static bool first = true;
++
++    if ( first == true )
++    {
++        chunkCfg.set( "type", "key" );
++        first = false;
++    }
++    else
++        chunkCfg.set( "type", (block->i_flags & BLOCK_FLAG_TYPE_I) ? "key" : "delta" );
++    auto timestamp = block->i_pts ? block->i_pts : block->i_dts;
++    chunkCfg.set( "timestamp", (long int)US_FROM_VLC_TICK( timestamp ) );
++    //if ( block->i_length > 0 )
++    //    chunkCfg.set( "duration", (long int)US_FROM_VLC_TICK( block->i_length ) );
++    chunkCfg.set( "data", emscripten::typed_memory_view( block->i_buffer, block->p_buffer ) );
++    auto chunk = chunkType.new_( std::move( chunkCfg ) );
++
++    /* We can't return a javascript object from the stack back to the JS caller
++     * as the object would be destroyed when falling out of scope.
++     * We can't also pass an object by reference as the only way to get a
++     * emscripten::val instance is to take ownership from the javascript object
++     * so we couldn't use it back in the JS
++     * As a work around, we access the JS decoder instance straight from the C++ code
++     */
++    EM_ASM({Module.decoder.decode( Emval.toValue( $0 ) ); }, chunk.as_handle());
++}
++
++}
++
++EM_ASYNC_JS(bool, probeConfig, (emscripten::EM_VAL cfg), {
++    var decoderCfg = Emval.toValue(cfg);
++    var res = await VideoDecoder.isConfigSupported(decoderCfg).catch((err) => {
++        console.log(err);
++        return {'supported': false};
++    });
++    return res['supported'];
++});
++
++static emval getDecoderConfig( decoder_t* dec, bool includeExtraData )
++{
++    auto decoderConfig = emval::object();
++    switch( dec->fmt_in.i_codec )
++    {
++    case VLC_CODEC_VP8:
++        decoderConfig.set( "codec", "vp8" );
++        break;
++    case VLC_CODEC_VP9:
++        decoderConfig.set( "codec", "vp09.*" );
++        break;
++    case VLC_CODEC_H264:
++    {
++        char codec[12];
++        snprintf(codec, sizeof(codec), "avc1.%.2X%.2X%.2X", dec->fmt_in.i_profile,
++                 0, dec->fmt_in.i_level);
++        decoderConfig.set( "codec", codec );
++
++        //decoderConfig.set("codec", "avc1.64000b" );
++        break;
++    }
++    case VLC_CODEC_AV1:
++        decoderConfig.set( "codec", "av01" );
++        break;
++    default:
++        return emval::undefined();
++    }
++    decoderConfig.set( "codedWidth", dec->fmt_in.video.i_width );
++    decoderConfig.set( "codedHeight", dec->fmt_in.video.i_height );
++    decoderConfig.set( "displayAspectWidth", dec->fmt_in.video.i_visible_width );
++    decoderConfig.set( "displayAspectHeight", dec->fmt_in.video.i_visible_height );
++    decoderConfig.set( "optimizeForLatency", false );
++    if ( includeExtraData )
++    {
++        if ( dec->fmt_in.i_extra > 0 )
++        {
++            decoderConfig.set( "description",
++                               emscripten::typed_memory_view(
++                                    dec->fmt_in.i_extra,
++                                   static_cast<uint8_t*>( dec->fmt_in.p_extra ) )
++                               );
++        }
++    }
++    return decoderConfig;
++}
++
++EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder, emscripten::EM_VAL decCfgHandle), {
++    function onInteropMessage(msg) {
++        let data = msg['data'];
++        if (data['customCmd'] == 'sendFrame') {
++            let picIdx = data['pictureIdx'];
++            let frame = Module.framesReady[picIdx];
++            Module.framesReady[picIdx] = undefined;
++            if (!frame) {
++                /* We may receive a late message after a flush, in which case
++                 * we still need to reply to the interop, but we don't have
++                 * anything to provide to it
++                 */
++                Module.voutPort.postMessage({
++                    customCmd: 'displayFrame',
++                    frame: undefined,
++                    pictureId: picIdx
++                });
++                return;
++            }
++            Module.voutPort.postMessage({
++                customCmd: 'displayFrame',
++                frame: frame,
++                pictureId: picIdx,
++              }, [frame]);
++        }
++    }
++
++    async function getVoutMessagePort() {
++        let p = new Promise((resolve, reject) => {
++            self.addEventListener('message', function(e) {
++                let msg = e['data'];
++                if (msg.customCmd == 'transferMessagePort') {
++                    let port = msg['transferList'][0];
++                    if (!port)
++                        reject();
++                    Module.voutPort = port;
++                    Module.voutPort.onmessage = onInteropMessage;
++                    resolve();
++                }
++            });
++        });
++        await p;
++    }
++
++    async function onDecoderWorkerMessage(msg) {
++        const data = msg['data'];
++        if (data['customCmd'] == 'decode') {
++            let block = data['block'];
++            _decodeBlock( block );
++            _releaseBlock(block);
++        } else if ( data['customCmd'] == 'flush' ) {
++            await Module.decoder.flush();
++            for ( let i = 0; i < Module.framesReady.length; ++i ) {
++                if (Module.framesReady[i]) {
++                    Module.framesReady[i].close();
++                    Module.framesReady[i] = undefined;
++                }
++            }
++            Module.msgChannel.port1.postMessage({
++                customCmd: 'onFlushCompleted'
++            });
++        } else if ( data['customCmd'] == 'close' ) {
++            Module.decoder.close();
++        }
++    }
++
++    async function getPictureAsync(dec) {
++        function getPicture(dec, resolve) {
++            let pic = _tryGetPictureFromPool(dec);
++            if (!pic) {
++                setTimeout( function() {
++                      getPicture(dec, resolve);
++                  }, 1);
++                return;
++            }
++            resolve(pic);
++        }
++        let p = new Promise((resolve) => {
++            getPicture(dec, resolve);
++        });
++        return await p;
++    }
++
++    self.addEventListener('message', (e) => {
++        let msg = e['data'];
++
++        console.log('Received message in decoder worker');
++        console.dir(msg);
++
++        if (msg['customCmd'] == 'getDecoderWorkerMessagePort') {
++            Module.msgChannel = new MessageChannel();
++            Module.msgChannel.port1.onmessage = onDecoderWorkerMessage;
++            self.postMessage({
++                customCmd: 'transferMessagePort',
++                targetThread: msg['replyTo'],
++                transferList: [Module.msgChannel.port2],
++            }, [Module.msgChannel.port2]);
++        }
++    });
++
++    /* Store a handle to our decoder_t for later invocations */
++    Module.webCodecCtx = decoder;
++
++    /* Prepare an array containing the decoded frames, so the interop can query
++     * then later */
++    Module.framesReady = [];
++
++    let initCfg = {
++        'output': async function (frame) {
++            /* Always update the video output format so we can ensure the vout
++             * is created when we try to acquire its message port */
++            if ( !_updateVideoOutput(Module.webCodecCtx) )
++            {
++                frame.close();
++                return;
++            }
++            if (Module.voutPort === undefined)
++                await getVoutMessagePort();
++            let p = await getPictureAsync(Module.webCodecCtx);
++            let picIdx = _queuePicture(Module.webCodecCtx, p, frame.timestamp);
++            if ( Module.framesReady[picIdx] ) {
++                /*
++                 *  If we end up overriding a frame, it means it was dropped
++                 *  by the vout before the interop asked for it, so we can close
++                 *  it safely.
++                 */
++                console.log('Discarding dropped frame ', picIdx);
++                Module.framesReady[picIdx].close();
++            }
++            Module.framesReady[picIdx] = frame;
++        },
++        'error': function(err) {
++            console.log('Error while decoding: ');
++            console.log(err);
++        }
++    };
++    Module.decoder = new VideoDecoder( initCfg );
++    let decCfg = Emval.toValue( decCfgHandle );
++    Module.decoder.configure( decCfg );
++});
++
++static bool initDecoder( decoder_t* dec )
++{
++    auto decCfg = getDecoderConfig( dec, true );
++    initDecoderJS( dec, decCfg.as_handle() );
++
++    return true;
++}
++
++static void mainloop_tick()
++{
++}
++
++static void* WebcodecDecodeWorker( void* arg )
++{
++    /*
++     * We need to be able to yield back to the browser main loop after we
++     * queue some blocks for decoding, otherwise the callback will never be
++     * invoked.
++     * In order to do so, we spawn a dedidated thread that will run a "main loop"
++     * which consist of dequeuing a single block and passing it to webcodec.
++     * After doing so, it yields back to the message loop and so on. If no
++     * blocks are queued for decoding, we can block as there nothing else being
++     * done from this worker.
++     */
++    auto dec = static_cast<decoder_t*>( arg );
++    if ( !initDecoder( dec ) )
++    {
++        msg_Err( dec, "Failed to initialize decoder: FIXME" );
++        return NULL;
++    }
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    auto vctxPrivate = static_cast<webcodec_context*>(
++            vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
++    vctxPrivate->decoder_worker = pthread_self();
++    emscripten_set_main_loop(mainloop_tick, 1, true);
++    return NULL;
++}
++
++EM_ASYNC_JS(void, initDecoderWorkerMessagePort, (decoder_t* dec), {
++    if (Module.decoderWorkerPort !== undefined) {
++        return;
++    }
++    let workerMessagePortPromise = new Promise((resolve, reject) => {
++        self.addEventListener('message', function(e) {
++            let msg = e['data'];
++            if (msg.customCmd == 'transferMessagePort') {
++                let port = msg['transferList'][0];
++                if (!port) {
++                    console.log('No port provided, rejecting');
++                    reject();
++                }
++                Module.decoderWorkerPort = port;
++                resolve();
++            }
++        });
++        self.postMessage({
++            customCmd: 'getDecoderWorkerMessagePort',
++            targetThread: _getVlcDecoderWorkerThread(dec),
++            replyTo: _pthread_self()
++        });
++    });
++    await workerMessagePortPromise;
++    Module.decoderWorkerPort.onmessage = (e) => {
++        let data = e['data'];
++        if (data['customCmd'] == 'onFlushCompleted') {
++            Module.flushPromiseResolver();
++        }
++    };
++})
++
++static int Decode( decoder_t* dec, block_t* block )
++{
++    initDecoderWorkerMessagePort(dec);
++    EM_ASM({
++        Module.decoderWorkerPort.postMessage({
++            customCmd: 'decode',
++            block: $0
++        });
++    }, block);
++    return VLCDEC_SUCCESS;
++}
++
++EM_ASYNC_JS(void, flushAsync, (), {
++    let p = new Promise((r) => {
++        Module.flushPromiseResolver = r;
++        Module.decoderWorkerPort.postMessage({
++            customCmd: 'flush'
++        });
++    });
++    await p;
++    Module.flushPromiseResolver = undefined;
++});
++
++static void Flush( decoder_t* dec )
++{
++    initDecoderWorkerMessagePort(dec);
++    flushAsync();
++}
++
++static int Open( vlc_object_t* obj )
++{
++    auto dec = reinterpret_cast<decoder_t*>(obj);
++
++    if ( dec->fmt_in.i_cat != VIDEO_ES )
++        return VLC_EGENERIC;
++
++    auto decoderType = emval::global("VideoDecoder");
++    if ( !decoderType.as<bool>() )
++    {
++        msg_Err( obj, "Can't get VideoDecoder type, webcodec is probably not "
++                      "supported on this browser" );
++        return VLC_EGENERIC;
++    }
++    auto sys = std::make_unique<decoder_sys_t>();
++    dec->p_sys = sys.get();
++
++    auto decoderConfig = getDecoderConfig( dec, false );
++    if ( decoderConfig.isUndefined() )
++        return VLC_EGENERIC;
++    auto isSupported = probeConfig(decoderConfig.as_handle());
++
++    if ( isSupported == false )
++    {
++        msg_Err( dec, "VideoDecoder doesn't support this configuration" );
++        return VLC_EGENERIC;
++    }
++
++    if ( es_format_Copy( &dec->fmt_out, &dec->fmt_in ) != VLC_SUCCESS )
++        return VLC_ENOMEM;
++    dec->fmt_out.i_codec = dec->fmt_out.video.i_chroma = VLC_CODEC_WEBCODEC_OPAQUE;
++
++    auto dec_dev = decoder_GetDecoderDevice(dec);
++    sys->vctx = vlc_video_context_Create(dec_dev, VLC_VIDEO_CONTEXT_WEBCODEC,
++                                         sizeof(webcodec_context), nullptr);
++    auto vctxPrivate = static_cast<webcodec_context*>(
++            vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
++    new (vctxPrivate) webcodec_context();
++
++    if ( webcodec_CreatePool(sys->vctx, &dec->fmt_out.video) != VLC_SUCCESS )
++        return VLC_EGENERIC;
++
++    if ( vlc_clone( &sys->th, &WebcodecDecodeWorker, dec, 0 ) != VLC_SUCCESS )
++    {
++        msg_Err( obj, "Failed to create webcodec thread" );
++        return VLC_EGENERIC;
++    }
++
++    dec->pf_decode = &Decode;
++    dec->pf_flush = &Flush;
++
++    sys.release();
++    return VLCDEC_SUCCESS;
++}
++
++static void Close( decoder_t* dec )
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    auto vctx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC ) );
++    picture_pool_Release(vctx->pool);
++    EM_ASM({
++        Module.decoderWorkerPort.postMessage({
++            customCmd: 'close'
++        });
++    });
++    delete sys;
++}
++
++static int
++OpenDecDevice(vlc_decoder_device *device, vout_window_t *)
++{
++    static const struct vlc_decoder_device_operations ops =
++    {
++        nullptr,
++    };
++    device->ops = &ops;
++    device->type = VLC_DECODER_DEVICE_WEBCODEC;
++
++    return VLC_SUCCESS;
++}
++
++vlc_module_begin ()
++    set_description("Video decoder using browser provided implementation")
++    set_subcategory(SUBCAT_INPUT_VCODEC)
++    set_section(N_("Decoding"), NULL)
++    set_capability("video decoder", 100)
++    set_callbacks(Open, Close)
++    add_shortcut("webcodec")
++
++    add_submodule()
++        set_callback_dec_device(OpenDecDevice, 1)
++vlc_module_end ()
+diff --git a/modules/demux/Makefile.am b/modules/demux/Makefile.am
+index 86dfd8abee..3e64246e4d 100644
+--- a/modules/demux/Makefile.am
++++ b/modules/demux/Makefile.am
+@@ -543,4 +543,6 @@ libvlc_json_la_SOURCES = \
+ libvlc_json_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/demux/json
+ libvlc_json_la_LIBADD = $(LTLIBVLCCORE) ../compat/libcompat.la $(LIBM)
+ libvlc_json_la_LDFLAGS = -static
++if !HAVE_EMSCRIPTEN
+ noinst_LTLIBRARIES += libvlc_json.la
++endif
+diff --git a/modules/hw/emscripten/Makefile.am b/modules/hw/emscripten/Makefile.am
+new file mode 100644
+index 0000000000..3f2a118bc1
+--- /dev/null
++++ b/modules/hw/emscripten/Makefile.am
+@@ -0,0 +1,10 @@
++emscriptendir = $(pluginsdir)/emscripten
++
++libglconverter_emscripten_plugin_la_SOURCES = hw/emscripten/converter.cpp video_output/emscripten/common.cpp
++libglconverter_emscripten_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
++libglconverter_emscripten_plugin_la_CXXFLAGS = $(AM_CXXFLAGS)
++libglconverter_emscripten_plugin_la_LIBADD = $(AM_LIBADD) 
++
++if HAVE_EMSCRIPTEN
++emscripten_LTLIBRARIES = libglconverter_emscripten_plugin.la
++endif
+diff --git a/modules/hw/emscripten/converter.cpp b/modules/hw/emscripten/converter.cpp
+new file mode 100644
+index 0000000000..edc8d93bc0
+--- /dev/null
++++ b/modules/hw/emscripten/converter.cpp
+@@ -0,0 +1,137 @@
++/*****************************************************************************
++ * webcodec.cpp: VLC picture to WebCodec VideoFrame
++ *****************************************************************************
++ * Copyright (C) 2022 VLC authors, VideoLAN and VideoLabs
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <vlc_common.h>
++#include <vlc_filter.h>
++#include <vlc_plugin.h>
++
++#include "../../video_output/emscripten/common.h"
++
++#include <emscripten/emscripten.h>
++#include <emscripten/em_js.h>
++#include <emscripten/val.h>
++
++struct chroma_sys_t
++{
++};
++
++static picture_t* UploadSurface(filter_t* filter, picture_t* src)
++{
++    auto vctx = static_cast<webcodec_context*>(
++            vlc_video_context_GetPrivate( filter->vctx_out, VLC_VIDEO_CONTEXT_WEBCODEC) );
++    auto dst = picture_pool_Wait( vctx->pool );
++    if (dst == nullptr)
++    {
++        picture_Release(src);
++        return nullptr;
++    }
++
++    auto size = 0u;
++    for ( auto i = 0; i < src->i_planes; ++i )
++        size += src->p[i].i_lines * src->p[i].i_pitch;
++    auto buffer = emscripten::val::global("Uint8Array").new_( size );
++    auto planesLayout = emscripten::val::array();
++    auto offset = 0u;
++    for ( auto i = 0; i < src->i_planes; ++i )
++    {
++        auto planeSize = src->p[i].i_lines * src->p[i].i_pitch;
++        auto p = emscripten::typed_memory_view( planeSize, src->p[i].p_pixels );
++        buffer.call<void>("set", p, offset);
++        auto layout = emscripten::val::object();
++        layout.set("offset", offset);
++        layout.set("stride", src->p[i].i_pitch);
++        planesLayout.call<void>( "push", layout );
++        offset += planeSize;
++    }
++
++    auto init = emscripten::val::object();
++    init.set( "format", "I420" );
++    init.set( "codedWidth", src->format.i_width );
++    init.set( "codedHeight", src->format.i_height );
++    init.set( "timestamp", (long)US_FROM_VLC_TICK( src->date ) );
++    init.set( "layout", planesLayout );
++    init.set( "displayWidth", src->format.i_visible_width);
++    init.set( "displayHeight", src->format.i_visible_height );
++
++    auto visibleRect = emscripten::val::object();
++    visibleRect.set( "x", src->format.i_x_offset );
++    visibleRect.set( "y", src->format.i_y_offset );
++    visibleRect.set( "width", src->format.i_visible_width);
++    visibleRect.set( "height", src->format.i_visible_height );
++    init.set( "visibleRect", visibleRect );
++
++    auto frame = emscripten::val::global("VideoFrame").new_( buffer, init );
++    auto pictureIdx = PictureContextPrivate(dst->context)->pictureIdx;
++    EM_ASM({
++        let frame = Emval.toValue($0);
++        Module.msgChannel.port2.postMessage({
++            customCmd: 'displayFrame',
++            pictureId: $1,
++            frame: frame
++        });
++    }, frame.as_handle(), pictureIdx);
++
++
++    picture_CopyProperties( dst, src );
++    picture_Release(src);
++    return dst;
++}
++
++static void vlc_webcodec_CloseChroma(filter_t* filter)
++{
++    auto vctx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(filter->vctx_out, VLC_VIDEO_CONTEXT_WEBCODEC ) );
++    picture_pool_Release(vctx->pool);
++}
++
++static const struct vlc_filter_operations filter_ops = {
++    .filter_video = UploadSurface,   .close = vlc_webcodec_CloseChroma,
++};
++
++static int vlc_webcodec_OpenChroma(filter_t* filter)
++{
++    if (filter->fmt_in.video.i_height != filter->fmt_out.video.i_height
++     || filter->fmt_in.video.i_width != filter->fmt_out.video.i_width
++     || filter->fmt_in.video.orientation != filter->fmt_out.video.orientation)
++    {
++        return VLC_EGENERIC;
++    }
++
++    if (filter->fmt_out.video.i_chroma != VLC_CODEC_WEBCODEC_OPAQUE)
++        return VLC_EGENERIC;
++    if (filter->fmt_in.video.i_chroma != VLC_CODEC_I420)
++        return VLC_EGENERIC;
++
++    filter->ops = &filter_ops;
++    return webcodec_CreatePool(filter->vctx_out, &filter->fmt_out.video);
++}
++
++vlc_module_begin()
++    set_shortname(N_("WebCodec filters"))
++    set_description(N_("WebCodec filters"))
++    set_subcategory(SUBCAT_VIDEO_VFILTER)
++
++    add_submodule()
++    set_callback_video_converter(vlc_webcodec_OpenChroma, 10)
++vlc_module_end()
+diff --git a/modules/video_output/Makefile.am b/modules/video_output/Makefile.am
+index d4ada0394b..ea3a0c6da9 100644
+--- a/modules/video_output/Makefile.am
++++ b/modules/video_output/Makefile.am
+@@ -305,6 +305,13 @@ vout_LTLIBRARIES += libegl_android_plugin.la libglinterop_android_plugin.la
+ endif
+ endif
+ 
++### Emscripten
++libglinterop_emscripten_plugin_la_SOURCES = video_output/opengl/interop_emscripten.cpp \
++	video_output/opengl/interop.h
++libglinterop_emscripten_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) -DUSE_OPENGL_ES2
++if HAVE_EMSCRIPTEN
++vout_LTLIBRARIES += libglinterop_emscripten_plugin.la
++endif
+ 
+ ### FrameBuffer ###
+ 
+@@ -345,6 +352,13 @@ libcaca_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
+ EXTRA_LTLIBRARIES += libcaca_plugin.la
+ vout_LTLIBRARIES += $(LTLIBcaca)
+ 
++### Emscripten ###
++libemscripten_window_plugin_la_SOURCES = video_output/emscripten.cpp
++
++if HAVE_EMSCRIPTEN
++vout_LTLIBRARIES += libemscripten_window_plugin.la
++endif
++
+ ### Common ###
+ 
+ libflaschen_plugin_la_SOURCES = video_output/flaschen.c
+diff --git a/modules/video_output/emscripten.cpp b/modules/video_output/emscripten.cpp
+new file mode 100644
+index 0000000000..9fd34350b5
+--- /dev/null
++++ b/modules/video_output/emscripten.cpp
+@@ -0,0 +1,253 @@
++/**
++ * @file emscripten.c
++ * @brief Emscripten webgl video output for VLC media player
++ */
++/*****************************************************************************
++ * Copyright © 2020 VLC authors and VideoLAN
++ *
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include <config.h>
++#endif
++
++#include <cstdarg>
++#include <new>
++#include <string>
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_vout_window.h>
++#include <vlc_vout_display.h>
++#include <vlc_opengl.h>
++
++#include "./opengl/vout_helper.h"
++#include "opengl/renderer.h"
++
++#include "emscripten/common.h"
++
++#include <emscripten.h>
++#include <emscripten/html5.h>
++#include <emscripten/val.h>
++#include <webgl/webgl2.h>
++// eglGetProcAddress
++#include <EGL/egl.h>
++
++static const struct vout_window_operations ops = {
++    //TODO: Implement canvas operations
++    //vout_window_ReportSize() should be called from here
++};
++
++//MAIN_THREAD_
++//EM_JS(emscripten::EM_VAL, GetCanvasSize, (), {
++//    let canvas = document.getElementById('canvas');
++//    if (!canvas)
++//        return Emval.bindValue([]);
++//    return Emval.bindValue([canvas.width, canvas.height]);
++//});
++
++typedef struct emscripten_gl_sys_t
++{
++    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
++} emscripten_gl_sys_t;
++
++static int OpenWindow(vout_window_t *wnd)
++{
++    wnd->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
++    wnd->ops = &ops;
++    wnd->handle.canvas = "canvas";
++
++    //emscripten::val size = GetCanvasSize();
++    //std::vector<int> vec_size = emscripten::vecFromJSArray(size);
++    //if (vec_size.size() != 2)
++    //    return VLC_EGENERIC;
++
++    //vout_window_ReportSize(wnd, vec_size[0], vec_size[1]);
++    vout_window_ReportSize(wnd, 1280, 720);
++    return VLC_SUCCESS;
++}
++
++static void *GetProcAddress(vlc_gl_t *gl, const char *name)
++{
++    VLC_UNUSED(gl);
++
++    return reinterpret_cast<void*>(eglGetProcAddress(name));
++}
++
++static int MakeCurrent(vlc_gl_t *gl)
++{
++    auto sys = static_cast<emscripten_gl_sys_t*>( gl->sys );
++
++    if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS)
++        return VLC_EGENERIC;
++    return VLC_SUCCESS;
++}
++
++static void ReleaseCurrent(vlc_gl_t *gl)
++{
++    VLC_UNUSED(gl);
++    emscripten_webgl_make_context_current(0);
++}
++
++static void Swap(vlc_gl_t *gl)
++{
++    /**
++     * There is no way to commit/swapbuffer from an offscreen canvas, so instead
++     * we render the offscreen canvas onto a bitmap and let the actual canvas
++     * display that bitmap from the main thread.
++     */
++    VLC_UNUSED(gl);
++    EM_ASM({
++        let bitmap = Module.offscreenCanvas.transferToImageBitmap();
++        Module.voutMsgPort.postMessage({
++            customCmd: 'commitFrame',
++            bitmap: bitmap,
++        }, [bitmap]);
++    });
++}
++
++static void Resize(vlc_gl_t *gl, unsigned w, unsigned h)
++{
++    VLC_UNUSED(gl);
++    VLC_UNUSED(w);
++    VLC_UNUSED(h);
++}
++
++EM_ASYNC_JS(void, getVoutMessagePort, (), {
++    let p = new Promise((resolve, reject) => {
++        let listener = function(e) {
++            let msg = e.data;
++            if (msg.customCmd == 'getVoutMessagePortResult') {
++                Module.voutMsgPort = msg['msgPort'];
++                resolve();
++                self.removeEventListener('message', listener);
++            };
++        };
++        self.addEventListener('message', listener);
++        self.postMessage({
++            customCmd: 'getVoutMessagePort'
++        });
++    });
++    await p;
++});
++
++EM_JS(int, createGlContext, (int width, int height), {
++    Module.offscreenCanvas = new OffscreenCanvas(width, height);
++    Module.glCtx = Module.offscreenCanvas.getContext('webgl2');
++
++    return GL.registerContext(Module.glCtx, {
++        antialias: false
++    });
++});
++
++static void Close (vlc_gl_t *gl)
++{
++    auto sys = static_cast<emscripten_gl_sys_t*>( gl->sys );
++    delete sys;
++}
++
++static int Open (vlc_gl_t *gl, unsigned width, unsigned height)
++{
++    VLC_UNUSED(width), VLC_UNUSED(height);
++
++    vout_window_t *wnd = gl->surface;
++
++    if (wnd->type != VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
++        goto error;
++
++    emscripten_gl_sys_t *sys;
++
++    gl->sys = sys = new (std::nothrow)emscripten_gl_sys_t;
++    if (!sys)
++        return VLC_ENOMEM;
++
++    MAIN_THREAD_EM_ASM({
++        if (Module.canvasCtx === undefined) {
++            let canvasName = UTF8ToString($1);
++            Module.canvasCtx = document.getElementById(canvasName).getContext('2d');
++        }
++        function onVoutMessage(msg) {
++            let data = msg['data'];
++            if (data.customCmd == 'commitFrame') {
++                let bmp = data['bitmap'];
++                Module.canvasCtx.drawImage(bmp, 0, 0);
++                bmp.close();
++            }
++        }
++        let w = Module.PThread.pthreads[$0].worker;
++        w.addEventListener('message', function (e) {
++            let msg = e['data'];
++            if (msg.customCmd == 'getVoutMessagePort') {
++                let msgChannel = new MessageChannel();
++                msgChannel.port1.onmessage = onVoutMessage;
++                w.postMessage({
++                    customCmd: 'getVoutMessagePortResult',
++                    msgPort: msgChannel.port2,
++                }, [msgChannel.port2]);
++            }
++        });
++    }, pthread_self(), wnd->handle.canvas ? wnd->handle.canvas : "canvas");
++
++    getVoutMessagePort();
++    sys->context = createGlContext(width, height);
++
++    if (!sys->context) {
++        goto error;
++    }
++    // Check that the WebGL context is valid
++    if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS) {
++        emscripten_log(EM_LOG_CONSOLE, "failed to make context current");
++        goto error;
++    }
++
++    // Release the context
++    emscripten_webgl_make_context_current(0);
++    wnd->handle.em_context = sys->context;
++
++    // Implement egl routines:
++    gl->make_current = MakeCurrent;
++    gl->release_current = ReleaseCurrent;
++    gl->resize = Resize;
++    gl->swap = Swap;
++    gl->get_proc_address = GetProcAddress;
++    gl->destroy = Close;
++    return VLC_SUCCESS;
++
++error:
++    Close(gl);
++    return VLC_EGENERIC;
++}
++
++/*
++ * Module descriptor
++ */
++vlc_module_begin()
++    set_shortname(N_("Emscripten Window"))
++    set_description(N_("Emscripten drawing area"))
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++    set_capability("vout window", 10)
++    set_callbacks(OpenWindow, nullptr)
++
++    add_submodule ()
++    set_shortname("Emscripten GL")
++    set_description(N_("Emscripten extension for OpenGL"))
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++    set_capability("opengl es2", 50)
++    set_callback(Open)
++    add_shortcut("em_webgl")
++vlc_module_end()
++
+diff --git a/modules/video_output/emscripten/common.cpp b/modules/video_output/emscripten/common.cpp
+new file mode 100644
+index 0000000000..b2065be3b4
+--- /dev/null
++++ b/modules/video_output/emscripten/common.cpp
+@@ -0,0 +1,82 @@
++/*****************************************************************************
++ * common.h: Emscripten decoder/vout common code
++ *****************************************************************************
++ * Copyright (C) 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <vlc_common.h>
++#include <vlc_decoder.h>
++#include <vlc_picture_pool.h>
++
++#include "common.h"
++
++static picture_context_t* PictureContextCopy(picture_context_t* picCtx)
++{
++    vlc_video_context_Hold( picCtx->vctx );
++    return picCtx;
++}
++
++static void PictureContextDestroy( picture_context_t* )
++{
++    /* Context is already released by picture_Release() */
++}
++
++static picture_context_t* webcodec_CreatePictureContext( vlc_video_context* vctx, uint32_t picIdx )
++{
++    auto picCtx = static_cast<webcodec_picture_ctx*>(
++                malloc( sizeof(  webcodec_picture_ctx ) ) );
++    if ( picCtx == nullptr )
++        return nullptr;
++    picCtx->context.copy = PictureContextCopy;
++    picCtx->context.destroy = PictureContextDestroy;
++    picCtx->context.vctx = vctx;
++    picCtx->pictureIdx = picIdx;
++    return &picCtx->context;
++}
++
++
++int webcodec_CreatePool( vlc_video_context* vctx, const video_format_t* fmt )
++{
++    auto ctx = static_cast<webcodec_context*>(
++        vlc_video_context_GetPrivate( vctx, VLC_VIDEO_CONTEXT_WEBCODEC ) );
++
++    for ( auto i = 0u; i < ARRAY_SIZE(ctx->pictures); ++i )
++    {
++        auto pic = picture_NewFromFormat(fmt);
++        if ( pic != nullptr )
++            pic->context = webcodec_CreatePictureContext( vctx, i );
++        if ( pic == nullptr || pic->context == nullptr )
++        {
++            while ( i-- )
++                picture_Release( ctx->pictures[i] );
++            return VLC_EGENERIC;
++        }
++        ctx->pictures[i] = pic;
++    }
++    ctx->pool = picture_pool_New(ARRAY_SIZE(ctx->pictures), ctx->pictures);
++    if ( ctx->pool == nullptr )
++    {
++        for ( auto i = 0u; i < ARRAY_SIZE(ctx->pictures); ++i )
++            picture_Release( ctx->pictures[i] );
++        return VLC_EGENERIC;
++    }
++    return VLC_SUCCESS;
++}
+diff --git a/modules/video_output/emscripten/common.h b/modules/video_output/emscripten/common.h
+new file mode 100644
+index 0000000000..08967d0703
+--- /dev/null
++++ b/modules/video_output/emscripten/common.h
+@@ -0,0 +1,57 @@
++/*****************************************************************************
++ * common.h: Emscripten decoder/vout common code
++ *****************************************************************************
++ * Copyright (C) 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifndef EMSCRIPTEN_COMMON_H
++#define EMSCRIPTEN_COMMON_H
++
++#ifndef __cplusplus
++# error This only supports C++
++#endif
++
++#include <vlc_threads.h>
++#include <vlc_picture.h>
++#include <vlc_picture_pool.h>
++
++#include <emscripten/html5_webgl.h>
++//#include <emscripten/val.h>
++
++#define WEBCODEC_MAX_PICTURES 32
++
++struct webcodec_context
++{
++    pthread_t decoder_worker;
++    picture_pool_t* pool;
++    picture_t* pictures[WEBCODEC_MAX_PICTURES];
++};
++
++struct webcodec_picture_ctx
++{
++    picture_context_t context;
++    uint32_t pictureIdx;
++};
++
++int webcodec_CreatePool( vlc_video_context* vctx, const video_format_t* fmt );
++
++static inline webcodec_picture_ctx* PictureContextPrivate( picture_context_t* picCtx )
++{
++    return container_of( picCtx, webcodec_picture_ctx, context );
++}
++
++#endif // EMSCRIPTEN_COMMON_H
+diff --git a/modules/video_output/opengl/Makefile.am b/modules/video_output/opengl/Makefile.am
+index bc4079fefc..bdb5a1b3eb 100644
+--- a/modules/video_output/opengl/Makefile.am
++++ b/modules/video_output/opengl/Makefile.am
+@@ -108,6 +108,12 @@ libglfilter_mock_plugin_la_LIBADD += libvlc_opengl.la $(GL_LIBS)
+ noinst_LTLIBRARIES += libglfilter_mock_plugin.la
+ endif
+ 
++if HAVE_EMSCRIPTEN
++libglfilter_mock_plugin_la_LIBADD += libvlc_opengles.la $(GL_LIBS)
++libglfilter_mock_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
++noinst_LTLIBRARIES += libglfilter_mock_plugin.la
++endif
++
+ if HAVE_IOS
+ libglfilter_mock_plugin_la_LIBADD += libvlc_opengles.la $(GLES2_LIBS)
+ libglfilter_mock_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
+diff --git a/modules/video_output/opengl/egl_display_generic.c b/modules/video_output/opengl/egl_display_generic.c
+index dfb841feef..730fb381d2 100644
+--- a/modules/video_output/opengl/egl_display_generic.c
++++ b/modules/video_output/opengl/egl_display_generic.c
+@@ -52,8 +52,8 @@ static vlc_egl_display_open_fn Open;
+ static int
+ Open(struct vlc_egl_display *display)
+ {
+-#ifdef __ANDROID__
+-    /* The default display is refcounted on Android */
++#if defined(__ANDROID__) || defined(__EMSCRIPTEN__)
++    /* The default display is refcounted on Android and Emscripten */
+     display->display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+ #elif defined(EGL_KHR_display_reference)
+     const char *extensions = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+diff --git a/modules/video_output/opengl/filter.c b/modules/video_output/opengl/filter.c
+index 7f0aa73e7c..491ce88dd5 100644
+--- a/modules/video_output/opengl/filter.c
++++ b/modules/video_output/opengl/filter.c
+@@ -31,6 +31,7 @@
+ #include <vlc_modules.h>
+ 
+ #include "gl_api.h"
++#include "picture.h"
+ 
+ struct vlc_gl_filter *
+ vlc_gl_filter_New(struct vlc_gl_t *gl, const struct vlc_gl_api *api)
+diff --git a/modules/video_output/opengl/filter.h b/modules/video_output/opengl/filter.h
+index dc81b69d8a..b8272a5115 100644
+--- a/modules/video_output/opengl/filter.h
++++ b/modules/video_output/opengl/filter.h
+@@ -19,139 +19,4 @@
+  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+  *****************************************************************************/
+ 
+-#ifndef VLC_GL_FILTER_H
+-#define VLC_GL_FILTER_H
+-
+-#include <vlc_tick.h>
+-
+-#include "picture.h"
+-
+-struct vlc_gl_filter;
+-
+-#ifdef __cplusplus
+-extern "C"
+-{
+-#endif
+-
+-struct vlc_gl_tex_size {
+-    unsigned width;
+-    unsigned height;
+-};
+-
+-struct vlc_gl_input_meta {
+-    vlc_tick_t pts;
+-    unsigned plane;
+-};
+-
+-typedef int
+-vlc_gl_filter_open_fn(struct vlc_gl_filter *filter,
+-                      const config_chain_t *config,
+-                      const struct vlc_gl_format *glfmt,
+-                      struct vlc_gl_tex_size *size_out);
+-
+-#define set_callback_opengl_filter(open) \
+-    { \
+-        vlc_gl_filter_open_fn *fn = open; \
+-        (void) fn; \
+-        set_callback(fn); \
+-    }
+-
+-struct vlc_gl_filter_ops {
+-    /**
+-     * Draw the result of the filter to the current framebuffer
+-     */
+-    int (*draw)(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
+-                const struct vlc_gl_input_meta *meta);
+-
+-    /**
+-     * Free filter resources
+-     */
+-    void (*close)(struct vlc_gl_filter *filter);
+-
+-    /**
+-     * Request a (responsive) filter to adapt its output size (optional)
+-     *
+-     * A responsive filter is a filter for which the size of the produced
+-     * pictures depends on the output (e.g. display) size rather than the
+-     * input. This is for example the case for a renderer.
+-     *
+-     * A new output size is requested (size_out). The filter is authorized to
+-     * change the size_out to enforce its own constraints.
+-     *
+-     * In addition, it may request to the previous filter (if any) an optimal
+-     * size it wants to receive. If set to non-zero value, this previous filter
+-     * will receive this size as its requested size (and so on).
+-     *
+-     * \retval true if the resize is accepted (possibly with a modified
+-     *              size_out)
+-     * \retval false if the resize is rejected (included on error)
+-     */
+-    int (*request_output_size)(struct vlc_gl_filter *filter,
+-                               struct vlc_gl_tex_size *size_out,
+-                               struct vlc_gl_tex_size *optimal_in);
+-
+-    /**
+-     * Callback to notify input size changes
+-     *
+-     * When a filter changes its output size as a result of
+-     * request_output_size(), the next filter is notified by this callback.
+-     */
+-    void (*on_input_size_change)(struct vlc_gl_filter *filter,
+-                                 const struct vlc_gl_tex_size *size);
+-};
+-
+-/**
+- * OpenGL filter, in charge of a rendering pass.
+- */
+-struct vlc_gl_filter {
+-    vlc_object_t obj;
+-    module_t *module;
+-
+-    struct vlc_gl_t *gl;
+-    const struct vlc_gl_api *api;
+-    const struct vlc_gl_format *glfmt_in;
+-
+-    struct {
+-        /**
+-         * An OpenGL filter may either operate on the input RGBA picture, or on
+-         * individual input planes (without chroma conversion) separately.
+-         *
+-         * In practice, this is useful for deinterlace filters.
+-         *
+-         * This flag must be set by the filter module (default is false).
+-         */
+-        bool filter_planes;
+-
+-        /**
+-         * A blend filter draws over the input picture (without reading it).
+-         *
+-         * Meaningless if filter_planes is true.
+-         *
+-         * This flag must be set by the filter module (default is false).
+-         */
+-        bool blend;
+-
+-        /**
+-         * Request MSAA level.
+-         *
+-         * This value must be set by the filter module (default is 0, which
+-         * means disabled).
+-         *
+-         * Meaningless if filter_planes is true.
+-         *
+-         * The actual MSAA level may be overwritten to 0 if multisampling is
+-         * not supported, or to a higher value if another filter rendering on
+-         * the same framebuffer requested a higher MSAA level.
+-         */
+-        unsigned msaa_level;
+-    } config;
+-
+-    const struct vlc_gl_filter_ops *ops;
+-    void *sys;
+-};
+-
+-#ifdef __cplusplus
+-}
+-#endif
+-
+-#endif
++#include <vlc_opengl_filter.h>
+diff --git a/modules/video_output/opengl/filter_mock.c b/modules/video_output/opengl/filter_mock.c
+index 64a73b303e..3915456d7e 100644
+--- a/modules/video_output/opengl/filter_mock.c
++++ b/modules/video_output/opengl/filter_mock.c
+@@ -73,6 +73,7 @@
+ #include "gl_common.h"
+ #include "gl_util.h"
+ #include "sampler.h"
++#include "picture.h"
+ 
+ #define MOCK_CFG_PREFIX "mock-"
+ 
+@@ -101,6 +102,7 @@ struct sys {
+ 
+     float rotation_matrix[16];
+     float ar;
++    struct vlc_gl_api api;
+ };
+ 
+ static void
+@@ -586,6 +588,9 @@ Open(struct vlc_gl_filter *filter, const config_chain_t *config,
+ 
+     sys->sampler = NULL;
+ 
++    vlc_gl_api_Init(&sys->api, filter->gl);
++    filter->api = &sys->api;
++
+     int ret;
+     if (plane)
+         ret = InitPlane(filter, glfmt);
+diff --git a/modules/video_output/opengl/filter_priv.h b/modules/video_output/opengl/filter_priv.h
+index 7b702ddb17..cd0e3084fa 100644
+--- a/modules/video_output/opengl/filter_priv.h
++++ b/modules/video_output/opengl/filter_priv.h
+@@ -27,6 +27,7 @@
+ #include <vlc_picture.h>
+ 
+ #include "filter.h"
++#include "picture.h"
+ 
+ struct vlc_gl_filter_priv {
+     struct vlc_gl_filter filter;
+diff --git a/modules/video_output/opengl/filters.c b/modules/video_output/opengl/filters.c
+index b93c1ee2fe..abd00b755b 100644
+--- a/modules/video_output/opengl/filters.c
++++ b/modules/video_output/opengl/filters.c
+@@ -183,6 +183,7 @@ vlc_gl_filters_Append(struct vlc_gl_filters *filters, const char *name,
+     struct vlc_gl_filter *filter = vlc_gl_filter_New(filters->gl, filters->api);
+     if (!filter)
+         return NULL;
++    filter->gl = filters->gl;
+ 
+     struct vlc_gl_filter_priv *priv = vlc_gl_filter_PRIV(filter);
+ 
+diff --git a/modules/video_output/opengl/interop_emscripten.cpp b/modules/video_output/opengl/interop_emscripten.cpp
+new file mode 100644
+index 0000000000..f745fcfef4
+--- /dev/null
++++ b/modules/video_output/opengl/interop_emscripten.cpp
+@@ -0,0 +1,287 @@
++﻿/*****************************************************************************
++ * interop_emscripten.cpp: OpenGL Emscripten/Webcodec opaque converter
++ *****************************************************************************
++ * Copyright (C) 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++//#ifndef __EMSCRIPTEN__
++//# error this file must be built with emscripten
++//#endif
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_filter.h>
++
++#include "interop.h"
++#include "gl_common.h"
++#include <cassert>
++#include "../emscripten/common.h"
++
++#include <emscripten.h>
++#include <emscripten/em_js.h>
++#include <emscripten/val.h>
++#include <emscripten/html5_webgl.h>
++
++struct EmscriptenInterop
++{
++    struct
++    {
++        PFNGLBINDTEXTUREPROC BindTexture;
++    } gl;
++};
++
++static int
++tc_emscripten_op_allocate_textures(const struct vlc_gl_interop *interop, GLuint *textures,
++                          const GLsizei *tex_width, const GLsizei *tex_height)
++{
++    (void) tex_width; (void) tex_height;
++    assert(textures[0] != 0);
++
++    return VLC_SUCCESS;
++}
++
++EM_ASYNC_JS(void, bindVideoFrame, (int pictureIdx), {
++    let frame = await Module.awaitFrame(pictureIdx);
++    if (!frame)
++        return;
++
++    let glCtx = Module.glCtx;
++    glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, frame.codedWidth, frame.codedHeight, 0,
++                glCtx.RGBA, glCtx.UNSIGNED_BYTE, frame);
++})
++
++static int
++tc_emscripten_op_update(const struct vlc_gl_interop *interop, GLuint *textures,
++               const GLsizei *tex_width, const GLsizei *tex_height,
++               picture_t *pic, const size_t *plane_offset)
++{
++    auto sys = static_cast<EmscriptenInterop *>( interop->priv );
++
++    sys->gl.BindTexture(interop->tex_target, textures[0]);
++
++    auto picCtx = PictureContextPrivate(pic->context);
++    bindVideoFrame(picCtx->pictureIdx);
++
++    return VLC_SUCCESS;
++}
++
++extern "C"
++{
++EMSCRIPTEN_KEEPALIVE int getDecoderWorker(vlc_video_context* vctx)
++{
++    auto wcCtx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
++    if (!vctx)
++        return 0;
++    return wcCtx->decoder_worker;
++}
++}
++
++EM_JS(void, setupMessagePort, (vlc_video_context* vctx), {
++    function onDecoderMessage(msg) {
++        let data = msg['data'];
++        if (data.customCmd == 'displayFrame') {
++            let pictureIdx = data.pictureId;
++            let frame = data['frame'];
++            Module.glConv.frameResolver( frame );
++        }
++    };
++    Module.msgChannel = new MessageChannel();
++    Module.msgChannel.port1.onmessage = onDecoderMessage;
++    let workerId = _getDecoderWorker(vctx);
++    if (workerId == 0)
++        return;
++    self.postMessage({
++        customCmd: 'transferMessagePort',
++        targetThread: workerId,
++        transferList: [Module.msgChannel.port2],
++    }, [Module.msgChannel.port2]);
++});
++
++EM_JS(void, initGlConvWorker, (int maxPictures), {
++    Module.glConv = {};
++    Module.glConv.lastFrame = {
++        pictureIdx: -1,
++        frame: undefined
++    };
++
++    Module.awaitFrame = async function(pictureIdx) {
++        if (Module.glConv.lastFrame.pictureIdx == pictureIdx) {
++            return Module.glConv.lastFrame.frame;
++        }
++        let p = new Promise((resolve, reject) => {
++            Module.glConv.frameResolver = resolve;
++            Module.msgChannel.port1.postMessage({
++                'customCmd': 'sendFrame',
++                'pictureIdx': pictureIdx,
++            });
++
++        });
++        let frame = await p;
++        Module.glConv.frameResolver = undefined;
++        if (Module.glConv.lastFrame.frame)
++            Module.glConv.lastFrame.frame.close();
++        Module.glConv.lastFrame.frame = frame;
++        Module.glConv.lastFrame.pictureIdx = pictureIdx;
++        return frame;
++    }
++})
++
++EM_JS(void, closeMessagePort, (void), {
++    if (Module.msgChannel)
++        delete Module.msgChannel;
++});
++
++static void
++Close(struct vlc_gl_interop *)
++{
++    closeMessagePort();
++}
++
++static int
++Open(vlc_object_t *obj)
++{
++    auto interop = reinterpret_cast<vlc_gl_interop*>( obj );
++
++    if (interop->fmt_in.i_chroma != VLC_CODEC_WEBCODEC_OPAQUE)
++        return VLC_EGENERIC;
++
++    EmscriptenInterop *sys = (decltype(sys))
++        vlc_obj_malloc(VLC_OBJECT(interop), sizeof *sys);
++    if (sys == NULL)
++        return VLC_EGENERIC;
++    sys->gl.BindTexture = (decltype(sys->gl.BindTexture))
++        vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
++    if (sys->gl.BindTexture == NULL)
++        return VLC_EGENERIC;
++
++    static const struct vlc_gl_interop_ops ops = {
++        .allocate_textures = tc_emscripten_op_allocate_textures,
++        .update_textures = tc_emscripten_op_update,
++        .close = Close,
++    };
++    interop->ops = &ops;
++    initGlConvWorker(WEBCODEC_MAX_PICTURES);
++    setupMessagePort(interop->vctx);
++
++    interop->tex_target = GL_TEXTURE_2D;
++    interop->fmt_out.i_chroma = VLC_CODEC_RGBA;
++    interop->fmt_out.space = COLOR_SPACE_UNDEF;
++    interop->tex_count = 1;
++    interop->texs[0] = vlc_gl_interop::vlc_gl_tex_cfg{
++            /*.w =*/ { 1, 1 },
++            /*.h =*/ { 1, 1 },
++            /*.internal =*/ GL_RGBA,
++            /*.format = */GL_RGBA,
++            /*.type = */GL_UNSIGNED_BYTE,
++    };
++    interop->fmt_out.i_rmask = 0xFF0000;
++    interop->fmt_out.i_gmask = 0x00FF00;
++    interop->fmt_out.i_bmask = 0x0000FF;
++    interop->priv = sys;
++
++    interop->fmt_out.orientation = ORIENT_VFLIPPED;
++
++    return VLC_SUCCESS;
++}
++
++EM_ASYNC_JS(void, CopyFrameToBuffer, (int pictureIdx, emscripten::EM_VAL infoHandle), {
++    let info = Emval.toValue(infoHandle);
++    let frame = await Module.awaitFrame(pictureIdx);
++    let copyOpts = {
++        rect: frame.codedRect,
++        layout: info.layout
++    };
++    await frame.copyTo(info.buffer, copyOpts);
++});
++
++static picture_t* vlc_webcodec_UploadVideoFrame(filter_t* filter, picture_t* src)
++{
++    auto pic = filter_NewPicture(filter);
++    if (unlikely(pic == nullptr))
++    {
++        picture_Release(src);
++        return nullptr;
++    }
++
++    auto pictureIdx = PictureContextPrivate(src->context)->pictureIdx;
++
++    size_t picSize = 0;
++    auto info = emscripten::val::object();
++    auto planesLayout = emscripten::val::array();
++    for ( auto i = 0; i < pic->i_planes; ++i )
++    {
++        auto p = pic->p[i];
++        auto layout = emscripten::val::object();
++        layout.set( "offset", picSize );
++        layout.set( "stride", p.i_pitch );
++        planesLayout.call<void>( "push", std::move( layout ) );
++        picSize += p.i_lines * p.i_pitch;
++    }
++
++    info.set( "buffer", emscripten::typed_memory_view( picSize, pic->p[0].p_pixels ) );
++    info.set( "layout", std::move( planesLayout ) );
++
++    CopyFrameToBuffer( pictureIdx, info.as_handle() );
++
++    pic->date = src->date;
++    picture_Release(src);
++    return pic;
++}
++
++static void vlc_webcodec_CloseConverter(filter_t*)
++{
++    closeMessagePort();
++}
++
++static const struct vlc_filter_operations video_frame_to_sw_ops = {
++    .filter_video = vlc_webcodec_UploadVideoFrame,
++    .close = vlc_webcodec_CloseConverter,
++};
++
++static int OpenConverter(filter_t* filter)
++{
++    if (filter->fmt_in.video.i_height != filter->fmt_out.video.i_height
++     || filter->fmt_in.video.i_width != filter->fmt_out.video.i_width
++     || filter->fmt_in.video.orientation != filter->fmt_out.video.orientation
++     || filter->fmt_in.video.i_chroma != VLC_CODEC_WEBCODEC_OPAQUE
++     || filter->fmt_out.video.i_chroma != VLC_CODEC_I420 )
++    {
++        return VLC_EGENERIC;
++    }
++    initGlConvWorker(WEBCODEC_MAX_PICTURES);
++    setupMessagePort(filter->vctx_in);
++
++    filter->ops = &video_frame_to_sw_ops;
++
++    return VLC_SUCCESS;
++}
++
++vlc_module_begin ()
++    set_description("Emscripten OpenGL SurfaceTexture converter")
++    set_capability("glinterop", 1)
++    set_callback(Open)
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++
++    add_submodule()
++        set_subcategory(SUBCAT_VIDEO_VFILTER)
++        set_callback_video_converter(OpenConverter, 10)
++vlc_module_end ()
+diff --git a/modules/video_output/opengl/renderer.c b/modules/video_output/opengl/renderer.c
+index aebbb84e67..092fc7b7e4 100644
+--- a/modules/video_output/opengl/renderer.c
++++ b/modules/video_output/opengl/renderer.c
+@@ -41,6 +41,7 @@
+ #include "gl_util.h"
+ #include "vout_helper.h"
+ #include "sampler.h"
++#include "picture.h"
+ 
+ #define SPHERE_RADIUS 1.f
+ 
+diff --git a/modules/video_output/opengl/sampler.c b/modules/video_output/opengl/sampler.c
+index 846cbc75ab..80f9d43e10 100644
+--- a/modules/video_output/opengl/sampler.c
++++ b/modules/video_output/opengl/sampler.c
+@@ -37,6 +37,7 @@
+ #include "gl_api.h"
+ #include "gl_common.h"
+ #include "gl_util.h"
++#include "picture.h"
+ 
+ struct vlc_gl_sampler_priv {
+     struct vlc_gl_sampler sampler;
+@@ -292,25 +293,30 @@ sampler_base_load(struct vlc_gl_sampler *sampler)
+     struct vlc_gl_format *glfmt = &sampler->glfmt;
+     struct vlc_gl_picture *pic = &priv->pic;
+ 
+-    if (priv->yuv_color)
++    if (priv->yuv_color && priv->uloc.ConvMatrix != -1)
+         vt->UniformMatrix4fv(priv->uloc.ConvMatrix, 1, GL_FALSE,
+                              priv->conv_matrix);
+ 
+     for (unsigned i = 0; i < glfmt->tex_count; ++i)
+     {
++        if (priv->uloc.Textures[i] == -1)
++            continue;
+         vt->Uniform1i(priv->uloc.Textures[i], i);
+ 
+         assert(pic->textures[i] != 0);
+         vt->ActiveTexture(GL_TEXTURE0 + i);
+         vt->BindTexture(glfmt->tex_target, pic->textures[i]);
+-
+     }
+ 
+     if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
+     {
+         for (unsigned i = 0; i < glfmt->tex_count; ++i)
++        {
++            if (priv->uloc.TexSizes[i] == -1)
++                continue;
+             vt->Uniform2f(priv->uloc.TexSizes[i], glfmt->tex_widths[i],
+                           glfmt->tex_heights[i]);
++        }
+     }
+ 
+ #ifdef HAVE_LIBPLACEBO
+@@ -365,6 +371,9 @@ sampler_xyz12_load(struct vlc_gl_sampler *sampler)
+     struct vlc_gl_format *glfmt = &sampler->glfmt;
+     struct vlc_gl_picture *pic = &priv->pic;
+ 
++    if (priv->uloc.Textures[0] == -1)
++        return;
++
+     vt->Uniform1i(priv->uloc.Textures[0], 0);
+ 
+     assert(pic->textures[0] != 0);
+@@ -537,13 +546,17 @@ sampler_planes_load(struct vlc_gl_sampler *sampler)
+     struct vlc_gl_format *glfmt = &sampler->glfmt;
+     struct vlc_gl_picture *pic = &priv->pic;
+ 
+-    vt->Uniform1i(priv->uloc.Textures[0], 0);
++    if (priv->uloc.Textures[0] != -1)
++    {
++        vt->Uniform1i(priv->uloc.Textures[0], 0);
+ 
+-    assert(pic->textures[plane] != 0);
+-    vt->ActiveTexture(GL_TEXTURE0);
+-    vt->BindTexture(glfmt->tex_target, pic->textures[plane]);
++        assert(pic->textures[plane] != 0);
++        vt->ActiveTexture(GL_TEXTURE0);
++        vt->BindTexture(glfmt->tex_target, pic->textures[plane]);
++    }
+ 
+-    if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
++    if (glfmt->tex_target == GL_TEXTURE_RECTANGLE &&
++        priv->uloc.TexSizes[0] != -1)
+     {
+         vt->Uniform2f(priv->uloc.TexSizes[0], glfmt->tex_widths[plane],
+                       glfmt->tex_heights[plane]);
+diff --git a/modules/video_output/opengl/sampler.h b/modules/video_output/opengl/sampler.h
+index c779f2a9ba..2a5f0ef063 100644
+--- a/modules/video_output/opengl/sampler.h
++++ b/modules/video_output/opengl/sampler.h
+@@ -38,6 +38,11 @@ extern "C"
+ {
+ #endif
+ 
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++
+ /**
+  * The purpose of a sampler is to provide pixel values of a VLC input picture,
+  * stored in any format.
+@@ -199,4 +204,8 @@ vlc_gl_sampler_SelectPlane(struct vlc_gl_sampler *sampler, unsigned plane);
+ }
+ #endif
+ 
++#ifdef __cplusplus
++}
++#endif
++
+ #endif
+diff --git a/src/misc/fourcc.c b/src/misc/fourcc.c
+index 101bb0d980..479a1bd13e 100644
+--- a/src/misc/fourcc.c
++++ b/src/misc/fourcc.c
+@@ -840,6 +840,8 @@ static const struct
+     { { VLC_CODEC_VAAPI_420, VLC_CODEC_VAAPI_420_10BPP },
+                                                FAKE_FMT() },
+ 
++    { { VLC_CODEC_WEBCODEC_OPAQUE }, FAKE_FMT() },
++
+     { { 0 },                                   FAKE_FMT() }
+ };
+ 
+diff --git a/src/video_output/display.c b/src/video_output/display.c
+index 9f07f04e3a..b00f0d1877 100644
+--- a/src/video_output/display.c
++++ b/src/video_output/display.c
+@@ -615,7 +615,7 @@ void vout_SetDisplayViewpoint(vout_display_t *vd,
+     }
+ }
+ 
+-vout_display_t *vout_display_New(vlc_object_t *parent,
++vout_display_t *(vout_display_New)(vlc_object_t *parent,
+                                  const video_format_t *source,
+                                  vlc_video_context *vctx,
+                                  const vout_display_cfg_t *cfg,
+diff --git a/src/video_output/video_output.c b/src/video_output/video_output.c
+index 7b03fca641..8b8ce5f323 100644
+--- a/src/video_output/video_output.c
++++ b/src/video_output/video_output.c
+@@ -100,6 +100,13 @@ typedef struct vout_thread_sys_t
+     vout_control_t  control;
+     atomic_bool     control_is_terminated; // shutdown the vout thread
+     vlc_thread_t    thread;
++    vlc_sem_t       thread_ready_sem;
++    bool            thread_success;
++
++    // Begin lazy ass chouquette test:
++    vlc_video_context* vctx_vout_start;
++    const vout_configuration_t *cfg_vout_start;
++    //end of lazy ass chouquette test. don't use this for anything else than vout_start
+ 
+     struct {
+         vlc_tick_t  date;
+@@ -1705,6 +1712,8 @@ error:
+     return VLC_EGENERIC;
+ }
+ 
++
++static void vout_DisableWindow(vout_thread_sys_t *sys);
+ /*****************************************************************************
+  * Thread: video output thread
+  *****************************************************************************
+@@ -1717,6 +1726,17 @@ static void *Thread(void *object)
+     vout_thread_sys_t *vout = object;
+     vout_thread_sys_t *sys = vout;
+ 
++    if (vout_Start(vout, sys->vctx_vout_start, sys->cfg_vout_start))
++    {
++        sys->thread_success = false;
++        msg_Err(&vout->obj, "video output display creation failed");
++        vout_DisableWindow(vout);
++        vlc_sem_post(&sys->thread_ready_sem);
++        return NULL;
++    }
++    sys->thread_success = true;
++    vlc_sem_post(&sys->thread_ready_sem);
++
+     vlc_tick_t deadline = VLC_TICK_INVALID;
+ 
+     for (;;) {
+@@ -2108,19 +2128,18 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
+     sys->rate = 1.f;
+     sys->clock = cfg->clock;
+     sys->delay = 0;
++    vlc_sem_init(&sys->thread_ready_sem, 0);
++
++    sys->cfg_vout_start = cfg;
++    sys->vctx_vout_start = vctx;
+ 
+-    if (vout_Start(vout, vctx, cfg))
+-    {
+-        msg_Err(cfg->vout, "video output display creation failed");
+-        vout_DisableWindow(vout);
+-        return -1;
+-    }
+     atomic_store(&sys->control_is_terminated, false);
+     if (vlc_clone(&sys->thread, Thread, vout, VLC_THREAD_PRIORITY_OUTPUT)) {
+         vout_ReleaseDisplay(vout);
+         vout_DisableWindow(vout);
+         return -1;
+     }
++    vlc_sem_wait(&sys->thread_ready_sem);
+ 
+     if (input != NULL && sys->spu)
+         spu_Attach(sys->spu, input);
+-- 
+2.35.1
+
