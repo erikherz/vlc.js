@@ -6,7 +6,6 @@
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
-#include <emscripten/wasmfs.h>
 
 libvlc_media_player_t *mp;
 libvlc_instance_t *libvlc;
