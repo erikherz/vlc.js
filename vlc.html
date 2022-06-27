@@ -126,8 +126,10 @@
       let inputElement = document.getElementById("fpicker_btn");
       function handleFiles() {
 	  // iterator in case the user selected multiple files.
-	  for (i in this.files) {
-	      Module['vlc_access_file'].push(this.files[i]);	
+	  for (var i=0; i < this.files.length; i++) {
+	      var name = this.files.item(i).name;
+	      console.log("opened file: ", name);
+	      Module['vlc_access_file'].push(this.files.item(i));
 	  }
       }
       inputElement.addEventListener("change", handleFiles, false);  
