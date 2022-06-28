@@ -1,9 +1,8 @@
-From 5516b764daa2aa7636095c5226999cbbe066c8ae Mon Sep 17 00:00:00 2001
+From 88e59dbaa68156d0a00c88217a9e1a4c6502b731 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Tue, 27 Apr 2021 15:34:23 +0200
-Subject: [PATCH 1/2] webcodec: work in progress
+Subject: [PATCH 1/1] wip: vlc.js patchset
 
-(squashed)
 ---
  configure.ac                                  |  10 +-
  contrib/src/aribb24/rules.mak                 |   4 +
@@ -11,7 +10,6 @@ Subject: [PATCH 1/2] webcodec: work in progress
  ...nitial-support-for-wasm32-emscripten.patch | 105 ++++
  contrib/src/fontconfig/rules.mak              |   4 +
  contrib/src/gcrypt/rules.mak                  |   6 +
- contrib/src/gme/rules.mak                     |   2 +-
  contrib/src/gmp/rules.mak                     |   3 +
  contrib/src/gnutls/rules.mak                  |   4 +
  contrib/src/gpg-error/emscripten.patch        |  43 ++
@@ -24,7 +22,7 @@ Subject: [PATCH 1/2] webcodec: work in progress
  include/vlc_opengl_filter.h                   | 157 ++++++
  include/vlc_picture.h                         |   1 +
  include/vlc_vout_display.h                    |   2 +
- include/vlc_vout_window.h                     |   3 +
+ include/vlc_window.h                          |   3 +
  modules/Makefile.am                           |   1 +
  modules/audio_output/Makefile.am              |   5 +
  modules/audio_output/emscripten.cpp           | 421 ++++++++++++++
@@ -34,7 +32,7 @@ Subject: [PATCH 1/2] webcodec: work in progress
  modules/hw/emscripten/Makefile.am             |  10 +
  modules/hw/emscripten/converter.cpp           | 137 +++++
  modules/video_output/Makefile.am              |  14 +
- modules/video_output/emscripten.cpp           | 253 +++++++++
+ modules/video_output/emscripten.cpp           | 257 +++++++++
  modules/video_output/emscripten/common.cpp    |  82 +++
  modules/video_output/emscripten/common.h      |  57 ++
  modules/video_output/opengl/Makefile.am       |   6 +
@@ -51,7 +49,7 @@ Subject: [PATCH 1/2] webcodec: work in progress
  src/misc/fourcc.c                             |   2 +
  src/video_output/display.c                    |   2 +-
  src/video_output/video_output.c               |  31 +-
- 46 files changed, 2231 insertions(+), 156 deletions(-)
+ 45 files changed, 2234 insertions(+), 155 deletions(-)
  create mode 100644 contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
  create mode 100644 contrib/src/gpg-error/emscripten.patch
  create mode 100644 include/vlc_opengl_filter.h
@@ -65,10 +63,10 @@ Subject: [PATCH 1/2] webcodec: work in progress
  create mode 100644 modules/video_output/opengl/interop_emscripten.cpp
 
 diff --git a/configure.ac b/configure.ac
-index a5771e36f4..5bde060fb7 100644
+index d0e5f8e216..9ef4138d9f 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -3140,13 +3140,17 @@ have_gl="no"
+@@ -3122,13 +3122,17 @@ have_gl="no"
  PKG_CHECK_MODULES([GL], [gl], [
    have_gl="yes"
  ], [
@@ -105,7 +103,7 @@ index 0c0ba9ff91..ba8a70b6d5 100644
  	$(REQUIRE_GPL)
  	$(REQUIRE_GNUV3)
 diff --git a/contrib/src/ass/rules.mak b/contrib/src/ass/rules.mak
-index 05c7679896..be465bf409 100644
+index d5fd21ff29..f70216f028 100644
 --- a/contrib/src/ass/rules.mak
 +++ b/contrib/src/ass/rules.mak
 @@ -25,6 +25,11 @@ WITH_DWRITE = 1
@@ -232,7 +230,7 @@ index 0000000000..b1308fb19e
 +2.32.0
 +
 diff --git a/contrib/src/fontconfig/rules.mak b/contrib/src/fontconfig/rules.mak
-index ae4b218fd2..5b4b15ca34 100644
+index 7f60dcad6c..8a72d05288 100644
 --- a/contrib/src/fontconfig/rules.mak
 +++ b/contrib/src/fontconfig/rules.mak
 @@ -23,6 +23,10 @@ ifdef HAVE_WIN32
@@ -263,20 +261,8 @@ index c9c9be3efa..0275e21fe8 100644
  
  .gcrypt: gcrypt
  	# Reconfiguring this requires a git repo to be available, to
-diff --git a/contrib/src/gme/rules.mak b/contrib/src/gme/rules.mak
-index b0acdb8ca4..411b83fb24 100644
---- a/contrib/src/gme/rules.mak
-+++ b/contrib/src/gme/rules.mak
-@@ -16,6 +16,6 @@ game-music-emu: game-music-emu-$(GME_VERSION).tar.xz .sum-gme
- 	$(MOVE)
- 
- .gme: game-music-emu toolchain.cmake
--	cd $< && $(HOSTVARS_PIC) $(CMAKE) .
-+	cd $< && $(HOSTVARS_PIC) $(CMAKE) . -DENABLE_UBSAN=OFF
- 	+$(CMAKEBUILD) $< --target install
- 	touch $@
 diff --git a/contrib/src/gmp/rules.mak b/contrib/src/gmp/rules.mak
-index 11fe8acdfa..d6cd702ce0 100644
+index 09604e2a89..42bb60f3fe 100644
 --- a/contrib/src/gmp/rules.mak
 +++ b/contrib/src/gmp/rules.mak
 @@ -13,6 +13,9 @@ ifeq ($(ARCH),mips64el)
@@ -381,7 +367,7 @@ index 7a8db11d5a..f1c93b835b 100644
  	$(call download_pkg,$(PNG_URL),png)
  
 diff --git a/contrib/src/zlib/rules.mak b/contrib/src/zlib/rules.mak
-index 4f7fc7397a..166d6b528a 100644
+index 17688df984..e3ae815dfc 100644
 --- a/contrib/src/zlib/rules.mak
 +++ b/contrib/src/zlib/rules.mak
 @@ -7,6 +7,10 @@ ifeq ($(call need_pkg,"zlib"),)
@@ -412,7 +398,7 @@ index 69d6b98c47..acd74591fc 100755
  fi
  
 diff --git a/include/vlc_codec.h b/include/vlc_codec.h
-index ff707e73a3..7460d03ed6 100644
+index f68da3bde4..baa6977bbd 100644
 --- a/include/vlc_codec.h
 +++ b/include/vlc_codec.h
 @@ -583,6 +583,7 @@ enum vlc_decoder_device_type
@@ -424,10 +410,10 @@ index ff707e73a3..7460d03ed6 100644
  
  struct vlc_decoder_device_operations
 diff --git a/include/vlc_fourcc.h b/include/vlc_fourcc.h
-index 176028e351..4c7f35d4ff 100644
+index 6ed227d2c6..10f82ff535 100644
 --- a/include/vlc_fourcc.h
 +++ b/include/vlc_fourcc.h
-@@ -440,6 +440,9 @@
+@@ -439,6 +439,9 @@
  #define VLC_CODEC_CVPX_BGRA       VLC_FOURCC('C','V','P','B')
  #define VLC_CODEC_CVPX_P010       VLC_FOURCC('C','V','P','P')
  
@@ -601,7 +587,7 @@ index 0000000000..3a1f18197d
 +
 +#endif
 diff --git a/include/vlc_picture.h b/include/vlc_picture.h
-index 5aece95120..fa62e307bd 100644
+index c37abed150..fc3b757d14 100644
 --- a/include/vlc_picture.h
 +++ b/include/vlc_picture.h
 @@ -98,6 +98,7 @@ enum vlc_video_context_type
@@ -613,10 +599,10 @@ index 5aece95120..fa62e307bd 100644
  
  VLC_API vlc_video_context * vlc_video_context_Create(vlc_decoder_device *,
 diff --git a/include/vlc_vout_display.h b/include/vlc_vout_display.h
-index 6b11c4066c..64dd64581b 100644
+index 4220793ae0..1b2f79b3b4 100644
 --- a/include/vlc_vout_display.h
 +++ b/include/vlc_vout_display.h
-@@ -375,6 +375,8 @@ vout_display_t *vout_display_New(vlc_object_t *,
+@@ -383,6 +383,8 @@ vout_display_t *vout_display_New(vlc_object_t *,
      const video_format_t *, vlc_video_context *,
      const vout_display_cfg_t *, const char *module,
      const vout_display_owner_t *);
@@ -625,19 +611,19 @@ index 6b11c4066c..64dd64581b 100644
  
  /**
   * Destroys a video output display.
-diff --git a/include/vlc_vout_window.h b/include/vlc_vout_window.h
-index a3dfd1bfca..0803e65b78 100644
---- a/include/vlc_vout_window.h
-+++ b/include/vlc_vout_window.h
-@@ -65,6 +65,7 @@ enum vout_window_type {
-     VOUT_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
-     VOUT_WINDOW_TYPE_DCOMP /**< Win32 DirectComposition */,
-     VOUT_WINDOW_TYPE_KMS /**< DRM KMS CRTC */,
-+    VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL /**< Emscripten surface */,
+diff --git a/include/vlc_window.h b/include/vlc_window.h
+index 9c8596ddaf..2124cdd028 100644
+--- a/include/vlc_window.h
++++ b/include/vlc_window.h
+@@ -65,6 +65,7 @@ enum vlc_window_type {
+     VLC_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
+     VLC_WINDOW_TYPE_DCOMP /**< Win32 DirectComposition */,
+     VLC_WINDOW_TYPE_KMS /**< DRM KMS CRTC */,
++    VLC_WINDOW_TYPE_EMSCRIPTEN_WEBGL /**< Emscripten surface */,
  };
  
  /**
-@@ -385,6 +386,8 @@ typedef struct vout_window_t {
+@@ -385,6 +386,8 @@ typedef struct vlc_window {
          struct wl_surface *wl;   /**< Wayland surface (client pointer) */
          void     *dcomp_visual;  /**<  Win32 direct composition visual */
          uint32_t crtc;           /**< KMS CRTC identifier */
@@ -659,10 +645,10 @@ index 333acb0586..0c931d51ca 100644
  include isa/arm/Makefile.am
  include isa/riscv/Makefile.am
 diff --git a/modules/audio_output/Makefile.am b/modules/audio_output/Makefile.am
-index 24c05429d0..dc91f3cd7e 100644
+index 38e47bc838..290b724983 100644
 --- a/modules/audio_output/Makefile.am
 +++ b/modules/audio_output/Makefile.am
-@@ -117,3 +117,8 @@ endif
+@@ -116,3 +116,8 @@ endif
  if HAVE_TVOS
  aout_LTLIBRARIES += libaudiounit_ios_plugin.la
  endif
@@ -1099,7 +1085,7 @@ index 0000000000..a7e9fb0d4d
 +	set_callbacks( Open, Close )
 +vlc_module_end ()
 diff --git a/modules/codec/Makefile.am b/modules/codec/Makefile.am
-index 6bdc40b491..59079ebce6 100644
+index 20a9606fd8..13ec8fa952 100644
 --- a/modules/codec/Makefile.am
 +++ b/modules/codec/Makefile.am
 @@ -644,3 +644,9 @@ noinst_LTLIBRARIES += libhxxxhelper_testdec_plugin.la
@@ -1114,7 +1100,7 @@ index 6bdc40b491..59079ebce6 100644
 +endif
 diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
 new file mode 100644
-index 0000000000..07b3690dab
+index 0000000000..4d1fa5d932
 --- /dev/null
 +++ b/modules/codec/webcodec.cpp
 @@ -0,0 +1,518 @@
@@ -1585,7 +1571,7 @@ index 0000000000..07b3690dab
 +    if ( webcodec_CreatePool(sys->vctx, &dec->fmt_out.video) != VLC_SUCCESS )
 +        return VLC_EGENERIC;
 +
-+    if ( vlc_clone( &sys->th, &WebcodecDecodeWorker, dec, 0 ) != VLC_SUCCESS )
++    if ( vlc_clone( &sys->th, &WebcodecDecodeWorker, dec ) != VLC_SUCCESS )
 +    {
 +        msg_Err( obj, "Failed to create webcodec thread" );
 +        return VLC_EGENERIC;
@@ -1613,7 +1599,7 @@ index 0000000000..07b3690dab
 +}
 +
 +static int
-+OpenDecDevice(vlc_decoder_device *device, vout_window_t *)
++OpenDecDevice(vlc_decoder_device *device, vlc_window_t *)
 +{
 +    static const struct vlc_decoder_device_operations ops =
 +    {
@@ -1637,7 +1623,7 @@ index 0000000000..07b3690dab
 +        set_callback_dec_device(OpenDecDevice, 1)
 +vlc_module_end ()
 diff --git a/modules/demux/Makefile.am b/modules/demux/Makefile.am
-index 86dfd8abee..3e64246e4d 100644
+index 802ce9038b..171a9ce8e3 100644
 --- a/modules/demux/Makefile.am
 +++ b/modules/demux/Makefile.am
 @@ -543,4 +543,6 @@ libvlc_json_la_SOURCES = \
@@ -1807,10 +1793,10 @@ index 0000000000..edc8d93bc0
 +    set_callback_video_converter(vlc_webcodec_OpenChroma, 10)
 +vlc_module_end()
 diff --git a/modules/video_output/Makefile.am b/modules/video_output/Makefile.am
-index d4ada0394b..ea3a0c6da9 100644
+index 381c9cd0eb..a3104c5e63 100644
 --- a/modules/video_output/Makefile.am
 +++ b/modules/video_output/Makefile.am
-@@ -305,6 +305,13 @@ vout_LTLIBRARIES += libegl_android_plugin.la libglinterop_android_plugin.la
+@@ -303,6 +303,13 @@ vout_LTLIBRARIES += libegl_android_plugin.la libglinterop_android_plugin.la
  endif
  endif
  
@@ -1822,9 +1808,9 @@ index d4ada0394b..ea3a0c6da9 100644
 +vout_LTLIBRARIES += libglinterop_emscripten_plugin.la
 +endif
  
- ### FrameBuffer ###
+ ### Direct Rendering Manager (DRM) ###
  
-@@ -345,6 +352,13 @@ libcaca_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
+@@ -339,6 +346,13 @@ libcaca_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
  EXTRA_LTLIBRARIES += libcaca_plugin.la
  vout_LTLIBRARIES += $(LTLIBcaca)
  
@@ -1840,10 +1826,10 @@ index d4ada0394b..ea3a0c6da9 100644
  libflaschen_plugin_la_SOURCES = video_output/flaschen.c
 diff --git a/modules/video_output/emscripten.cpp b/modules/video_output/emscripten.cpp
 new file mode 100644
-index 0000000000..9fd34350b5
+index 0000000000..e054826263
 --- /dev/null
 +++ b/modules/video_output/emscripten.cpp
-@@ -0,0 +1,253 @@
+@@ -0,0 +1,257 @@
 +/**
 + * @file emscripten.c
 + * @brief Emscripten webgl video output for VLC media player
@@ -1877,7 +1863,7 @@ index 0000000000..9fd34350b5
 +
 +#include <vlc_common.h>
 +#include <vlc_plugin.h>
-+#include <vlc_vout_window.h>
++#include <vlc_window.h>
 +#include <vlc_vout_display.h>
 +#include <vlc_opengl.h>
 +
@@ -1893,9 +1879,9 @@ index 0000000000..9fd34350b5
 +// eglGetProcAddress
 +#include <EGL/egl.h>
 +
-+static const struct vout_window_operations ops = {
++static const struct vlc_window_operations ops = {
 +    //TODO: Implement canvas operations
-+    //vout_window_ReportSize() should be called from here
++    //vlc_window_ReportSize() should be called from here
 +};
 +
 +//MAIN_THREAD_
@@ -1911,9 +1897,9 @@ index 0000000000..9fd34350b5
 +    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
 +} emscripten_gl_sys_t;
 +
-+static int OpenWindow(vout_window_t *wnd)
++static int OpenWindow(vlc_window_t *wnd)
 +{
-+    wnd->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
++    wnd->type = VLC_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
 +    wnd->ops = &ops;
 +    wnd->handle.canvas = "canvas";
 +
@@ -1922,8 +1908,8 @@ index 0000000000..9fd34350b5
 +    //if (vec_size.size() != 2)
 +    //    return VLC_EGENERIC;
 +
-+    //vout_window_ReportSize(wnd, vec_size[0], vec_size[1]);
-+    vout_window_ReportSize(wnd, 1280, 720);
++    //vlc_window_ReportSize(wnd, vec_size[0], vec_size[1]);
++    vlc_window_ReportSize(wnd, 1280, 720);
 +    return VLC_SUCCESS;
 +}
 +
@@ -2010,9 +1996,9 @@ index 0000000000..9fd34350b5
 +{
 +    VLC_UNUSED(width), VLC_UNUSED(height);
 +
-+    vout_window_t *wnd = gl->surface;
++    vlc_window_t *wnd = gl->surface;
 +
-+    if (wnd->type != VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
++    if (wnd->type != VLC_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
 +        goto error;
 +
 +    emscripten_gl_sys_t *sys;
@@ -2064,13 +2050,17 @@ index 0000000000..9fd34350b5
 +    emscripten_webgl_make_context_current(0);
 +    wnd->handle.em_context = sys->context;
 +
-+    // Implement egl routines:
-+    gl->make_current = MakeCurrent;
-+    gl->release_current = ReleaseCurrent;
-+    gl->resize = Resize;
-+    gl->swap = Swap;
-+    gl->get_proc_address = GetProcAddress;
-+    gl->destroy = Close;
++    static const struct vlc_gl_operations gl_ops =
++    {
++        .make_current = MakeCurrent,
++        .release_current = ReleaseCurrent,
++        .resize = Resize,
++        .swap = Swap,
++        .get_proc_address = GetProcAddress,
++        .close = Close,
++    };
++    gl->ops = &gl_ops;
++    
 +    return VLC_SUCCESS;
 +
 +error:
@@ -2249,10 +2239,10 @@ index 0000000000..08967d0703
 +
 +#endif // EMSCRIPTEN_COMMON_H
 diff --git a/modules/video_output/opengl/Makefile.am b/modules/video_output/opengl/Makefile.am
-index bc4079fefc..bdb5a1b3eb 100644
+index f95a1effaf..e2587f3706 100644
 --- a/modules/video_output/opengl/Makefile.am
 +++ b/modules/video_output/opengl/Makefile.am
-@@ -108,6 +108,12 @@ libglfilter_mock_plugin_la_LIBADD += libvlc_opengl.la $(GL_LIBS)
+@@ -112,6 +112,12 @@ libglfilter_mock_plugin_la_LIBADD += libvlc_opengl.la $(GL_LIBS)
  noinst_LTLIBRARIES += libglfilter_mock_plugin.la
  endif
  
@@ -2900,10 +2890,10 @@ index c779f2a9ba..2a5f0ef063 100644
 +
  #endif
 diff --git a/src/misc/fourcc.c b/src/misc/fourcc.c
-index 101bb0d980..479a1bd13e 100644
+index a0cf8cc3a8..212d07360f 100644
 --- a/src/misc/fourcc.c
 +++ b/src/misc/fourcc.c
-@@ -840,6 +840,8 @@ static const struct
+@@ -838,6 +838,8 @@ static const struct
      { { VLC_CODEC_VAAPI_420, VLC_CODEC_VAAPI_420_10BPP },
                                                 FAKE_FMT() },
  
@@ -2913,10 +2903,10 @@ index 101bb0d980..479a1bd13e 100644
  };
  
 diff --git a/src/video_output/display.c b/src/video_output/display.c
-index 9f07f04e3a..b00f0d1877 100644
+index aae3a26976..43a77c2387 100644
 --- a/src/video_output/display.c
 +++ b/src/video_output/display.c
-@@ -615,7 +615,7 @@ void vout_SetDisplayViewpoint(vout_display_t *vd,
+@@ -629,7 +629,7 @@ void vout_SetDisplayViewpoint(vout_display_t *vd,
      }
  }
  
@@ -2926,10 +2916,10 @@ index 9f07f04e3a..b00f0d1877 100644
                                   vlc_video_context *vctx,
                                   const vout_display_cfg_t *cfg,
 diff --git a/src/video_output/video_output.c b/src/video_output/video_output.c
-index 7b03fca641..8b8ce5f323 100644
+index 2a18e01ba7..3b35b2bf69 100644
 --- a/src/video_output/video_output.c
 +++ b/src/video_output/video_output.c
-@@ -100,6 +100,13 @@ typedef struct vout_thread_sys_t
+@@ -102,6 +102,13 @@ typedef struct vout_thread_sys_t
      vout_control_t  control;
      atomic_bool     control_is_terminated; // shutdown the vout thread
      vlc_thread_t    thread;
@@ -2943,7 +2933,7 @@ index 7b03fca641..8b8ce5f323 100644
  
      struct {
          vlc_tick_t  date;
-@@ -1705,6 +1712,8 @@ error:
+@@ -1725,6 +1732,8 @@ error:
      return VLC_EGENERIC;
  }
  
@@ -2952,9 +2942,9 @@ index 7b03fca641..8b8ce5f323 100644
  /*****************************************************************************
   * Thread: video output thread
   *****************************************************************************
-@@ -1717,6 +1726,17 @@ static void *Thread(void *object)
-     vout_thread_sys_t *vout = object;
-     vout_thread_sys_t *sys = vout;
+@@ -1739,6 +1748,17 @@ static void *Thread(void *object)
+ 
+     vlc_thread_set_name("vlc-vout");
  
 +    if (vout_Start(vout, sys->vctx_vout_start, sys->cfg_vout_start))
 +    {
@@ -2970,8 +2960,8 @@ index 7b03fca641..8b8ce5f323 100644
      vlc_tick_t deadline = VLC_TICK_INVALID;
  
      for (;;) {
-@@ -2108,19 +2128,18 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
-     sys->rate = 1.f;
+@@ -2129,19 +2149,18 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
+     sys->str_id = cfg->str_id;
      sys->clock = cfg->clock;
      sys->delay = 0;
 +    vlc_sem_init(&sys->thread_ready_sem, 0);
@@ -2986,7 +2976,7 @@ index 7b03fca641..8b8ce5f323 100644
 -        return -1;
 -    }
      atomic_store(&sys->control_is_terminated, false);
-     if (vlc_clone(&sys->thread, Thread, vout, VLC_THREAD_PRIORITY_OUTPUT)) {
+     if (vlc_clone(&sys->thread, Thread, vout)) {
          vout_ReleaseDisplay(vout);
          vout_DisableWindow(vout);
          return -1;

@@ -29,7 +29,7 @@ if [ ! -d emsdk ]; then
 fi
 
 cd $WORK_DIR
-TESTED_HASH="06e361b127e4609e429909756212ed5e30e7d032"
+TESTED_HASH="4448ddb3610e83bf62955918c894ffb055ee284d"
 # Go go go vlc
 if [ ! -d vlc ]; then
     diagnostic "VLC source not found, cloning"

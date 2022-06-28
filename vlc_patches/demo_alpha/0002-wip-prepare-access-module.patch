@@ -1,16 +1,16 @@
-From da3a371a0ac37e6089acadcc59fdb420af2b70c5 Mon Sep 17 00:00:00 2001
+From 635cea37412f500c29fad197fa5a1ba99b7b7e0a Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Thu, 9 Jun 2022 21:05:04 +0200
-Subject: [PATCH 2/2] wip: prepare access module
+Subject: [PATCH 1/2] wip: prepare access module
 
 ---
  modules/access/Makefile.am |   5 +
- modules/access/emfs.c      | 187 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 192 insertions(+)
- create mode 100644 modules/access/emfs.c
+ modules/access/emjsfile.c  | 202 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 207 insertions(+)
+ create mode 100644 modules/access/emjsfile.c
 
 diff --git a/modules/access/Makefile.am b/modules/access/Makefile.am
-index d4f6b5f10a..9790805be8 100644
+index d4f6b5f10a..cc827027df 100644
 --- a/modules/access/Makefile.am
 +++ b/modules/access/Makefile.am
 @@ -26,6 +26,11 @@ libfilesystem_plugin_la_LIBADD = -lshlwapi
@@ -18,21 +18,21 @@ index d4f6b5f10a..9790805be8 100644
  access_LTLIBRARIES += libfilesystem_plugin.la
  
 +if HAVE_EMSCRIPTEN
-+libemfs_plugin_la_SOURCES = access/emfs.c
-+access_LTLIBRARIES += libemfs_plugin.la
++libemjsfile_plugin_la_SOURCES = access/emjsfile.c
++access_LTLIBRARIES += libemjsfile_plugin.la
 +endif
 +
  libidummy_plugin_la_SOURCES = access/idummy.c
  access_LTLIBRARIES += libidummy_plugin.la
  
-diff --git a/modules/access/emfs.c b/modules/access/emfs.c
+diff --git a/modules/access/emjsfile.c b/modules/access/emjsfile.c
 new file mode 100644
-index 0000000000..cafd285813
+index 0000000000..f0736bc34c
 --- /dev/null
-+++ b/modules/access/emfs.c
-@@ -0,0 +1,187 @@
++++ b/modules/access/emjsfile.c
+@@ -0,0 +1,202 @@
 +/*****************************************************************************
-+ * emfs.c: emscripten file system access plugin
++ * emjsfile.c: emscripten js file access plugin
 + *****************************************************************************
 + * Copyright (C) 2022 VLC authors Videolabs, and VideoLAN
 + *
@@ -81,8 +81,11 @@ index 0000000000..cafd285813
 +        size = js_file_size - offset;
 +    }
 +    EM_ASM({
-+            var blob = Module.worker_js_file.slice($0, $0 + $2);
-+            HEAPU8.set(new Uint8Array(Module.reader.readAsArrayBuffer(blob)), $1);
++            const offset = $0;
++            const buffer = $1;
++            const size = $2;
++            var blob = Module.worker_js_file.slice(offset, offset + size);
++            HEAPU8.set(new Uint8Array(Module.reader.readAsArrayBuffer(blob)), buffer);
 +        }, offset, buffer, size);
 +    p_sys->offset += size;
 +    return size;
@@ -90,7 +93,12 @@ index 0000000000..cafd285813
 +
 +static int FileSeek (stream_t *p_access, uint64_t offset) {
 +    access_sys_t *p_sys = p_access->p_sys;
++    size_t js_file_size = p_sys->js_file_size;
 +
++    if (offset > js_file_size) {
++        msg_Err(p_access, "emjsfile: could not seek!");
++        return VLC_EGENERIC;
++    }
 +    p_sys->offset = offset;
 +    return VLC_SUCCESS;
 +}
@@ -111,12 +119,12 @@ index 0000000000..cafd285813
 +        case STREAM_CAN_PAUSE:
 +        case STREAM_CAN_CONTROL_PACE:
 +            pb_bool = va_arg( args, bool * );
-+            *pb_bool = 1; // TODO: Can you really?
++            *pb_bool = 1;
 +            break;
 +
 +        case STREAM_GET_SIZE:
 +        {            
-+            *va_arg( args, uint64_t * ) = EM_ASM_DOUBLE({ return Module.worker_js_file.size }); // TODO
++            *va_arg( args, uint64_t * ) = EM_ASM_DOUBLE({ return Module.worker_js_file.size });
 +            break;
 +        }
 +
@@ -127,7 +135,6 @@ index 0000000000..cafd285813
 +            break;
 +
 +        case STREAM_SET_PAUSE_STATE:
-+            /* Nothing to do */
 +            break;
 +
 +        default:
@@ -137,14 +144,14 @@ index 0000000000..cafd285813
 +    return VLC_SUCCESS;
 +}
 +
-+EM_ASYNC_JS(int, init_js_file, (), {        
++EM_ASYNC_JS(int, init_js_file, (), {
 +        let p = new Promise((resolve, reject) => {
 +                self.addEventListener('message', function(e) {
 +                        let msg = e['data'];
 +                        if (msg.type === 'FileResult') {
 +                            if (msg.file !== undefined) {
-+                                Module.worker_js_file = msg.file;                            
-+                                Module.reader = new FileReaderSync();                                
++                                Module.worker_js_file = msg.file;
++                                Module.reader = new FileReaderSync();
 +                                resolve();
 +                            }
 +                            else {
@@ -155,7 +162,7 @@ index 0000000000..cafd285813
 +            });
 +        self.postMessage({ cmd: "customCmd", type: "requestFile"});
 +        try {
-+            await p;            
++            await p;
 +        }
 +        catch (error) {
 +            console.error("vlc_access error in init_js_file(): ", error);
@@ -167,11 +174,16 @@ index 0000000000..cafd285813
 +int EmFileOpen( vlc_object_t *p_this ) {
 +    stream_t *p_access = (stream_t*)p_this;
 +    /*
-+      setup event handler for sending/receiving the file.
-+      This function will be proxied to the main_thread.
-+    */    
++      This block will run in the main thread, to access the DOM.
++      When the user selects a file, it is assigned to the Module.vlc_access_file
++      array.
++      
++      We listen to 'message' events so that when the file is requested by the
++      input thread, we can answer and send the File object from the main thread.
++    */
 +    MAIN_THREAD_EM_ASM({
-+            let w = Module.PThread.pthreads[$0].worker;
++            const thread_id = $0;
++            let w = Module.PThread.pthreads[thread_id].worker;
 +            w.addEventListener('message', function (e) {
 +                    var msg = e.data;
 +                    if (msg.type === "requestFile") {
@@ -183,7 +195,9 @@ index 0000000000..cafd285813
 +                });
 +        }, pthread_self());
 +
-+    // request the file, from the main thread. (this function will block)
++    /*
++      Request the file from the main thread.
++    */
 +    if (init_js_file()) {
 +        return VLC_EGENERIC;
 +    }
@@ -204,6 +218,7 @@ index 0000000000..cafd285813
 +}
 +
 +void EmFileClose (vlc_object_t * p_this) {
++    VLC_UNUSED(p_this);
 +    EM_ASM({
 +            Module.worker_js_file = undefined;
 +            Module.reader = undefined;            
@@ -215,7 +230,7 @@ index 0000000000..cafd285813
 +    set_shortname( N_("Emscripten Local File Input") )
 +    set_subcategory( SUBCAT_INPUT_ACCESS )
 +    set_capability( "access", 50 )
-+    add_shortcut( "emfs" )
++    add_shortcut( "emjsfile" )
 +    set_callbacks( EmFileOpen, EmFileClose )
 +vlc_module_end()
 -- 
