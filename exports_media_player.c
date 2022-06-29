@@ -20,6 +20,10 @@ libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new() {
   return libvlc_media_player_new(libvlc);
 }
 
+libvlc_media_list_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_list_player_new() {
+  return libvlc_media_list_player_new(libvlc);
+}
+
 libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new_from_media(libvlc_media_t* media) {
     return libvlc_media_player_new_from_media(libvlc, media);
 }
