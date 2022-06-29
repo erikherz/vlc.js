@@ -18,6 +18,7 @@ compile-job:
       - experimental*       # worker.js, wasm file and js file, data...
       - assets/             # Assets for logos etc...
       - vlc.html            # HTML page
+      - vlc_media_list_poc.html
       - lib/*               # libvlc.js, module-loader.js, overlay.js, wasm-imports.js
       - coi-serviceworker.js
       - ./vlc/modules/gui/qt/pixmaps/toolbar/volume-muted.png
