@@ -240,3 +240,24 @@ int EMSCRIPTEN_KEEPALIVE wasm_media_player_get_role(libvlc_media_player_t *media
 int EMSCRIPTEN_KEEPALIVE wasm_media_player_set_role(libvlc_media_player_t *media_player, unsigned role) {
   return libvlc_media_player_set_role(media_player, role);
 }
+
+int EMSCRIPTEN_KEEPALIVE wasm_libvlc_init(size_t size, char const *argv[]) {
+    /*
+    char const *vlc_argv[] = {
+        "-vvv",
+        "--no-spu",
+        "--no-osd",
+        "--aout=emworklet_audio",
+        "--codec=avcodec",
+        "-Idummy",
+        "--ignore-config",
+    };
+    */
+    libvlc = libvlc_new( size, argv );
+    if (libvlc == NULL)
+    {
+        fprintf( stderr, "unable to create libvlc instance" );
+        return -1;
+    }
+    return 0;
+}

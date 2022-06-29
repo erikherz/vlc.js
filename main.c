@@ -7,7 +7,7 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-libvlc_media_player_t *mp;
+libvlc_media_player_t *mp = NULL;
 libvlc_instance_t *libvlc;
 libvlc_time_t t = -1;
 
@@ -46,11 +46,13 @@ int main() {
      * If this thread stop, all proxyfied functions wont be called.
      */
     EM_ASM(Module['noExitRuntime']=true);
+    /*
     char const *vlc_argv[] = {
         "-vvv",
         "--no-spu",
         "--no-osd",
         "--aout=emworklet_audio",
+        "--codec=avcodec",
         "-Idummy",
         "--ignore-config",
     };
@@ -61,7 +63,7 @@ int main() {
         fprintf( stderr, "unable to create libvlc instance" );
         return -1;
     }
-
+    */
     emscripten_set_main_loop(iter, 1, 0);
     emscripten_exit_with_live_runtime();
     return 0;
