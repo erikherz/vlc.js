@@ -147,7 +147,7 @@
 	      mlp_ptr = Module._wasm_media_list_player_new();
 	  }
 	  if (ml_ptr === undefined) {
-	      console.abort("bad !");
+	      console.error("bad !");
 	      return ;
 	  }
 	  if (Module._libvlc_media_list_count(ml_ptr) === 0) {
