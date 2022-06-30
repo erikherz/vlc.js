@@ -83,6 +83,7 @@
     <button id="vlc_play">Play</button>
     <button id="vlc_next">Next</button>
     <button id="vlc_prev">Previous</button>
+    <button id="vlc_stop">Stop</button>
     <br></br>
     <div id="stack">
         <canvas
@@ -130,6 +131,7 @@
       let play_elem = document.getElementById("vlc_play");
       let next_elem = document.getElementById("vlc_next");
       let prev_elem = document.getElementById("vlc_prev");
+      let stop_elem = document.getElementById("vlc_stop");
       let options_input = document.getElementById("opts");
 
       var ml_ptr = undefined;
@@ -164,6 +166,10 @@
 	  else {
 	      Module._libvlc_media_list_player_play(mlp_ptr);
 	  }
+      });
+
+      stop_elem.addEventListener("click", function () {
+	  Module._libvlc_media_list_player_stop_async(mlp_ptr);
       });
 
       next_elem.addEventListener("click", function () {
