@@ -64,13 +64,7 @@ cd ./vlc/extras/package/wasm-emscripten/
 cd $WORK_DIR
 sed -e 's/^/_/' ./vlc/lib/libvlc.sym > libvlc_wasm.sym
 
-url="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
 
-diagnostic "getting video"
 cd $WORK_DIR
-mkdir -p samples/
-if [ ! -f "./samples/BigBuckBunny.mp4" ]; then
-    curl ${url} -o samples/BigBuckBunny.mp4
-fi
 diagnostic "Generating executable"
 ./create_main.sh
