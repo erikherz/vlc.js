@@ -1,0 +1,40 @@
+From 2e7a43f54ae86fcf9fd913d5ec4478a022285c4a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 09:51:05 +0100
+Subject: [PATCH 23/77] fourcc: Add an opaque webcodec fourcc
+
+---
+ include/vlc_fourcc.h | 3 +++
+ src/misc/fourcc.c    | 2 ++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/include/vlc_fourcc.h b/include/vlc_fourcc.h
+index 176028e351..4c7f35d4ff 100644
+--- a/include/vlc_fourcc.h
++++ b/include/vlc_fourcc.h
+@@ -440,6 +440,9 @@
+ #define VLC_CODEC_CVPX_BGRA       VLC_FOURCC('C','V','P','B')
+ #define VLC_CODEC_CVPX_P010       VLC_FOURCC('C','V','P','P')
+ 
++/* Webcodec opaque VideoFrame types */
++#define VLC_CODEC_WEBCODEC_OPAQUE VLC_FOURCC('W','C','O','P')
++
+ /* Image codec (video) */
+ #define VLC_CODEC_PNG             VLC_FOURCC('p','n','g',' ')
+ #define VLC_CODEC_PPM             VLC_FOURCC('p','p','m',' ')
+diff --git a/src/misc/fourcc.c b/src/misc/fourcc.c
+index 101bb0d980..479a1bd13e 100644
+--- a/src/misc/fourcc.c
++++ b/src/misc/fourcc.c
+@@ -840,6 +840,8 @@ static const struct
+     { { VLC_CODEC_VAAPI_420, VLC_CODEC_VAAPI_420_10BPP },
+                                                FAKE_FMT() },
+ 
++    { { VLC_CODEC_WEBCODEC_OPAQUE }, FAKE_FMT() },
++
+     { { 0 },                                   FAKE_FMT() }
+ };
+ 
+-- 
+2.35.1
+

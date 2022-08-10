@@ -1,0 +1,43 @@
+From cdd64a1c6c680245cd89a66c957347318be707ec Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Tue, 27 Apr 2021 15:34:23 +0200
+Subject: [PATCH 01/77] configure: improve testing unsupported GL functions for
+ emscripten
+
+The build system assumes OpenGL functions are implemented if the headers are defined.
+Which is wrong, so we need to disable the HAVE_GL marker, if linking fails.
+
+we use AM_LINK_IFELSE() because AC_COMPILE will add the "-c" option, and thus
+in wasm-emscripten this function will appear supported even if it is not.
+---
+ configure.ac | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index a5771e36f4..5bde060fb7 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3140,13 +3140,17 @@ have_gl="no"
+ PKG_CHECK_MODULES([GL], [gl], [
+   have_gl="yes"
+ ], [
+-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
++  AC_MSG_CHECKING([for OpenGL])
++  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+ #ifdef _WIN32
+ # include <GL/glew.h>
+ #endif
+ #include <GL/gl.h>
+-]], [
+-    [int t0 = GL_TEXTURE0;]])
++]], [[
++	int t0 = GL_TEXTURE0;
++	// glColorMaterial is unavailable in webgl, and emscripten
++	glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
++	]])
+   ], [
+     GL_CFLAGS=""
+     AS_IF([test "${SYS}" != "mingw32"], [
+-- 
+2.35.1
+

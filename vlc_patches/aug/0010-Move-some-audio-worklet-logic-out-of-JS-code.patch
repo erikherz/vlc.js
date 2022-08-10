@@ -1,0 +1,84 @@
+From 44959e310fbf34b740b25010387fd08914fb5f3d Mon Sep 17 00:00:00 2001
+From: Olivier FAURE <couteaubleu@gmail.com>
+Date: Sun, 30 May 2021 14:18:32 +0200
+Subject: [PATCH 10/77] Move some audio worklet logic out of JS code.
+
+This isn't terribly useful on its own, but serves to prepare the next
+commit.
+---
+ modules/audio_output/emscripten.cpp | 35 ++++++++++++++++++-----------
+ 1 file changed, 22 insertions(+), 13 deletions(-)
+
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+index 3fefa60065..625dda30c0 100644
+--- a/modules/audio_output/emscripten.cpp
++++ b/modules/audio_output/emscripten.cpp
+@@ -86,12 +86,23 @@ namespace {
+ 			val AudioNode = val::global("AudioWorkletNode").new_(context, std::string("worklet-processor"), awn_options);
+ 			AudioNode.set("channelCount", channels);
+ 
++      val Uint32Array = val::global("Uint32Array");
++      val Int32Array = val::global("Int32Array");
++      val Float32Array = val::global("Float32Array");
++
++      auto wasm_memory_buffer = val::module_property("wasmMemory")["buffer"];
++      uint32_t storage_capacity = sab_size / 4;
++
+ 			//Prepare postMessage message
+ 			val msg = val::object();
+ 			msg.set("type", std::string("recv-audio-queue"));
+-			msg.set("data", val::module_property("wasmMemory")["buffer"]);
+-			msg.set("sab_ptr", sab_ptr);
+-			msg.set("sab_size", sab_size);
++
++			msg.set("flag", Uint32Array.new_(wasm_memory_buffer, sab_ptr + 0, 1));
++			msg.set("head", Uint32Array.new_(wasm_memory_buffer, sab_ptr + 4, 1));
++			msg.set("tail", Uint32Array.new_(wasm_memory_buffer, sab_ptr + 8, 1));
++			msg.set("can_write", Int32Array.new_(wasm_memory_buffer, sab_ptr + 12, 1));
++			msg.set("volume", Int32Array.new_(wasm_memory_buffer, sab_ptr + 16, 1));
++			msg.set("storage", Float32Array.new_(wasm_memory_buffer, sab_ptr + 20, storage_capacity));
+ 
+ 			AudioNode["port"].call<val>("postMessage", msg);
+ 			AudioNode.call<val>("connect", context["destination"]);
+@@ -122,7 +133,7 @@ namespace {
+ 	} aout_sys_t;
+ 
+ 	EM_BOOL requestAnimationFrame_cb( double time, void *userData ) {
+-		(double) time;
++		(void) time;
+ 		AWNodeWrapper *inst = reinterpret_cast<AWNodeWrapper *>(userData);
+ 		uint32_t *sab = reinterpret_cast<uint32_t *>(inst->getSabPtr());
+ 		val view = val(typed_memory_view(inst->getSabSize(), sab));
+@@ -332,14 +343,12 @@ namespace {
+ 		super(); \
+ 		this.port.onmessage = e => { \
+ 			if (e.data.type === 'recv-audio-queue') { \
+-				this.buf = e.data.data; \
+-				this.capacity = e.data.sab_size / 4; \
+-				this.flag = new Uint32Array(this.buf, e.data.sab_ptr, 1); \
+-				this.head = new Uint32Array(this.buf, e.data.sab_ptr + 4, 1); \
+-				this.tail = new Uint32Array(this.buf, e.data.sab_ptr + 8, 1); \
+-				this.can_write = new Int32Array(this.buf, e.data.sab_ptr + 12, 1); \
+-				this.volume = new Int32Array(this.buf, e.data.sab_ptr + 16, 1); \
+-				this.storage = new Float32Array(this.buf, e.data.sab_ptr + 20, this.capacity); \
++				this.flag = e.data.flag; \
++				this.head = e.data.head; \
++				this.tail = e.data.tail; \
++				this.can_write = e.data.can_write; \
++				this.volume = e.data.volume; \
++				this.storage = e.data.storage; \
+ 			} else { \
+ 				throw 'unexpected.'; \
+ 			} \
+@@ -361,7 +370,7 @@ namespace {
+ 			for (let c = 0; c < nbChannels; ++c) { \
+ 				output[c][i] = this.storage[tail] * volume; \
+ 				tail++; \
+-				if (tail == this.capacity) { \
++				if (tail == this.storage.length) { \
+ 					tail = 0; \
+ 				} \
+ 			} \
+-- 
+2.35.1
+

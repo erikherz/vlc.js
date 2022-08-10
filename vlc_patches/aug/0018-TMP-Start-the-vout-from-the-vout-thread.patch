@@ -1,0 +1,82 @@
+From 5f9b0db3e274cbc2cd83414d3245bed255aa4b81 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Fri, 21 Jan 2022 09:59:35 +0100
+Subject: [PATCH 18/77] TMP: Start the vout from the vout thread
+
+---
+ src/video_output/video_output.c | 31 +++++++++++++++++++++++++------
+ 1 file changed, 25 insertions(+), 6 deletions(-)
+
+diff --git a/src/video_output/video_output.c b/src/video_output/video_output.c
+index 7b03fca641..8b8ce5f323 100644
+--- a/src/video_output/video_output.c
++++ b/src/video_output/video_output.c
+@@ -100,6 +100,13 @@ typedef struct vout_thread_sys_t
+     vout_control_t  control;
+     atomic_bool     control_is_terminated; // shutdown the vout thread
+     vlc_thread_t    thread;
++    vlc_sem_t       thread_ready_sem;
++    bool            thread_success;
++
++    // Begin lazy ass chouquette test:
++    vlc_video_context* vctx_vout_start;
++    const vout_configuration_t *cfg_vout_start;
++    //end of lazy ass chouquette test. don't use this for anything else than vout_start
+ 
+     struct {
+         vlc_tick_t  date;
+@@ -1705,6 +1712,8 @@ error:
+     return VLC_EGENERIC;
+ }
+ 
++
++static void vout_DisableWindow(vout_thread_sys_t *sys);
+ /*****************************************************************************
+  * Thread: video output thread
+  *****************************************************************************
+@@ -1717,6 +1726,17 @@ static void *Thread(void *object)
+     vout_thread_sys_t *vout = object;
+     vout_thread_sys_t *sys = vout;
+ 
++    if (vout_Start(vout, sys->vctx_vout_start, sys->cfg_vout_start))
++    {
++        sys->thread_success = false;
++        msg_Err(&vout->obj, "video output display creation failed");
++        vout_DisableWindow(vout);
++        vlc_sem_post(&sys->thread_ready_sem);
++        return NULL;
++    }
++    sys->thread_success = true;
++    vlc_sem_post(&sys->thread_ready_sem);
++
+     vlc_tick_t deadline = VLC_TICK_INVALID;
+ 
+     for (;;) {
+@@ -2108,19 +2128,18 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
+     sys->rate = 1.f;
+     sys->clock = cfg->clock;
+     sys->delay = 0;
++    vlc_sem_init(&sys->thread_ready_sem, 0);
++
++    sys->cfg_vout_start = cfg;
++    sys->vctx_vout_start = vctx;
+ 
+-    if (vout_Start(vout, vctx, cfg))
+-    {
+-        msg_Err(cfg->vout, "video output display creation failed");
+-        vout_DisableWindow(vout);
+-        return -1;
+-    }
+     atomic_store(&sys->control_is_terminated, false);
+     if (vlc_clone(&sys->thread, Thread, vout, VLC_THREAD_PRIORITY_OUTPUT)) {
+         vout_ReleaseDisplay(vout);
+         vout_DisableWindow(vout);
+         return -1;
+     }
++    vlc_sem_wait(&sys->thread_ready_sem);
+ 
+     if (input != NULL && sys->spu)
+         spu_Attach(sys->spu, input);
+-- 
+2.35.1
+

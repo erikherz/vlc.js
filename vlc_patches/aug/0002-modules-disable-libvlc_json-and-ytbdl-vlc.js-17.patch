@@ -1,0 +1,25 @@
+From bcc3fabcc3dadb03cd0768daa137d019fc45d4c5 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Fri, 16 Apr 2021 11:32:33 +0200
+Subject: [PATCH 02/77] modules: disable libvlc_json and ytbdl vlc.js#17
+
+The libjson library is not linkable with emsdk v2.0.17,
+this commit should be reverted when the ticket is resolved.
+---
+ modules/demux/Makefile.am | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/modules/demux/Makefile.am b/modules/demux/Makefile.am
+index 86dfd8abee..3e64246e4d 100644
+--- a/modules/demux/Makefile.am
++++ b/modules/demux/Makefile.am
+@@ -543,4 +543,6 @@ libvlc_json_la_SOURCES = \
+ libvlc_json_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/demux/json
+ libvlc_json_la_LIBADD = $(LTLIBVLCCORE) ../compat/libcompat.la $(LIBM)
+ libvlc_json_la_LDFLAGS = -static
++if !HAVE_EMSCRIPTEN
+ noinst_LTLIBRARIES += libvlc_json.la
++endif
+-- 
+2.35.1
+

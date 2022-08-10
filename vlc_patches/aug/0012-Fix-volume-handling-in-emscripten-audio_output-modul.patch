@@ -1,0 +1,124 @@
+From 57c7d65d059510b0a39567a0d69351780d8b44c0 Mon Sep 17 00:00:00 2001
+From: Olivier FAURE <couteaubleu@gmail.com>
+Date: Sun, 30 May 2021 17:18:23 +0200
+Subject: [PATCH 12/77] Fix volume handling in emscripten audio_output module
+
+Fix bug that had volume divided by 4
+Store mute state separately
+---
+ modules/audio_output/emscripten.cpp | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
+
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+index fa0f5bd3e4..c39ca884b6 100644
+--- a/modules/audio_output/emscripten.cpp
++++ b/modules/audio_output/emscripten.cpp
+@@ -55,6 +55,7 @@ namespace {
+     std::atomic<uint32_t> tail;
+     std::atomic<uint32_t> can_write;
+     std::atomic<uint32_t> volume;
++    std::atomic<uint32_t> is_muted;
+     int8_t storage[STORAGE_SIZE];
+ 
+ 	} sound_buffer_t;
+@@ -116,6 +117,8 @@ namespace {
+         Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, can_write), 1));
+       msg.set("volume",
+         Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, volume), 1));
++      msg.set("is_muted",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, is_muted), 1));
+ 
+       uint32_t storage_capacity = STORAGE_SIZE / 4;
+       msg.set("storage",
+@@ -143,7 +146,6 @@ namespace {
+ 	{
+ 		sound_buffer_t *sab; // TODO - rename to sound_buff
+ 		AWNodeWrapper *awn_inst;
+-		float volume;
+ 
+ 	} aout_sys_t;
+ 
+@@ -190,7 +192,6 @@ namespace {
+ 		fmt->i_rate = AUDIO_WORKLET_SAMPLE_RATE;
+ 
+ 		// resume audio context (first start, it is paused when initialized)
+-		sys->sab->volume.store((int)(sys->volume * 100));
+ 		sys->sab->is_paused.store(1);
+ 
+ 		return VLC_SUCCESS;
+@@ -240,12 +241,10 @@ namespace {
+ 		{
+ 			// the worklet processor keeps rendering  until tail matches head
+ 			// it will be notified by an Atomics.notify() from the process() callback
++      // FIXME - This is layout-dependent, which isn't ideal
+ 			js_index_wait(sys->sab, 3);
+ 		}
+ 
+-		// set volume
+-		sys->sab->volume.store((int)(sys->volume * 100));
+-
+ 		audio_worklet_push(aout, data, data_size);
+ 		block_Release(block);
+ 	}
+@@ -288,7 +287,9 @@ namespace {
+ 		else if (volume < 0.0f)
+ 			volume = 0.0f;
+ 		// TODO: implement gain
+-		sys->volume = volume;
++		// Note: We store volume as an integer between 0..100 because
++		// for some reason Float32Array doesn't allow atomic operations
++		sys->sab->volume.store((int)(volume * 100));
+ 		aout_VolumeReport(aout, volume);
+ 
+ 		return 0;
+@@ -298,12 +299,9 @@ namespace {
+ 	{
+ 		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
+ 
+-		if (mute == 0)
+-			sys->sab->volume.store(0);
+-		else
+-			sys->sab->volume.store((int)(sys->volume * 100));
+-
++		sys->sab->is_muted.store(mute);
+ 		aout_MuteReport(aout, mute);
++
+ 		return 0;
+ 	}
+ 
+@@ -329,11 +327,11 @@ namespace {
+ 
+ 		sys->awn_inst = new AWNodeWrapper(AUDIO_WORKLET_SAMPLE_RATE);
+ 		sys->sab = (sound_buffer_t*)malloc(sizeof(sound_buffer_t));
+-		sys->volume = 1.0f;
+ 
+ 		if ( unlikely(sys->sab == NULL) )
+ 			return VLC_ENOMEM;
+ 		bzero(sys->sab, sizeof(sound_buffer_t));
++		sys->sab->volume = 100;
+ 
+ 		val webaudio_context = sys->awn_inst->getCtx();
+ 
+@@ -351,6 +349,7 @@ namespace {
+ 				this.tail = e.data.tail; \
+ 				this.can_write = e.data.can_write; \
+ 				this.volume = e.data.volume; \
++				this.is_muted = e.data.is_muted; \
+ 				this.storage = e.data.storage; \
+ 			} else { \
+ 				throw 'unexpected.'; \
+@@ -367,7 +366,10 @@ namespace {
+ 		var head = Atomics.load(this.head, 0) / 4; \
+ 		var tail = Atomics.load(this.tail, 0) / 4; \
+ 		var i = 0; \
+-		var volume = (Atomics.load(this.volume, 0) / 4) / 100; \
++		var volume = Atomics.load(this.volume, 0) / 100; \
++		if (Atomics.load(this.is_paused, 0) != 0 || Atomics.load(this.is_muted, 0) != 0) { \
++			volume = 0; \
++		} \
+ 		while (tail != head && i < nbSamples) \
+ 		{ \
+ 			for (let c = 0; c < nbChannels; ++c) { \
+-- 
+2.35.1
+

@@ -1,0 +1,117 @@
+From 55339e6437de6ccc6813b0551ac737d6f7a43d3d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Wed, 11 May 2022 13:17:03 +0200
+Subject: [PATCH 59/77] WIP: webcodec: Reintroduce a block queue hoping to
+ solve the late frames
+
+which doesn't work for now
+---
+ modules/codec/webcodec.cpp | 44 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 36 insertions(+), 8 deletions(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index b3546edaea..1967231999 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -48,6 +48,8 @@ using emval = emscripten::val;
+ struct decoder_sys_t
+ {
+     vlc_thread_t th;
++    std::queue<block_t*> blocks;
++    vlc::threads::mutex mutex;
+ 
+     vlc_video_context* vctx;
+ };
+@@ -93,7 +95,8 @@ EMSCRIPTEN_KEEPALIVE void releaseBlock( block_t* block )
+     block_Release( block );
+ }
+ 
+-EMSCRIPTEN_KEEPALIVE void decodeBlock( block_t* block )
++// doesn't need to be extern anymore
++void decodeBlock( block_t* block )
+ {
+     auto chunkType = emval::global("EncodedVideoChunk");
+     auto chunkCfg = emval::object();
+@@ -124,6 +127,23 @@ EMSCRIPTEN_KEEPALIVE void decodeBlock( block_t* block )
+     EM_ASM({Module.decoder.decode( Emval.toValue( $0 ) ); }, chunk.as_handle());
+ }
+ 
++EMSCRIPTEN_KEEPALIVE void decodeBlocks( decoder_t* dec )
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    while ( true )
++    {
++        block_t* block;
++        {
++            vlc::threads::mutex_locker lock{ sys->mutex };
++            if ( sys->blocks.empty() )
++                return;
++            block = sys->blocks.front();
++            sys->blocks.pop();
++        }
++        decodeBlock( block );
++        block_Release( block );
++    }
++}
+ 
+ }
+ 
+@@ -217,9 +237,7 @@ EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder, emscripten::EM_VAL decC
+     function onDecoderWorkerMessage(msg) {
+         const data = msg['data'];
+         if (data['customCmd'] == 'decode') {
+-            let block = data['block'];
+-            _decodeBlock( block );
+-            _releaseBlock( block );
++            _decodeBlocks( Module.webCodecCtx );
+         } else if ( data['customCmd'] == 'flush' ) {
+             Module.decoder.flush();
+         } else if ( data['customCmd'] == 'close' ) {
+@@ -310,8 +328,10 @@ static bool initDecoder( decoder_t* dec )
+     return true;
+ }
+ 
+-static void mainloop_tick()
++static void mainloop_tick( void* arg )
+ {
++//    auto dec = static_cast<decoder_t*>( arg );
++//    decodeBlocks( dec );
+ }
+ 
+ static void* WebcodecDecodeWorker( void* arg )
+@@ -336,7 +356,7 @@ static void* WebcodecDecodeWorker( void* arg )
+     auto vctxPrivate = static_cast<webcodec_context*>(
+             vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
+     vctxPrivate->decoder_worker = pthread_self();
+-    emscripten_set_main_loop(mainloop_tick, 1, true);
++    emscripten_set_main_loop_arg(mainloop_tick, dec, 1, true);
+     return NULL;
+ }
+ 
+@@ -368,13 +388,21 @@ EM_ASYNC_JS(void, initDecoderWorkerMessagePort, (decoder_t* dec), {
+ 
+ static int Decode( decoder_t* dec, block_t* block )
+ {
++    if ( block == nullptr )
++        fprintf(stderr, "NULL BLOCK\n");
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
+     initDecoderWorkerMessagePort(dec);
++    {
++        vlc::threads::mutex_locker lock{ sys->mutex };
++        sys->blocks.push( block );
++        if ( sys->blocks.size() > 1 )
++            return VLCDEC_SUCCESS;
++    }
+     EM_ASM({
+         Module.decoderWorkerPort.postMessage({
+             customCmd: 'decode',
+-            block: $0
+         });
+-    }, block);
++    });
+     return VLCDEC_SUCCESS;
+ }
+ 
+-- 
+2.35.1
+

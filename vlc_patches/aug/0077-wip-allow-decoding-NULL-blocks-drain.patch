@@ -1,0 +1,24 @@
+From c3e109460e95fba32914a1b525a8b3f85b705ff9 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 8 Aug 2022 16:57:45 +0200
+Subject: [PATCH 77/77] wip: allow decoding NULL blocks (drain ?)
+
+---
+ modules/codec/webcodec.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index fd93713480..aefe6a6153 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -396,6 +396,7 @@ EM_ASYNC_JS(void, initDecoderWorkerMessagePort, (decoder_t* dec), {
+ 
+ static int Decode( decoder_t* dec, block_t* block )
+ {
++    if ( !block ) return VLCDEC_SUCCESS;
+     initDecoderWorkerMessagePort(dec);
+     EM_ASM({
+         Module.decoderWorkerPort.postMessage({
+-- 
+2.35.1
+

@@ -1,0 +1,28 @@
+From 624edf3c2ec7deb967e1071620762bca438aa3aa Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdisabwat@gmail.com>
+Date: Wed, 13 Apr 2022 10:56:02 +0200
+Subject: [PATCH 42/77] contrib: disable ubsan in gme
+
+ubsan is enabled in the contrib recipe :
+https://bitbucket.org/mpyne/game-music-emu/src/b3d158a30492181fd7c38ef795c8d4dcfd77eaa9/CMakeLists.txt#lines-67
+
+This will require vlc to be always built with ubsan and we don't want this in production.
+---
+ contrib/src/gme/rules.mak | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/contrib/src/gme/rules.mak b/contrib/src/gme/rules.mak
+index b0acdb8ca4..411b83fb24 100644
+--- a/contrib/src/gme/rules.mak
++++ b/contrib/src/gme/rules.mak
+@@ -16,6 +16,6 @@ game-music-emu: game-music-emu-$(GME_VERSION).tar.xz .sum-gme
+ 	$(MOVE)
+ 
+ .gme: game-music-emu toolchain.cmake
+-	cd $< && $(HOSTVARS_PIC) $(CMAKE) .
++	cd $< && $(HOSTVARS_PIC) $(CMAKE) . -DENABLE_UBSAN=OFF
+ 	+$(CMAKEBUILD) $< --target install
+ 	touch $@
+-- 
+2.35.1
+

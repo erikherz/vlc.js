@@ -1,0 +1,24 @@
+From 1c9fdc8f0e1df8ea34f6f6cae882b2559d802a88 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 10 May 2022 10:23:28 +0200
+Subject: [PATCH 54/77] webcodec: remove debug
+
+---
+ modules/codec/webcodec.cpp | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index 48383575f0..983084103e 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -77,7 +77,6 @@ EMSCRIPTEN_KEEPALIVE int32_t queuePicture(void* ctx, picture_t* pic, int64_t tim
+ {
+     auto dec = static_cast<decoder_t*>(ctx);
+     pic->date = VLC_TICK_FROM_US(timestamp);
+-    msg_Dbg(dec, "Picture timestamp: %" PRId64 "\n", timestamp);
+     pic->b_progressive = true;
+     decoder_QueueVideo(dec, pic);
+     return PictureContextPrivate(pic->context)->pictureIdx;
+-- 
+2.35.1
+

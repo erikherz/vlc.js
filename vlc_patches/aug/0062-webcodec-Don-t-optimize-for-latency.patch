@@ -1,0 +1,27 @@
+From 7de88352bd623463cd6d4c5df50ef951e3b4d76a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 12 May 2022 09:48:20 +0200
+Subject: [PATCH 62/77] webcodec: Don't optimize for latency
+
+This seems to pace the decoding better but is definitely not a stable
+enough solution, more of a temporary work around
+---
+ modules/codec/webcodec.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index 9c39a5c2b4..fbdbd3af5f 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -168,7 +168,7 @@ static emval getDecoderConfig( decoder_t* dec, bool includeExtraData )
+     decoderConfig.set( "codedHeight", dec->fmt_in.video.i_height );
+     decoderConfig.set( "displayAspectWidth", dec->fmt_in.video.i_visible_width );
+     decoderConfig.set( "displayAspectHeight", dec->fmt_in.video.i_visible_height );
+-    decoderConfig.set( "optimizeForLatency", true );
++    decoderConfig.set( "optimizeForLatency", false );
+     if ( includeExtraData )
+     {
+         if ( dec->fmt_in.i_extra > 0 )
+-- 
+2.35.1
+
