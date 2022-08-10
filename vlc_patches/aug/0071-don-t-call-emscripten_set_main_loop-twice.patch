@@ -1,0 +1,25 @@
+From 394a123418b39a827467598bf19aef7d9e0a3c3c Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 3 Aug 2022 17:17:27 +0200
+Subject: [PATCH 71/77] don't call emscripten_set_main_loop twice
+
+---
+ modules/codec/webcodec.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index 07b3690dab..fd93713480 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -358,7 +358,7 @@ static void* WebcodecDecodeWorker( void* arg )
+     auto vctxPrivate = static_cast<webcodec_context*>(
+             vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
+     vctxPrivate->decoder_worker = pthread_self();
+-    emscripten_set_main_loop(mainloop_tick, 1, true);
++
+     return NULL;
+ }
+ 
+-- 
+2.35.1
+

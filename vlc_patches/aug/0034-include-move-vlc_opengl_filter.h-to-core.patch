@@ -1,0 +1,160 @@
+From 356c5e7c876be70e73d84fa08b422794d674a540 Mon Sep 17 00:00:00 2001
+From: Alexandre Janniaux <ajanni@videolabs.io>
+Date: Tue, 22 Feb 2022 17:07:53 +0100
+Subject: [PATCH 34/77] include: move vlc_opengl_filter.h to core
+
+---
+ include/vlc_opengl_filter.h | 141 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 141 insertions(+)
+ create mode 100644 include/vlc_opengl_filter.h
+
+diff --git a/include/vlc_opengl_filter.h b/include/vlc_opengl_filter.h
+new file mode 100644
+index 0000000000..8cffea7708
+--- /dev/null
++++ b/include/vlc_opengl_filter.h
+@@ -0,0 +1,141 @@
++/*****************************************************************************
++ * filter.h
++ *****************************************************************************
++ * Copyright (C) 2020 VLC authors and VideoLAN
++ * Copyright (C) 2020 Videolabs
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifndef VLC_GL_FILTER_H
++#define VLC_GL_FILTER_H
++
++#include <vlc_tick.h>
++
++struct vlc_gl_filter;
++struct vlc_gl_sampler;
++
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++
++struct vlc_gl_tex_size {
++    unsigned width;
++    unsigned height;
++};
++
++struct vlc_gl_input_meta {
++    vlc_tick_t pts;
++    unsigned plane;
++};
++
++typedef int
++vlc_gl_filter_open_fn(struct vlc_gl_filter *filter,
++                      const config_chain_t *config,
++                      struct vlc_gl_tex_size *size_out);
++
++struct vlc_gl_filter_ops {
++    /**
++     * Draw the result of the filter to the current framebuffer
++     */
++    int (*draw)(struct vlc_gl_filter *filter,
++                const struct vlc_gl_input_meta *meta);
++
++    /**
++     * Free filter resources
++     */
++    void (*close)(struct vlc_gl_filter *filter);
++};
++
++struct vlc_gl_filter_owner_ops {
++    /**
++     * Get the sampler associated to this filter.
++     *
++     * The instance is lazy-loaded (to avoid creating one for blend filters).
++     * Successive calls to this function for the same filter is guaranteed to
++     * always return the same sampler.
++     *
++     * Important: filter->config must be initialized *before* getting the
++     * sampler, since the sampler behavior may depend on it.
++     *
++     * \param filter the filter
++     * \return sampler the sampler, NULL on error
++     */
++    struct vlc_gl_sampler *
++    (*get_sampler)(struct vlc_gl_filter *filter);
++};
++
++/**
++ * OpenGL filter, in charge of a rendering pass.
++ */
++struct vlc_gl_filter {
++    vlc_object_t obj;
++    module_t *module;
++
++    const struct vlc_gl_api *api;
++
++    struct {
++        /**
++         * An OpenGL filter may either operate on the input RGBA picture, or on
++         * individual input planes (without chroma conversion) separately.
++         *
++         * In practice, this is useful for deinterlace filters.
++         *
++         * This flag must be set by the filter module (default is false).
++         */
++        bool filter_planes;
++
++        /**
++         * A blend filter draws over the input picture (without reading it).
++         *
++         * Meaningless if filter_planes is true.
++         *
++         * This flag must be set by the filter module (default is false).
++         */
++        bool blend;
++
++        /**
++         * Request MSAA level.
++         *
++         * This value must be set by the filter module (default is 0, which
++         * means disabled).
++         *
++         * Meaningless if filter_planes is true.
++         *
++         * The actual MSAA level may be overwritten to 0 if multisampling is
++         * not supported, or to a higher value if another filter rendering on
++         * the same framebuffer requested a higher MSAA level.
++         */
++        unsigned msaa_level;
++    } config;
++
++    const struct vlc_gl_filter_ops *ops;
++    void *sys;
++
++    const struct vlc_gl_filter_owner_ops *owner_ops;
++};
++
++static inline struct vlc_gl_sampler *
++vlc_gl_filter_GetSampler(struct vlc_gl_filter *filter)
++{
++    return filter->owner_ops->get_sampler(filter);
++}
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+-- 
+2.35.1
+

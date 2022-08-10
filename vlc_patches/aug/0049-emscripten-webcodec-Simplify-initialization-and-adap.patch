@@ -1,0 +1,253 @@
+From 996deba93b85bc9a9bf7cdb12a35d4628d08d897 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Mon, 9 May 2022 10:16:29 +0200
+Subject: [PATCH 49/77] emscripten: webcodec: Simplify initialization and adapt
+ to new queue
+
+---
+ modules/codec/webcodec.cpp | 183 +++++++++++++++++++++++--------------
+ 1 file changed, 112 insertions(+), 71 deletions(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index cd902851b0..92b23d2b94 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -58,20 +58,28 @@ struct decoder_sys_t
+ 
+ extern "C"
+ {
++EMSCRIPTEN_KEEPALIVE picture_t* tryGetPictureFromPool(decoder_t* dec)
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    auto vctx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC) );
++    return picture_pool_Get(vctx->pool);
++}
+ 
+-EMSCRIPTEN_KEEPALIVE int32_t createAndQueuePicture(decoder_t* dec, int64_t timestamp)
++EMSCRIPTEN_KEEPALIVE bool updateVideoOutput(decoder_t* dec)
+ {
+     auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
+     if ( decoder_UpdateVideoOutput( dec, sys->vctx ) )
+     {
+         msg_Err( dec, "Failure during UpdateVideoOutput! FIXME" );
+-        return -1;
++        return false;
+     }
+-    auto vctx = static_cast<webcodec_context*>(
+-                vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC) );
+-    auto pic = picture_pool_Wait(vctx->pool);
+-    if (pic == nullptr)
+-        return -1;
++    return true;
++}
++
++EMSCRIPTEN_KEEPALIVE int32_t queuePicture(void* ctx, picture_t* pic, int64_t timestamp)
++{
++    auto dec = static_cast<decoder_t*>(ctx);
+     pic->date = VLC_TICK_FROM_US(timestamp);
+     pic->b_progressive = true;
+     decoder_QueueVideo(dec, pic);
+@@ -80,44 +88,6 @@ EMSCRIPTEN_KEEPALIVE int32_t createAndQueuePicture(decoder_t* dec, int64_t times
+ 
+ }
+ 
+-EM_JS(void, initModuleContext, (void* ctx), {
+-    globalThis.Module.webCodecCtx = ctx;
+-});
+-
+-EM_ASYNC_JS(void, declareCallbacks, (), {
+-    async function getVoutMessagePort() {
+-        let p = new Promise((resolve, reject) => {
+-            self.addEventListener('message', function(e) {
+-                let msg = e['data'];
+-                if (msg.customCmd == 'transferMessagePort') {
+-                    let port = msg['transferList'][0];
+-                    if (!port)
+-                        reject();
+-                    Module.voutPort = port;
+-                    resolve();
+-                }
+-            });
+-        });
+-        await p;
+-    }
+-
+-    globalThis.Module.boundOutputCb = async function(frame) {
+-        let picIdx = _createAndQueuePicture(globalThis.Module.webCodecCtx, frame.timestamp);
+-        if (Module.voutPort === undefined)
+-            await getVoutMessagePort();
+-        console.log('Posting frame', picIdx);
+-        Module.voutPort.postMessage({
+-            customCmd: 'displayFrame',
+-            frame: frame,
+-            pictureId: picIdx,
+-          }, [frame]);
+-    };
+-    globalThis.Module.boundErrorCb = function(err) {
+-        console.log('Error while decoding: ');
+-        console.log(err);
+-    };
+-});
+-
+ EM_ASYNC_JS(bool, probeConfig, (emscripten::EM_VAL cfg), {
+     var decoderCfg = Emval.toValue(cfg);
+     var res = await VideoDecoder.isConfigSupported(decoderCfg).catch((err) => {
+@@ -183,7 +153,6 @@ static emval getDecoderConfig( decoder_t* dec, bool includeExtraData )
+     decoderConfig.set( "optimizeForLatency", true );
+     if ( includeExtraData )
+     {
+-        msg_Err( dec, "i_extra: %u", dec->fmt_in.i_extra );
+         if ( dec->fmt_in.i_extra > 0 )
+         {
+             decoderConfig.set( "description",
+@@ -196,32 +165,100 @@ static emval getDecoderConfig( decoder_t* dec, bool includeExtraData )
+     return decoderConfig;
+ }
+ 
+-static bool initDecoder( decoder_t* dec )
+-{
+-    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
+-    initModuleContext(dec);
+-    declareCallbacks();
+-
+-    auto initCfg = emval::object();
++EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder), {
++    function onInteropMessage(msg) {
++        let data = msg['data'];
++        if (data['customCmd'] == 'sendFrame') {
++            let picIdx = data['pictureIdx'];
++            let frame = Module.framesReady[picIdx];
++            Module.framesReady[picIdx] = undefined;
++            console.log('Posting frame', picIdx, 'from webcodec', frame);
++            Module.voutPort.postMessage({
++                customCmd: 'displayFrame',
++                frame: frame,
++                pictureId: picIdx,
++              }, [frame]);
++        }
++    }
+ 
+-    auto outputCb = emval::module_property("boundOutputCb");
+-    if ( outputCb.isUndefined() )
+-    {
+-        msg_Err( dec, "Failed to find output callback" );
+-        return false;
++    async function getVoutMessagePort() {
++        let p = new Promise((resolve, reject) => {
++            self.addEventListener('message', function(e) {
++                let msg = e['data'];
++                if (msg.customCmd == 'transferMessagePort') {
++                    let port = msg['transferList'][0];
++                    if (!port)
++                        reject();
++                    Module.voutPort = port;
++                    Module.voutPort.onmessage = onInteropMessage;
++                    resolve();
++                }
++            });
++        });
++        await p;
+     }
+-    initCfg.set("output", outputCb);
+ 
+-    auto errorCb = emval::module_property("boundErrorCb");
+-    if ( errorCb.isUndefined() )
+-    {
+-        msg_Err( dec, "Failed to find error callback" );
+-        return false;
++    async function getPictureAsync(dec) {
++        function getPicture(dec, resolve) {
++            let pic = _tryGetPictureFromPool(dec);
++            if (!pic) {
++                setTimeout( function(d, r) {
++                      getPicture(d, r);
++                  }, 1, dec, resolve );
++                return;
++            }
++            resolve(pic);
++        }
++        let p = new Promise((resolve) => {
++            getPicture(dec, resolve);
++        });
++        return await p;
+     }
+-    initCfg.set("error", errorCb);
+ 
+-    auto decoderType = emval::global("VideoDecoder");
+-    sys->decoder = decoderType.new_(initCfg);
++    /* Store a handle to our decoder_t for later invocations */
++    Module.webCodecCtx = decoder;
++
++    /* Prepare an array containing the decoded frames, so the interop can query
++     * then later */
++    Module.framesReady = [];
++
++    let initCfg = {
++        'output': async function (frame) {
++            /* Always update the video output format so we can ensure the vout
++             * is created when we try to acquire its message port */
++            if ( !_updateVideoOutput(Module.webCodecCtx) )
++            {
++                frame.close();
++                return;
++            }
++            let p = await getPictureAsync(Module.webCodecCtx);
++            let picIdx = _queuePicture(Module.webCodecCtx, p, frame.timestamp);
++            if (Module.voutPort === undefined)
++                await getVoutMessagePort();
++            if ( Module.framesReady[picIdx] ) {
++                /*
++                 *  If we end up overriding a frame, it means it was dropped
++                 *  by the vout before the interop asked for it, so we can close
++                 *  it safely.
++                 */
++                console.log('Discarding dropped frame ', picIdx);
++                Module.framesReady[picIdx].close();
++            }
++            Module.framesReady[picIdx] = frame;
++        },
++        'error': function(err) {
++            console.log('Error while decoding: ');
++            console.log(err);
++        }
++    };
++    return Emval.toHandle( new VideoDecoder( initCfg ) );
++});
++
++static bool initDecoder( decoder_t* dec )
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++
++    sys->decoder = emval::take_ownership( initDecoderJS( dec ) );
+     if ( sys->decoder.isUndefined() )
+     {
+         msg_Err( dec, "Failed to instantiate VideoDecoder" );
+@@ -247,12 +284,12 @@ static void WebcodecDecodeWorkerTick( void* arg )
+ 
+         auto chunk = blockToEncodedVideoChunk( dec, block );
+         block_Release(block);
+-        msg_Err(dec, "Decoding a sample...");
+         sys->decoder.call<void>( "decode", chunk );
+ 
+-        auto queueSize = sys->decoder["decodeQueueSize"];
+-        auto state = sys->decoder["state"];
+-        msg_Err( dec, "Decoder state: %s ; queue size: %ld", state.as<std::string>().c_str(), queueSize.as<long int>());
++//        auto queueSize = sys->decoder["decodeQueueSize"];
++//        auto state = sys->decoder["state"];
++//        msg_Err( dec, "Decoder state: %s ; queue size: %ld",
++//          state.as<std::string>().c_str(), queueSize.as<long int>());
+     }
+ }
+ 
+@@ -392,3 +429,7 @@ vlc_module_begin ()
+     add_submodule()
+         set_callback_dec_device(OpenDecDevice, 1)
+ vlc_module_end ()
++
++EMSCRIPTEN_BINDINGS(vlc_picture) {
++    emscripten::class_<picture_t>("picture_t");
++}
+-- 
+2.35.1
+

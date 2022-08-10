@@ -1,0 +1,138 @@
+From 1a01a94d5d2eeb1fcc7e206c2e420f155bd25faa Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 3 May 2022 11:10:28 +0200
+Subject: [PATCH 43/77] emscripten: Add a picture_pool to the common code
+
+---
+ modules/video_output/emscripten/common.cpp | 82 ++++++++++++++++++++++
+ modules/video_output/emscripten/common.h   | 15 +++-
+ 2 files changed, 95 insertions(+), 2 deletions(-)
+ create mode 100644 modules/video_output/emscripten/common.cpp
+
+diff --git a/modules/video_output/emscripten/common.cpp b/modules/video_output/emscripten/common.cpp
+new file mode 100644
+index 0000000000..b2065be3b4
+--- /dev/null
++++ b/modules/video_output/emscripten/common.cpp
+@@ -0,0 +1,82 @@
++/*****************************************************************************
++ * common.h: Emscripten decoder/vout common code
++ *****************************************************************************
++ * Copyright (C) 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <vlc_common.h>
++#include <vlc_decoder.h>
++#include <vlc_picture_pool.h>
++
++#include "common.h"
++
++static picture_context_t* PictureContextCopy(picture_context_t* picCtx)
++{
++    vlc_video_context_Hold( picCtx->vctx );
++    return picCtx;
++}
++
++static void PictureContextDestroy( picture_context_t* )
++{
++    /* Context is already released by picture_Release() */
++}
++
++static picture_context_t* webcodec_CreatePictureContext( vlc_video_context* vctx, uint32_t picIdx )
++{
++    auto picCtx = static_cast<webcodec_picture_ctx*>(
++                malloc( sizeof(  webcodec_picture_ctx ) ) );
++    if ( picCtx == nullptr )
++        return nullptr;
++    picCtx->context.copy = PictureContextCopy;
++    picCtx->context.destroy = PictureContextDestroy;
++    picCtx->context.vctx = vctx;
++    picCtx->pictureIdx = picIdx;
++    return &picCtx->context;
++}
++
++
++int webcodec_CreatePool( vlc_video_context* vctx, const video_format_t* fmt )
++{
++    auto ctx = static_cast<webcodec_context*>(
++        vlc_video_context_GetPrivate( vctx, VLC_VIDEO_CONTEXT_WEBCODEC ) );
++
++    for ( auto i = 0u; i < ARRAY_SIZE(ctx->pictures); ++i )
++    {
++        auto pic = picture_NewFromFormat(fmt);
++        if ( pic != nullptr )
++            pic->context = webcodec_CreatePictureContext( vctx, i );
++        if ( pic == nullptr || pic->context == nullptr )
++        {
++            while ( i-- )
++                picture_Release( ctx->pictures[i] );
++            return VLC_EGENERIC;
++        }
++        ctx->pictures[i] = pic;
++    }
++    ctx->pool = picture_pool_New(ARRAY_SIZE(ctx->pictures), ctx->pictures);
++    if ( ctx->pool == nullptr )
++    {
++        for ( auto i = 0u; i < ARRAY_SIZE(ctx->pictures); ++i )
++            picture_Release( ctx->pictures[i] );
++        return VLC_EGENERIC;
++    }
++    return VLC_SUCCESS;
++}
+diff --git a/modules/video_output/emscripten/common.h b/modules/video_output/emscripten/common.h
+index 3a2d3c9099..08967d0703 100644
+--- a/modules/video_output/emscripten/common.h
++++ b/modules/video_output/emscripten/common.h
+@@ -27,6 +27,7 @@
+ 
+ #include <vlc_threads.h>
+ #include <vlc_picture.h>
++#include <vlc_picture_pool.h>
+ 
+ #include <emscripten/html5_webgl.h>
+ //#include <emscripten/val.h>
+@@ -36,11 +37,21 @@
+ struct webcodec_context
+ {
+     pthread_t decoder_worker;
++    picture_pool_t* pool;
++    picture_t* pictures[WEBCODEC_MAX_PICTURES];
+ };
+ 
+-struct webcodec_picture_sys_t
++struct webcodec_picture_ctx
+ {
+-    int pictureId;
++    picture_context_t context;
++    uint32_t pictureIdx;
+ };
+ 
++int webcodec_CreatePool( vlc_video_context* vctx, const video_format_t* fmt );
++
++static inline webcodec_picture_ctx* PictureContextPrivate( picture_context_t* picCtx )
++{
++    return container_of( picCtx, webcodec_picture_ctx, context );
++}
++
+ #endif // EMSCRIPTEN_COMMON_H
+-- 
+2.35.1
+

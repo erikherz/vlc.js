@@ -1,0 +1,24 @@
+From 5ec33317bdd1ef893d7e937c2fcc5435d3929652 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 09:52:49 +0100
+Subject: [PATCH 25/77] emscripten: build: Forcefully disable pipe2
+
+---
+ extras/package/wasm-emscripten/build.sh | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/extras/package/wasm-emscripten/build.sh b/extras/package/wasm-emscripten/build.sh
+index 5119fe6a6e..5a1dbd230d 100755
+--- a/extras/package/wasm-emscripten/build.sh
++++ b/extras/package/wasm-emscripten/build.sh
+@@ -166,6 +166,7 @@ if [ $BUILD_MODE -eq 1 ]; then
+                         --enable-gles2 \
+                         ac_cv_func_if_nameindex=yes ac_cv_header_sys_shm_h=no \
+                         ac_cv_func_accept4=no \
++                        ac_cv_func_pipe2=no \
+                         --enable-gles2 \
+                         --with-contrib="$VLC_SRCPATH"/contrib/wasm32-unknown-emscripten
+ fi
+-- 
+2.35.1
+

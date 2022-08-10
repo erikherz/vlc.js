@@ -1,0 +1,32 @@
+From e913df9e055f1fee9d17d9b23ed46d59600c89b2 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 8 Aug 2022 13:49:54 +0200
+Subject: [PATCH 75/77] emjsfile: document js_file_size struct field
+
+---
+ modules/access/emjsfile.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/modules/access/emjsfile.c b/modules/access/emjsfile.c
+index 488b6fb449..245a6a7201 100644
+--- a/modules/access/emjsfile.c
++++ b/modules/access/emjsfile.c
+@@ -27,13 +27,14 @@
+ #include <vlc_plugin.h>
+ #include <vlc_access.h>
+ #include <vlc_threads.h>
++#include <stdalign.h>
+ 
+ #include <emscripten.h>
+ 
+ typedef struct
+ {
+     uint64_t offset;
+-    uint64_t js_file_size;
++    uint64_t alignas(8) js_file_size;
+ } access_sys_t;
+ 
+ static ssize_t Read (stream_t *p_access, void *buffer, size_t size) {
+-- 
+2.35.1
+

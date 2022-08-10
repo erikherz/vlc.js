@@ -1,0 +1,82 @@
+From 5874bfc37d1ebd81e8b20382ec7b9a09207ca4ba Mon Sep 17 00:00:00 2001
+From: Alexandre Janniaux <ajanni@videolabs.io>
+Date: Wed, 23 Feb 2022 11:13:41 +0100
+Subject: [PATCH 30/77] opengl: sampler: avoid crashing on unbind location
+
+---
+ modules/video_output/opengl/sampler.c | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
+
+diff --git a/modules/video_output/opengl/sampler.c b/modules/video_output/opengl/sampler.c
+index 846cbc75ab..9df0446284 100644
+--- a/modules/video_output/opengl/sampler.c
++++ b/modules/video_output/opengl/sampler.c
+@@ -292,25 +292,30 @@ sampler_base_load(struct vlc_gl_sampler *sampler)
+     struct vlc_gl_format *glfmt = &sampler->glfmt;
+     struct vlc_gl_picture *pic = &priv->pic;
+ 
+-    if (priv->yuv_color)
++    if (priv->yuv_color && priv->uloc.ConvMatrix != -1)
+         vt->UniformMatrix4fv(priv->uloc.ConvMatrix, 1, GL_FALSE,
+                              priv->conv_matrix);
+ 
+     for (unsigned i = 0; i < glfmt->tex_count; ++i)
+     {
++        if (priv->uloc.Textures[i] == -1)
++            continue;
+         vt->Uniform1i(priv->uloc.Textures[i], i);
+ 
+         assert(pic->textures[i] != 0);
+         vt->ActiveTexture(GL_TEXTURE0 + i);
+         vt->BindTexture(glfmt->tex_target, pic->textures[i]);
+-
+     }
+ 
+     if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
+     {
+         for (unsigned i = 0; i < glfmt->tex_count; ++i)
++        {
++            if (priv->uloc.TexSizes[i] == -1)
++                continue;
+             vt->Uniform2f(priv->uloc.TexSizes[i], glfmt->tex_widths[i],
+                           glfmt->tex_heights[i]);
++        }
+     }
+ 
+ #ifdef HAVE_LIBPLACEBO
+@@ -365,6 +370,9 @@ sampler_xyz12_load(struct vlc_gl_sampler *sampler)
+     struct vlc_gl_format *glfmt = &sampler->glfmt;
+     struct vlc_gl_picture *pic = &priv->pic;
+ 
++    if (priv->uloc.Textures[0] == -1)
++        return;
++
+     vt->Uniform1i(priv->uloc.Textures[0], 0);
+ 
+     assert(pic->textures[0] != 0);
+@@ -537,13 +545,17 @@ sampler_planes_load(struct vlc_gl_sampler *sampler)
+     struct vlc_gl_format *glfmt = &sampler->glfmt;
+     struct vlc_gl_picture *pic = &priv->pic;
+ 
+-    vt->Uniform1i(priv->uloc.Textures[0], 0);
++    if (priv->uloc.Textures[0] != -1)
++    {
++        vt->Uniform1i(priv->uloc.Textures[0], 0);
+ 
+-    assert(pic->textures[plane] != 0);
+-    vt->ActiveTexture(GL_TEXTURE0);
+-    vt->BindTexture(glfmt->tex_target, pic->textures[plane]);
++        assert(pic->textures[plane] != 0);
++        vt->ActiveTexture(GL_TEXTURE0);
++        vt->BindTexture(glfmt->tex_target, pic->textures[plane]);
++    }
+ 
+-    if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
++    if (glfmt->tex_target == GL_TEXTURE_RECTANGLE &&
++        priv->uloc.TexSizes[0] != -1)
+     {
+         vt->Uniform2f(priv->uloc.TexSizes[0], glfmt->tex_widths[plane],
+                       glfmt->tex_heights[plane]);
+-- 
+2.35.1
+

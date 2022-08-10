@@ -1,0 +1,93 @@
+From 4d52418f13ee742ae96f2a1d5fa72f411122eb40 Mon Sep 17 00:00:00 2001
+From: Alexandre Janniaux <ajanni@videolabs.io>
+Date: Tue, 22 Feb 2022 17:06:21 +0100
+Subject: [PATCH 33/77] opengl: filter: forward-declaration for samplers
+
+---
+ modules/video_output/opengl/filter.c      | 1 +
+ modules/video_output/opengl/filter.h      | 4 ++--
+ modules/video_output/opengl/filter_mock.c | 1 +
+ modules/video_output/opengl/filter_priv.h | 1 +
+ modules/video_output/opengl/renderer.c    | 1 +
+ modules/video_output/opengl/sampler.c     | 1 +
+ 6 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/modules/video_output/opengl/filter.c b/modules/video_output/opengl/filter.c
+index 7f0aa73e7c..491ce88dd5 100644
+--- a/modules/video_output/opengl/filter.c
++++ b/modules/video_output/opengl/filter.c
+@@ -31,6 +31,7 @@
+ #include <vlc_modules.h>
+ 
+ #include "gl_api.h"
++#include "picture.h"
+ 
+ struct vlc_gl_filter *
+ vlc_gl_filter_New(struct vlc_gl_t *gl, const struct vlc_gl_api *api)
+diff --git a/modules/video_output/opengl/filter.h b/modules/video_output/opengl/filter.h
+index dc81b69d8a..d8b672cc35 100644
+--- a/modules/video_output/opengl/filter.h
++++ b/modules/video_output/opengl/filter.h
+@@ -24,9 +24,9 @@
+ 
+ #include <vlc_tick.h>
+ 
+-#include "picture.h"
+-
+ struct vlc_gl_filter;
++struct vlc_gl_picture;
++struct vlc_gl_format;
+ 
+ #ifdef __cplusplus
+ extern "C"
+diff --git a/modules/video_output/opengl/filter_mock.c b/modules/video_output/opengl/filter_mock.c
+index 64a73b303e..d455de4937 100644
+--- a/modules/video_output/opengl/filter_mock.c
++++ b/modules/video_output/opengl/filter_mock.c
+@@ -73,6 +73,7 @@
+ #include "gl_common.h"
+ #include "gl_util.h"
+ #include "sampler.h"
++#include "picture.h"
+ 
+ #define MOCK_CFG_PREFIX "mock-"
+ 
+diff --git a/modules/video_output/opengl/filter_priv.h b/modules/video_output/opengl/filter_priv.h
+index 7b702ddb17..cd0e3084fa 100644
+--- a/modules/video_output/opengl/filter_priv.h
++++ b/modules/video_output/opengl/filter_priv.h
+@@ -27,6 +27,7 @@
+ #include <vlc_picture.h>
+ 
+ #include "filter.h"
++#include "picture.h"
+ 
+ struct vlc_gl_filter_priv {
+     struct vlc_gl_filter filter;
+diff --git a/modules/video_output/opengl/renderer.c b/modules/video_output/opengl/renderer.c
+index aebbb84e67..092fc7b7e4 100644
+--- a/modules/video_output/opengl/renderer.c
++++ b/modules/video_output/opengl/renderer.c
+@@ -41,6 +41,7 @@
+ #include "gl_util.h"
+ #include "vout_helper.h"
+ #include "sampler.h"
++#include "picture.h"
+ 
+ #define SPHERE_RADIUS 1.f
+ 
+diff --git a/modules/video_output/opengl/sampler.c b/modules/video_output/opengl/sampler.c
+index 9df0446284..80f9d43e10 100644
+--- a/modules/video_output/opengl/sampler.c
++++ b/modules/video_output/opengl/sampler.c
+@@ -37,6 +37,7 @@
+ #include "gl_api.h"
+ #include "gl_common.h"
+ #include "gl_util.h"
++#include "picture.h"
+ 
+ struct vlc_gl_sampler_priv {
+     struct vlc_gl_sampler sampler;
+-- 
+2.35.1
+

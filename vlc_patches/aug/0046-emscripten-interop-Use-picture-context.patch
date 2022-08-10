@@ -1,0 +1,109 @@
+From a56c006fa9ff4108421ecce21684a63a2d723088 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 3 May 2022 11:12:45 +0200
+Subject: [PATCH 46/77] emscripten: interop: Use picture context
+
+Instead of a the Module.pictureId global
+---
+ .../opengl/interop_emscripten.cpp             | 37 +++++++++----------
+ 1 file changed, 18 insertions(+), 19 deletions(-)
+
+diff --git a/modules/video_output/opengl/interop_emscripten.cpp b/modules/video_output/opengl/interop_emscripten.cpp
+index 53b52fabd6..b9a9a5087d 100644
+--- a/modules/video_output/opengl/interop_emscripten.cpp
++++ b/modules/video_output/opengl/interop_emscripten.cpp
+@@ -58,9 +58,10 @@ tc_emscripten_op_allocate_textures(const struct vlc_gl_interop *interop, GLuint
+     return VLC_SUCCESS;
+ }
+ 
+-EM_ASYNC_JS(void, bindVideoFrame, (int pictureId), {
+-    let frame = await Module.awaitFrame(pictureId);
++EM_ASYNC_JS(void, bindVideoFrame, (int pictureIdx), {
++    let frame = await Module.awaitFrame(pictureIdx);
+ 
++    console.log('Binding texture for picture at index ' + pictureIdx);
+     let glCtx = Module.glCtx;
+     glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, frame.codedWidth, frame.codedHeight, 0,
+                 glCtx.RGBA, glCtx.UNSIGNED_BYTE, frame);
+@@ -75,8 +76,8 @@ tc_emscripten_op_update(const struct vlc_gl_interop *interop, GLuint *textures,
+ 
+     sys->gl.BindTexture(interop->tex_target, textures[0]);
+ 
+-    auto pictureId = reinterpret_cast<uintptr_t>( pic->p_sys );
+-    bindVideoFrame(pictureId);
++    auto picCtx = PictureContextPrivate(pic->context);
++    bindVideoFrame(picCtx->pictureIdx);
+ 
+     return VLC_SUCCESS;
+ }
+@@ -97,17 +98,16 @@ EM_JS(void, transferMessagePort, (vlc_video_context* vctx), {
+     function onDecoderMessage(msg) {
+         let data = msg['data'];
+         if (data.customCmd == 'displayFrame') {
+-            let pictureId = data.pictureId;
+-            let pictureIdx = pictureId % 32;
++            let pictureIdx = data.pictureId;
+             let frame = data['frame'];
+-            console.log('SINK Received frame ' + pictureId );
++            console.log('SINK Received frame with index ' + pictureIdx );
+             if ( Module.glConv.promiseResolvers[pictureIdx] ) {
+                 /* The interop is already waiting for this frame, resolve the promise */
+-                console.log('SINK Renderer is already waiting for frame ' + pictureId );
++                console.log('SINK Renderer is already waiting for frame ' + pictureIdx );
+                 Module.glConv.promiseResolvers[pictureIdx]( frame );
+             } else {
+                 /* The frame hasn't arrived to the interop yet, queue it */
+-                console.log('SINK No resolver, queuing frame ' + pictureId );
++                console.log('SINK No resolver, queuing frame ' + pictureIdx );
+                 Module.glConv.frameQueue[pictureIdx] = frame;
+             }
+         }
+@@ -129,36 +129,35 @@ EM_JS(void, initGlConvWorker, (int maxPictures), {
+     Module.glConv.promiseResolvers = [];
+     Module.glConv.frameQueue = [];
+     Module.glConv.lastFrame = {
+-        pictureId: -1,
++        pictureIdx: -1,
+         frame: undefined
+     };
+ 
+-    Module.awaitFrame = async function(pictureId) {
+-        console.log('CONSUME Fetching frame ' + pictureId);
+-        if (Module.glConv.lastFrame.pictureId == pictureId) {
++    Module.awaitFrame = async function(pictureIndex) {
++        console.log('CONSUME Fetching frame ' + pictureIndex);
++        if (Module.glConv.lastFrame.pictureIdx == pictureIndex) {
+             console.log('Reusing last frame');
+             return Module.glConv.lastFrame.frame;
+         }
+-        let pictureIndex = pictureId % 32;
+         let p = new Promise((resolve, reject) => {
+             if ( Module.glConv.frameQueue[pictureIndex] ) {
+-                console.log('CONSUME Frame ', pictureId, '(index ', pictureIndex,
+-                            ') was already queued');
++                console.log('CONSUME Frame at index ', pictureIndex,
++                            ' was already queued');
+                 let frame = Module.glConv.frameQueue[pictureIndex];
+                 resolve(frame);
+                 Module.glConv.frameQueue[pictureIndex] = undefined;
+             } else {
+-                console.log('CONSUME Frame ', pictureId, '(index ', pictureIndex,
++                console.log('CONSUME Frame at index ', pictureIndex,
+                             ') not available yet; exposing resolver' );
+                 Module.glConv.promiseResolvers[pictureIndex] = resolve;
+             }
+         });
+         let frame = await p;
+-        Module.glConv.promiseResolvers[pictureId] = undefined;
++        Module.glConv.promiseResolvers[pictureIndex] = undefined;
+         if (Module.glConv.lastFrame.frame)
+             Module.glConv.lastFrame.frame.close();
+         Module.glConv.lastFrame.frame = frame;
+-        Module.glConv.lastFrame.pictureId = pictureId;
++        Module.glConv.lastFrame.pictureIdx = pictureIndex;
+         console.log('CONSUME got frame');
+         return frame;
+     }
+-- 
+2.35.1
+
