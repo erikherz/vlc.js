@@ -54,6 +54,7 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=25 \
     $PATH_VLC/build-emscripten/src/.libs/libvlccore.a \
     $PATH_VLC/build-emscripten/compat/.libs/libcompat.a \
     --js-library lib/wasm-imports.js \
+    --js-library vlc/modules/audio_output/webaudio/webaudio.js \
     -o experimental.js
 
 
