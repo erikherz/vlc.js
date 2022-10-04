@@ -5,94 +5,89 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>VLC.js</title>
-    <style>
-        .emscripten {
-            text-align: center;
-        }
-        body {
-            background-color: #343a40;
-        }
-        #canvas {
-            border:0 !important;
-            display: flex;
-            margin: 0 auto;
-            background-color: #000;
-        }
-        #overlay {
-            border:0 !important;
-            display: flex;
-            margin: 0 auto;
-        }
-        #stack {
-            display: grid;
-        }
-        #stack > canvas {
-            grid-column: 1;
-            grid-row: 1;
-        }
-        #spinner {
-            display: none;
-        }
-        #status {
-            display: none;
-        }
-        #progress {
-            margin-left: auto;
-            margin-right: auto;
-        }
-        #logo {
-            width: 64px;
-            height: 64px;
-        }
-        #em_logo {
-            position: absolute;
-            width: 200px;
-            height: 80px;
-        }
-        #point {
-            color: #fff;
-            font-size: 60px;
-        }
-        #js {
-            color: #fff;
-            font-size: 60px;
-            font-weight: bold;
-        }
-        .banner {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .vlc_head {
-            flex: 1 1 0px;
-        }
-    </style>
+
+    <link href="./vlc.css" rel="stylesheet">
 </head>
-<body>
-    <div class="emscripten_border">
-    <div class="emscripten">
-        <progress id="progress" value="0" max="100"></progress>
-        <div class="spinner" id='spinner'></div>
-        <div class="emscripten" id="status">Downloading...</div>
+<body id="body">
+    <div id="spinner-lds" class="loader">
+      <div class="lds-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
     </div>
-    </div>
-    <br></br>
-    <label for="opts">Enter libvlc options here:</label>
-    <input type="text" size=60 id="opts" name="opts" value="--codec=webcodec --aout=emworklet_audio -vvv"></input>
-    <button id="vlc_init">Start libvlc</button>
-    <button id="vlc_stop">stop</button>
-    <br></br>
-    <div id="stack">
+    <div id="app">
+      <nav role="navigation">
+        <div id="menuToggle">
+          <input type="checkbox" />
+          <span></span>
+          <span></span>
+          <span></span>
+          <ul id="menu">
+            <div>
+              <input type="text" size=60 id="opts" name="opts"></input>
+              <button id="reload" class="menu-button">Save</button>
+              <button id="reset-options" class="menu-button">Default values</button>
+            </div>
+          </ul>
+        </div>
+      </nav>
+      <div class="title">
+        <h1 class="main-title">VLC.js</h1>
+        <h3>Webassembly powered VLC</h3>
+        <h3>
+          <a class="vlc-link" target="_blank" href="https://code.videolan.org/jbk/vlc.js">
+            <img class="gitlab-logo" src="./assets/gitlab-logo-black-and-white.png" />
+            <p>Fork me on gitlab</p>
+          </a>
+        </h3>
+      </div>
+      <div id="stack">
         <canvas
-          class="emscripten" id="canvas"
-          oncontextmenu="event.preventDefault()" tabindex=-1
-          width=1280 height=720
+          class="emscripten"
+          id="canvas"
+          oncontextmenu="event.preventDefault()"
+          tabindex=-1
+          width=1280
+          height=720
         ></canvas>
-        <canvas
-          class="emscripten hidden" id="overlay"
-          oncontextmenu="event.preventDefault()" tabindex=-2
-          width=1280 height=720
-        ></canvas>
+        <div id="p-overlay" class="p-overlay">
+          <div id="play-button" class="play-button eject-svg">
+            <div>
+              <svg>
+                <!-- <path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path> -->
+                <path d="M7.27 1.047a1 1 0 0 1 1.46 0l6.345 6.77c.6.638.146 1.683-.73 1.683H1.656C.78 9.5.326 8.455.926 7.816L7.27 1.047zM.5 11.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-1z"/>
+              </svg>
+            </div>
+          </div>
+          <div id="bottom-bar" class="bottom-bar">
+            <div id="bottom-play-button" class="bottom-bar-play-button">
+              <svg id="bottom-bar-play-button-svg" class="bottom-bar-play-button-svg bottom-bar-eject-button-svg">
+                <!-- <path d="M6 1H3c-.6 0-1 .4-1 1v14c0 .6.4 1 1 1h3c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1zm6 0c-.6 0-1 .4-1 1v14c0 .6.4 1 1 1h3c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1h-3z"></path> -->
+                <!-- <path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path> -->
+                <path d="M7.27 1.047a1 1 0 0 1 1.46 0l6.345 6.77c.6.638.146 1.683-.73 1.683H1.656C.78 9.5.326 8.455.926 7.816L7.27 1.047zM.5 11.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-1z"/>
+              </svg>
+            </div>
+            <div class="bottom-progress-bar">
+              <div id="bottom-progress" class="progress-zone">
+                <div class="bottom-progress">
+                  <div id="bottom-progress-value" class="bottom-progress-value"></div>
+                </div>
+              </div>
+            </div>
+            <div id="time" class="bottom-bar-timer"></div>
+            <div id="volume" class="bottom-bar-volume">
+              <div id="volume-svg-wrapper" class="volume-svg-wrapper">
+                <svg id="volume-svg"><path d="M15.6 3.3c-.4-.4-1-.4-1.4 0-.4.4-.4 1 0 1.4C15.4 5.9 16 7.4 16 9c0 1.6-.6 3.1-1.8 4.3-.4.4-.4 1 0 1.4.2.2.5.3.7.3.3 0 .5-.1.7-.3C17.1 13.2 18 11.2 18 9s-.9-4.2-2.4-5.7z"></path><path d="M11.282 5.282a.909.909 0 000 1.316c.735.735.995 1.458.995 2.402 0 .936-.425 1.917-.995 2.487a.909.909 0 000 1.316c.145.145.636.262 1.018.156a.725.725 0 00.298-.156C13.773 11.733 14.13 10.16 14.13 9c0-.17-.002-.34-.011-.51-.053-.992-.319-2.005-1.522-3.208a.909.909 0 00-1.316 0zm-7.496.726H.714C.286 6.008 0 6.31 0 6.76v4.512c0 .452.286.752.714.752h3.072l4.071 3.858c.5.3 1.143 0 1.143-.602V2.752c0-.601-.643-.977-1.143-.601L3.786 6.008z"></path></svg>
+              </div>
+              <div id="bottom-progress-volume" style="max-width: 100px;" class="progress-zone hide-volume">
+                <div class="bottom-progress-volume">
+                  <div id="bottom-progress-volume-value" class="bottom-progress-volume-value"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="file-picker">
+        <input type="file" id="fpicker_btn" required>
+      </div>
     </div>
     <script src="./lib/module-loader.js"></script>
     <script src="./experimental.js"></script>
@@ -102,82 +97,217 @@
 
       var vlc_options = "";
 
-      // VlcModule is a function generated by emscripten in experimental.js,
-      // that loads the wasm file and generates a module object from it.
-      // VlcModuleExt is an object defined in 'lib/module-loader.js' with a
-      // bunch of options; also, all the fields of VlcModuleExt are added to
-      // the returned Module.
+      var showCanvas = new CustomEvent('toggleCanvas', { detail: { files: true } });
+      var hideCanvas = new CustomEvent('toggleCanvas', { detail: { files: false } });
 
-      globalThis.Module = await initModule(VlcModuleExt);
+      async function init() {
+        const app = document.getElementById('app');
+        const stack = document.getElementById('stack');
+        const spinner = document.getElementById('spinner-lds');
+        const pOverlay = document.getElementById("p-overlay");
+        const playButton = document.getElementById("play-button");
+        const bottomBar = document.getElementById("bottom-bar");
+        const volume = document.getElementById("volume");
+        const progressVolume = document.getElementById("bottom-progress-volume");
+        const options = document.getElementById("opts");
+        const reloadBtn = document.getElementById('reload');
+        const resetBtn = document.getElementById('reset-options');
+        const buttonBarPlayButton = document.getElementById('bottom-bar-play-button-svg');
 
-      window.onerror = function(event) {
-        // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
-        Module.setStatus('Exception thrown, see JavaScript console');
-        spinnerElement.style.display = 'none';
-        Module.setStatus = function(text) {
-          if (text) Module.printErr('[post-exception status] ' + text);
+        reloadBtn.addEventListener('click', () => {
+          window.location.reload();
+        });
+
+        resetBtn.addEventListener('click', () => {
+          localStorage.setItem('options', '--codec=webcodec --aout=emworklet_audio -vvv');
+          reloadBtn.click();
+        });
+
+        options.value = localStorage.getItem('options') || '--codec=webcodec --aout=emworklet_audio -vvv';
+
+        options.addEventListener('change', () => {
+          localStorage.setItem('options', options.value);
+        });
+
+        pOverlay.addEventListener('mouseenter', e => {
+          if (window.files && window.files.length) {
+            playButton.classList.remove('eject-svg');
+            playButton.classList.remove('hide-button');
+            bottomBar.classList.remove('hide-bottom-bar');
+          }
+        });
+
+        pOverlay.addEventListener('mouseleave', e => {
+          if (window.files && window.files.length) {
+            playButton.classList.add('hide-button');
+            bottomBar.classList.add('hide-bottom-bar');
+          }
+        });
+
+        volume.addEventListener('mouseenter', e => {
+          progressVolume.classList.remove('hide-volume');
+        });
+
+        volume.addEventListener('mouseleave', e => {
+          progressVolume.classList.add('hide-volume');
+        });
+
+        body.addEventListener('isLoading', event => {
+          if (event.detail.isLoading) {
+            spinner.style.display = 'block';
+            app.style.display = 'none';
+          }
+
+          if (!event.detail.isLoading) {
+            spinner.style.display = 'none';
+            app.style.display = 'block';
+          }
+        });
+
+        body.addEventListener('toggleCanvas', event => {
+          if (event.detail.files) {
+            playButton.classList.remove('eject-svg');
+            playButton.classList.remove('hide-button');
+            playButton.innerHTML = '<div><svg><path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path></svg></div>';
+            buttonBarPlayButton.innerHTML = '<path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path>';
+            buttonBarPlayButton.classList.remove('bottom-bar-eject-button-svg');
+          } else {
+            playButton.innerHTML = '<div><svg><path d="M7.27 1.047a1 1 0 0 1 1.46 0l6.345 6.77c.6.638.146 1.683-.73 1.683H1.656C.78 9.5.326 8.455.926 7.816L7.27 1.047zM.5 11.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-1z"/></div></svg>';
+            playButton.classList.add('eject-svg');
+            buttonBarPlayButton.innerHTML = '<path d="M15,290.01h270c8.284,0,15-6.716,15-15s-6.716-15-15-15H15c-8.284,0-15,6.716-15,15   S6.716,290.01,15,290.01z"/><path d="M15,210.01h270c0.006-0.001,0.013-0.001,0.02,0c8.285,0,15-6.716,15-15c0-3.774-1.394-7.223-3.695-9.859   L161.746,15.682c-2.845-3.583-7.17-5.672-11.746-5.672c-4.576,0-8.901,2.088-11.746,5.672l-135,170   c-3.58,4.508-4.265,10.666-1.762,15.85C3.995,206.716,9.244,210.01,15,210.01z"/>';
+            buttonBarPlayButton.classList.add('bottom-bar-eject-button-svg');
+          }
+        });
+
+        try {
+          // VlcModule is a function generated by emscripten in experimental.js,
+          // that loads the wasm file and generates a module object from it.
+          // VlcModuleExt is an object defined in 'lib/module-loader.js' with a
+          // bunch of options; also, all the fields of VlcModuleExt are added to
+          // the returned Module.
+          globalThis.Module = await initModule(VlcModuleExt);
+          createHandlers();
+          localStorage.setItem('valid-options', options.value);
+        } catch (e) {
+          const validOptions = localStorage.getItem('valid-options');
+          localStorage.setItem('options', validOptions);
+          window.location.reload();
+        }
+      }
+
+      function createHandlers() {
+        window.onerror = function(event) {
+          // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
+          Module.setStatus('Exception thrown, see JavaScript console');
+          // spinnerElement.style.display = 'none';
+          body.dispatchEvent(isNotLoading);
+          Module.setStatus = function(text) {
+            if (text) Module.printErr('[post-exception status] ' + text);
+          };
         };
+
+        function handleFiles() {
+          // iterator in case the user selected multiple files.
+          for (var i=0; i < this.files.length; i++) {
+            var name = this.files.item(i).name;
+            console.log("opened file: ", name);
+            Module['vlc_access_file'][1] = this.files.item(i);
+          }
+
+          globalThis.files = this.files;
+
+          if (this.files.length) {
+            body.dispatchEvent(showCanvas); // toggle button (play / upload)
+          } else {
+            body.dispatchEvent(hideCanvas);
+          }
+        }
+
+        let inputElement = document.getElementById("fpicker_btn");
+        inputElement.addEventListener("change", handleFiles);
+
+        var media_player;
+        let options_input = document.getElementById("opts");
+        vlc_options = localStorage.getItem('options') || options_input.value;
+        console.log("vlc.js: starting vlc.js with : " + vlc_options);
+        let vlc_opts_array = vlc_options.split(' ');
+
+        let vlc_opts_size = 0;
+        for (let i in vlc_opts_array) {
+          vlc_opts_size += vlc_opts_array[i].length + 1;
+        }
+
+        var buffer = Module._malloc(vlc_opts_size);
+        var wrote_size = 0;
+        for (let i in vlc_opts_array) {
+          Module.writeAsciiToMemory(vlc_opts_array[i], buffer + wrote_size, true);
+          wrote_size += vlc_opts_array[i].length + 1;
+        }
+
+        var vlc_argv = Module._malloc(vlc_opts_array.length * 4 + 4);
+        var view_vlc_argv = new Uint32Array(
+          Module.wasmMemory.buffer,
+          vlc_argv,
+          vlc_opts_array.length
+        );
+
+        wrote_size = 0;
+        for (let i in vlc_opts_array) {
+          view_vlc_argv[i] = buffer + wrote_size;
+          wrote_size += vlc_opts_array[i].length + 1;
+        }
+
+        Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
+        media_player = new MediaPlayer(Module, "emjsfile://1");
+        media_player.set_volume(80);
+
+        Module._set_global_media_player(media_player.media_player_ptr);
+        window.media_player = media_player;
+        window.on_overlay_click = on_overlay_click;
+        window.update_overlay = update_overlay;
+
+        update_overlay();
+
+        const playButton = document.getElementById('play-button');
+        const bPlayButton = document.getElementById('bottom-play-button');
+
+        function handlePlayPause() {
+          if (globalThis.files) {
+            media_player.toggle_play();
+          } else {
+            inputElement.click();
+          }
+        }
+
+        playButton.addEventListener('click', handlePlayPause);
+        bPlayButton.addEventListener('click', handlePlayPause);
+
+        const volumeSvgWrapper = document.getElementById('volume-svg-wrapper');
+        volumeSvgWrapper.addEventListener('click', function() {
+          if (!window.files || !window.files.length) return;
+          media_player.toggle_mute();
+          update_overlay();
+        });
+
+        const progressTotal = document.getElementById('bottom-progress');
+        progressTotal.addEventListener('click', function(event) {
+          if (!window.files || !window.files.length) return;
+          media_player.set_position(event.offsetX / progressTotal.clientWidth);
+            update_overlay();
+        });
+
+        const progressVolumeTotal = document.getElementById('bottom-progress-volume');
+        progressVolumeTotal.addEventListener('click', function(event) {
+          if (!window.files || !window.files.length) return;
+          media_player.set_volume(event.offsetX / progressVolumeTotal.clientWidth * 100);
+          media_player.set_mute(0);
+          update_overlay();
+        });
       };
-      
-      const overlay = document.getElementById("overlay");
-      let inputElement = document.getElementById("fpicker_btn");
-      let init_elem = document.getElementById("vlc_init");
-      let stop_elem = document.getElementById("vlc_stop");
-      let options_input = document.getElementById("opts");
-      function handleFiles() {
-	  // iterator in case the user selected multiple files.
-	  for (var i=0; i < this.files.length; i++) {
-	      var name = this.files.item(i).name;
-	      console.log("opened file: ", name);
-	      Module['vlc_access_file'][1] = this.files.item(i);
-	  }
-      }
 
-      inputElement.addEventListener("change", handleFiles, false);  
-      var media_player;
-      function handleStart() {
-	  vlc_options = options_input.value;
-	  console.log("vlc.js: starting vlc.js with : " + vlc_options);
-	  let vlc_opts_array = vlc_options.split(' ');
-
-	  let vlc_opts_size = 0;
-	  for (let i in vlc_opts_array) {
-	      vlc_opts_size += vlc_opts_array[i].length + 1;
-	  }
-	  var buffer = Module._malloc(vlc_opts_size);
-	  var wrote_size = 0;
-	  for (let i in vlc_opts_array) {
-	      Module.writeAsciiToMemory(vlc_opts_array[i], buffer + wrote_size, true);
-	      wrote_size += vlc_opts_array[i].length + 1;
-	  }
-	  var vlc_argv = Module._malloc(vlc_opts_array.length * 4 + 4);
-	  var view_vlc_argv = new Uint32Array(
-	      Module.wasmMemory.buffer,
-	      vlc_argv,
-	      vlc_opts_array.length
-	  );
-	  wrote_size = 0;
-	  for (let i in vlc_opts_array) {
-	      view_vlc_argv[i] = buffer + wrote_size;
-	      wrote_size += vlc_opts_array[i].length + 1;
-	  }
-	  Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
-	  media_player = new MediaPlayer(Module, "emjsfile://1");
-	  media_player.set_volume(80);
-	  
-	  Module._set_global_media_player(media_player.media_player_ptr);
-	  window.media_player = media_player;
-	  window.on_overlay_click = on_overlay_click;
-	  window.update_overlay = update_overlay;      
-	  update_overlay(overlay);
-      }
-      function handleStop() {
-	  media_player.stop();
-      }
-      init_elem.addEventListener("click", handleStart, false);
-      stop_elem.addEventListener("click", handleStop, false);
+      window.onload = function () {
+        init();
+      };
     </script>
-
-
 </body>
 </html>
