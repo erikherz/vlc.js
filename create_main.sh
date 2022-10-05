@@ -34,6 +34,25 @@ SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 
 # -s ASYNCIFY_IMPORTS="['init_js_file', 'getVoutMessagePort', 'bindVideoFrame', 'CopyFrameToBuffer', 'probeConfig', 'initDecoderWorkerMessagePort', 'flushAsync', 'initDecoderJS']"
 
+VLC_USE_SANITIZER=
+while test -n "$1"
+do
+    case "$1" in
+        --with-sanitizer=*)
+            VLC_USE_SANITIZER="${1#--with-sanitizer=}"
+            ;;
+        *)
+            echo "Unrecognized options $1"
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+SANITIZERS=
+if echo "${VLC_USE_SANITIZER}" | grep address > /dev/null; then
+SANITIZERS="$SANITIZERS -fsanitize=address -fsanitize-address-use-after-scope -fno-omit-frame-pointer"
+fi
 
 emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=25 \
     -s OFFSCREEN_FRAMEBUFFER=1  \
@@ -47,6 +66,7 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=25 \
     -I $PATH_VLC/include/ \
     main.c exports_media_player.c exports_media.c \
     -s EXPORTED_FUNCTIONS=@libvlc_wasm.sym \
+    $SANITIZERS \
     $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
     $PATH_VLC/build-emscripten/vlc-modules.bc \
     $PATH_VLC/build-emscripten/modules/.libs/*.a \

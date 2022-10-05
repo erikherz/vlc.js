@@ -59,9 +59,25 @@ cd $WORK_DIR
 diagnostic "Setting the environment"
 . emsdk/emsdk_env.sh
 
+VLC_USE_SANITIZER=
+while test -n "$1"
+do
+    case "$1" in
+        --with-sanitizer=*)
+            VLC_USE_SANITIZER="$1"
+            ;;
+        *)
+            echo "Unrecognized options $1"
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 diagnostic "build libvlc"
 cd ./vlc/extras/package/wasm-emscripten/
-./build.sh --mode=${SLOW_MODE}
+./build.sh --mode=${SLOW_MODE} ${VLC_USE_SANITIZER}
 cd $WORK_DIR
 echo "_main" > libvlc_wasm.sym
 sed -e 's/^/_/' ./vlc/lib/libvlc.sym >> libvlc_wasm.sym
@@ -69,4 +85,4 @@ sed -e 's/^/_/' ./vlc/lib/libvlc.sym >> libvlc_wasm.sym
 
 cd $WORK_DIR
 diagnostic "Generating executable"
-./create_main.sh
+./create_main.sh ${VLC_USE_SANITIZER}
