@@ -10,7 +10,7 @@
 #include <GLES3/gl3.h>
 
 #include <vlc_common.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_opengl.h>
 #include <vlc_vout_display.h>
 #include <vlc_opengl_filter.h>
@@ -39,7 +39,7 @@ struct test_scenario {
     void (*setup)(struct test_scenario *scenario);
     float color[3];
 
-    vout_window_t *window;
+    vlc_window_t *window;
     vlc_gl_t *gl;
     vlc_thread_t thread;
 } tests[] =  {
@@ -93,9 +93,9 @@ static void *test_run(void *opaque)
     auto *test = static_cast<struct test_scenario *>(opaque);
     libvlc_int_t *root = libvlc->p_libvlc_int;
 
-    test->window = vlc_object_create<vout_window_t>(root);
+    test->window = vlc_object_create<vlc_window_t>(root);
     test->window->handle.canvas = test->canvas;
-    test->window->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
+    test->window->type = VLC_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
     struct vout_display_cfg cfg = {
         .window = test->window,
     };
@@ -140,7 +140,7 @@ int main() {
     {
         emscripten_log(EM_LOG_INFO | EM_LOG_CONSOLE, "- test %zu/%zu...\n",
             i, ARRAY_SIZE(tests));
-        vlc_clone(&tests[i].thread, test_run, &tests[i], 0);
+        vlc_clone(&tests[i].thread, test_run, &tests[i]);
     }
 
     emscripten_set_main_loop(iter, 1, 1);
@@ -329,7 +329,6 @@ static void scenario5_videoframe(struct test_scenario *scenario)
     auto interop = vlc_object_create<struct vlc_gl_interop>(scenario->gl);
     interop->gl = scenario->gl;
     interop->vctx = vctx;
-    interop->init = InteropInit;
     video_format_Init(&interop->fmt_in, VLC_CODEC_WEBCODEC_OPAQUE);
     interop->fmt_in.i_visible_width
         = interop->fmt_in.i_width
@@ -383,7 +382,6 @@ void scenario7_display(struct test_scenario *scenario)
     struct vout_display_cfg cfg = {
         .window = scenario->window,
         .display = { .width=400, .height=300, .sar = {1,1} },
-        .is_display_filled = true,
     };
 
     video_format_t format;

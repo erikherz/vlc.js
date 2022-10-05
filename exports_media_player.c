@@ -24,8 +24,9 @@ libvlc_media_list_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_list_player_new() {
   return libvlc_media_list_player_new(libvlc);
 }
 
-libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new_from_media(libvlc_media_t* media) {
-    return libvlc_media_player_new_from_media(media);
+libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE
+wasm_media_player_new_from_media(libvlc_instance_t *instance, libvlc_media_t* media) {
+    return libvlc_media_player_new_from_media(instance, media);
 }
 
 void EMSCRIPTEN_KEEPALIVE wasm_media_player_release(libvlc_media_player_t *media_player) {

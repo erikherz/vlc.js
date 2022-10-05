@@ -7,15 +7,12 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-// Singleton, defined in main.c
-extern libvlc_instance_t *libvlc;
-
 libvlc_media_t* EMSCRIPTEN_KEEPALIVE wasm_media_new_path(const char *path) {
-    return libvlc_media_new_path(libvlc, path);
+    return libvlc_media_new_path(path);
 }
 
 libvlc_media_t* EMSCRIPTEN_KEEPALIVE wasm_media_new_location(const char *path) {
-    return libvlc_media_new_location(libvlc, path);
+    return libvlc_media_new_location(path);
 }
 
 void EMSCRIPTEN_KEEPALIVE wasm_media_retain( libvlc_media_t *media) {
