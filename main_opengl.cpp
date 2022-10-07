@@ -143,8 +143,8 @@ int main() {
         vlc_clone(&tests[i].thread, test_run, &tests[i]);
     }
 
-    emscripten_set_main_loop(iter, 1, 1);
-
+    emscripten_set_main_loop(iter, 1, 0);
+    emscripten_exit_with_live_runtime();
     return 0;
 }
 
@@ -192,7 +192,7 @@ static void scenario3_clearsmooth(struct test_scenario *scenario)
 {
     init_gl(scenario);
 
-    emscripten_set_main_loop_arg(ClearColorAtTime, scenario, 0, false);
+    //emscripten_set_main_loop_arg(ClearColorAtTime, scenario, 0, false);
 }
 
 static void scenario4_mock(struct test_scenario *scenario)
@@ -329,6 +329,7 @@ static void scenario5_videoframe(struct test_scenario *scenario)
     auto interop = vlc_object_create<struct vlc_gl_interop>(scenario->gl);
     interop->gl = scenario->gl;
     interop->vctx = vctx;
+    //interop->init = InteropInit;
     video_format_Init(&interop->fmt_in, VLC_CODEC_WEBCODEC_OPAQUE);
     interop->fmt_in.i_visible_width
         = interop->fmt_in.i_width
