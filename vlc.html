@@ -307,6 +307,38 @@
         playButton.addEventListener('click', handlePlayPause);
         bPlayButton.addEventListener('click', handlePlayPause);
 
+        let dragController = playButton;
+        window.viewpoint = {};
+        window.viewpoint.dragging = false;
+        window.viewpoint.position = { x: 0, y: 0 };
+        window.viewpoint.offset = { x: 0, y: 0 };
+        window.viewpoint.lastOffset = { x: 0, y: 0 };
+        dragController.addEventListener('mousedown', e => {
+          window.viewpoint.dragging = true;
+          window.viewpoint.position.x = e.clientX;
+          window.viewpoint.position.y = e.clientY;
+        });
+        dragController.addEventListener('mouseup', e => {
+          window.viewpoint.dragging = false;
+          window.viewpoint.lastOffset = window.viewpoint.offset;
+        });
+        dragController.addEventListener('mousemove', e => {
+          if (!window.viewpoint.dragging) return;
+          if (!globalThis.files) return;
+
+          const offsetX = e.clientX - window.viewpoint.position.x;
+          const offsetY = e.clientY - window.viewpoint.position.y;
+          window.viewpoint.offset = {
+            x: window.viewpoint.lastOffset.x + offsetX,
+            y: window.viewpoint.lastOffset.y + offsetY,
+          };
+
+          const yaw = -0.05 * window.viewpoint.offset.x;
+          const pitch = -0.05 * window.viewpoint.offset.y;
+
+          window.media_player.set_viewpoint(yaw, pitch, 0, 80);
+        });
+
         const volumeSvgWrapper = document.getElementById('volume-svg-wrapper');
         volumeSvgWrapper.addEventListener('click', function() {
           if (!window.files || !window.files.length) return;

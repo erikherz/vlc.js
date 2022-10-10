@@ -246,6 +246,25 @@ int EMSCRIPTEN_KEEPALIVE wasm_media_player_set_role(libvlc_media_player_t *media
   return libvlc_media_player_set_role(media_player, role);
 }
 
+void EMSCRIPTEN_KEEPALIVE
+wasm_video_update_viewpoint(libvlc_media_player_t *player,
+                            libvlc_video_viewpoint_t *viewpoint,
+                            bool absolute) {
+  libvlc_video_update_viewpoint(player, viewpoint, absolute);
+}
+
+libvlc_video_viewpoint_t *EMSCRIPTEN_KEEPALIVE wasm_video_viewpoint_new() {
+  return libvlc_video_new_viewpoint();
+}
+
+void EMSCRIPTEN_KEEPALIVE wasm_video_viewpoint_set(libvlc_video_viewpoint_t *vp,
+        float yaw, float pitch, float roll, float fov) {
+  vp->f_yaw = yaw;
+  vp->f_pitch = pitch;
+  vp->f_roll = roll;
+  vp->f_field_of_view = fov;
+}
+
 int EMSCRIPTEN_KEEPALIVE wasm_libvlc_init(size_t size, char const *argv[]) {
     /*
     char const *vlc_argv[] = {
