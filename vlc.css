@@ -238,6 +238,15 @@ body {
     cursor: pointer;
 }
 
+.bottom-bar-stop-button {
+    flex: 1 1 0;
+    margin: auto;
+    height: 100%;
+    text-align: center;
+    display: flex;
+    cursor: pointer;
+}
+
 .file-picker {
     visibility: hidden;
     margin: auto;
@@ -257,6 +266,14 @@ body {
 }
 
 .bottom-bar-play-button-svg {
+    width: 20px;
+    margin: auto;
+    height: 18px;
+    z-index: 2;
+    fill: white;
+}
+
+.bottom-bar-stop {
     width: 20px;
     margin: auto;
     height: 18px;
