@@ -48,6 +48,7 @@ struct test_scenario {
         .setup = scenario1_clear,
         .color = { 1.f, 0.f, 0.f },
     },
+#if 1
     {
         .canvas = "canvas_step2",
         .setup = scenario1_clear,
@@ -69,7 +70,7 @@ struct test_scenario {
         .canvas = "canvas_step7",
         .setup = scenario7_display,
     }
-
+#endif
 };
 
 #define DECLARE_MEMBER(type, name) type name;
@@ -108,6 +109,13 @@ static void init_gl(struct test_scenario *scenario)
 {
     struct vout_display_cfg cfg = {
         .window = scenario->window,
+        .display = {
+            .width = 400,
+            .height = 300,
+            .sar = { 1, 1 },
+            .fitting = VLC_VIDEO_FIT_NONE,
+            .zoom = { 1, 1 },
+        }
     };
 
     scenario->gl = vlc_gl_Create(&cfg, VLC_OPENGL_ES2, "any");
@@ -191,8 +199,7 @@ static void ClearColorAtTime(void *opaque)
 static void scenario3_clearsmooth(struct test_scenario *scenario)
 {
     init_gl(scenario);
-
-    //emscripten_set_main_loop_arg(ClearColorAtTime, scenario, 0, false);
+    emscripten_set_main_loop_arg(ClearColorAtTime, scenario, 0, false);
 }
 
 static void scenario4_mock(struct test_scenario *scenario)
@@ -253,12 +260,6 @@ static void scenario4_mock(struct test_scenario *scenario)
     vlc_gl_Swap(scenario->gl);
     vlc_gl_ReleaseCurrent(scenario->gl);
     return;
-}
-
-static int InteropInit(struct vlc_gl_interop *interop, uint32_t tex_target,
-        vlc_fourcc_t chroma, video_color_space_t yuv_space)
-{
-    return VLC_SUCCESS;
 }
 
 EM_JS(void, SendVideoFrame, (int worker_id), {
@@ -329,7 +330,6 @@ static void scenario5_videoframe(struct test_scenario *scenario)
     auto interop = vlc_object_create<struct vlc_gl_interop>(scenario->gl);
     interop->gl = scenario->gl;
     interop->vctx = vctx;
-    //interop->init = InteropInit;
     video_format_Init(&interop->fmt_in, VLC_CODEC_WEBCODEC_OPAQUE);
     interop->fmt_in.i_visible_width
         = interop->fmt_in.i_width
@@ -382,7 +382,12 @@ void scenario7_display(struct test_scenario *scenario)
 {
     struct vout_display_cfg cfg = {
         .window = scenario->window,
-        .display = { .width=400, .height=300, .sar = {1,1} },
+        .display = {
+            .width=400, .height=300,
+            .sar = { 1, 1 },
+            .fitting = VLC_VIDEO_FIT_NONE,
+            .zoom = { 1, 1 },
+        },
     };
 
     video_format_t format;

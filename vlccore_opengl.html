@@ -161,7 +161,6 @@
         ></canvas>
     </div>
 
-
     <script src="./opengl.js"></script>
 
     <script type="module">
@@ -194,7 +193,7 @@
               }
           }
       };
-      globalThis.Module = await initModule(defaultModule);
+      globalThis.Module = await initModule({});
 //      globalThis.Module.postRun += [
 //        function() {
 //            // This should run after the wasm module is instantiated
