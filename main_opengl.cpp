@@ -118,7 +118,7 @@ static void init_gl(struct test_scenario *scenario)
         }
     };
 
-    scenario->gl = vlc_gl_Create(&cfg, VLC_OPENGL_ES2, "any");
+    scenario->gl = vlc_gl_Create(&cfg, VLC_OPENGL_ES2, "any", NULL);
     assert(scenario->gl);
 }
 
