@@ -58,7 +58,7 @@ You can run it locally by launching a webserver on your computer.
 
 ```bash
 source emsdk/emsdk_env.sh
-emrun --no_browser --port 8080 vlc.html --emrun
+emrun --no_browser --port 8080 vlc.html
 ```
 
 And seeing the result at url : http://localhost:8080/vlc.html
