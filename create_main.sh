@@ -35,11 +35,15 @@ SAMPLE_DIR=${SAMPLE_DIR:=./samples}
 # -s ASYNCIFY_IMPORTS="['init_js_file', 'getVoutMessagePort', 'bindVideoFrame', 'CopyFrameToBuffer', 'probeConfig', 'initDecoderWorkerMessagePort', 'flushAsync', 'initDecoderJS']"
 
 VLC_USE_SANITIZER=
+DEBUG_OPTIONS=
 while test -n "$1"
 do
     case "$1" in
         --with-sanitizer=*)
             VLC_USE_SANITIZER="${1#--with-sanitizer=}"
+            ;;
+        --export-debug-symbols)
+            DEBUG_OPTIONS="-g"
             ;;
         *)
             echo "Unrecognized options $1"
@@ -66,6 +70,7 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=25 \
     -I $PATH_VLC/include/ \
     main.c exports_media_player.c exports_media.c \
     -s EXPORTED_FUNCTIONS=@libvlc_wasm.sym \
+    $DEBUG_OPTIONS \
     $SANITIZERS \
     $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
     $PATH_VLC/build-emscripten/vlc-modules.bc \
@@ -77,11 +82,11 @@ emcc --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=25 \
     --js-library vlc/modules/audio_output/webaudio/webaudio.js \
     -o experimental.js
 
-
 #em++ --bind -s USE_PTHREADS=1 -s TOTAL_MEMORY=2GB -s PTHREAD_POOL_SIZE=21 \
 #    -s OFFSCREEN_FRAMEBUFFER=1\
 #    -s USE_WEBGL2=1 \
 #    --profiling-funcs \
+#    $DEBUG_OPTIONS \
 #    -s OFFSCREENCANVAS_SUPPORT=1 \
 #    -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
 #    -s EXTRA_EXPORTED_RUNTIME_METHODS="[allocateUTF8]" \

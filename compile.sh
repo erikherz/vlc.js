@@ -60,11 +60,15 @@ diagnostic "Setting the environment"
 . emsdk/emsdk_env.sh
 
 VLC_USE_SANITIZER=
+EXPORT_DEBUG_SYMBOLS=
 while test -n "$1"
 do
     case "$1" in
         --with-sanitizer=*)
             VLC_USE_SANITIZER="$1"
+            ;;
+        --export-debug-symbols)
+            EXPORT_DEBUG_SYMBOLS="$1"
             ;;
         *)
             echo "Unrecognized options $1"
@@ -85,4 +89,4 @@ sed -e 's/^/_/' ./vlc/lib/libvlc.sym >> libvlc_wasm.sym
 
 cd $WORK_DIR
 diagnostic "Generating executable"
-./create_main.sh ${VLC_USE_SANITIZER}
+./create_main.sh ${VLC_USE_SANITIZER} ${EXPORT_DEBUG_SYMBOLS}
