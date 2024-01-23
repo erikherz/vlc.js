@@ -59,6 +59,22 @@ cd $WORK_DIR
 diagnostic "Setting the environment"
 . emsdk/emsdk_env.sh
 
+EXPORT_DEBUG_SYMBOLS=
+while test -n "$1"
+do
+    case "$1" in
+        --export-debug-symbols)
+            EXPORT_DEBUG_SYMBOLS="$1"
+            ;;
+        *)
+            echo "Unrecognized options $1"
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 diagnostic "build libvlc"
 cd ./vlc/extras/package/wasm-emscripten/
 ./build.sh --mode=${SLOW_MODE}
@@ -69,4 +85,4 @@ sed -e 's/^/_/' ./vlc/lib/libvlc.sym >> libvlc_wasm.sym
 
 cd $WORK_DIR
 diagnostic "Generating executable"
-./create_main.sh
+./create_main.sh ${EXPORT_DEBUG_SYMBOLS}
