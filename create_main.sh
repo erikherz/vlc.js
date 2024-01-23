@@ -68,6 +68,7 @@ emcc --bind -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=25 \
     -I $PATH_VLC/include/ \
     main.c exports_media_player.c exports_media.c \
     -s EXPORTED_FUNCTIONS=@libvlc_wasm.sym \
+    -g \
     $SANITIZERS \
     $PATH_VLC/build-emscripten/lib/.libs/libvlc.a \
     $PATH_VLC/build-emscripten/vlc-modules.bc \
@@ -86,6 +87,7 @@ em++ --bind -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=21 \
     -s OFFSCREEN_FRAMEBUFFER=1\
     -s USE_WEBGL2=1 \
     --profiling-funcs \
+    -g \
     -s OFFSCREENCANVAS_SUPPORT=1 \
     -s MODULARIZE=1 -s EXPORT_NAME="initModule" \
     -s EXTRA_EXPORTED_RUNTIME_METHODS="[allocateUTF8, writeAsciiToMemory]" \
