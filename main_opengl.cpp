@@ -283,6 +283,8 @@ EM_JS(void, SendVideoFrame, (int worker_id), {
         format: 'RGBA',
         codedWidth: 32,
         codedHeight: 32,
+        displayWidth: 32,
+        displayHeight: 32,
         timestamp: 0,
     });
     self.postMessage({
