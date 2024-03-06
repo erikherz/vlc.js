@@ -19,7 +19,7 @@ checkfail()
 SLOW_MODE=${SLOW_MODE:=1}
 WORK_DIR=$PWD
 
-EMSDK_VERSION="3.1.18"
+EMSDK_VERSION="3.1.55"
 # Download the portable SDK and uncompress it
 if [ ! -d emsdk ]; then
     diagnostic "emsdk not found. Fetching it"
@@ -80,6 +80,8 @@ cd ./vlc/extras/package/wasm-emscripten/
 ./build.sh --mode=${SLOW_MODE} ${VLC_USE_SANITIZER}
 cd $WORK_DIR
 echo "_main" > libvlc_wasm.sym
+echo "_malloc" >> libvlc_wasm.sym
+echo "_free" >> libvlc_wasm.sym
 sed -e 's/^/_/' ./vlc/lib/libvlc.sym >> libvlc_wasm.sym
 
 
