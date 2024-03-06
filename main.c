@@ -13,15 +13,15 @@ libvlc_time_t t = -1;
 
 static void iter()
 {
-    if (!mp)
-        return;
-    if (libvlc_media_player_get_time(mp) == t) {
-        // when enable, the js does not respond.
-        //libvlc_media_player_release( mp );
-        //libvlc_release( libvlc );
-        emscripten_cancel_main_loop();
-    }
-    t = libvlc_media_player_get_time(mp);
+    //if (!mp)
+    //    return;
+    //if (libvlc_media_player_get_time(mp) == t) {
+    //    // when enable, the js does not respond.
+    //    //libvlc_media_player_release( mp );
+    //    //libvlc_release( libvlc );
+    //    emscripten_cancel_main_loop();
+    //}
+    //t = libvlc_media_player_get_time(mp);
 }
 
 void EMSCRIPTEN_KEEPALIVE set_global_media_player(libvlc_media_player_t *media_player) {

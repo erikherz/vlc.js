@@ -15,6 +15,10 @@ libvlc_media_t* EMSCRIPTEN_KEEPALIVE wasm_media_new_location(const char *path) {
     return libvlc_media_new_location(path);
 }
 
+void EMSCRIPTEN_KEEPALIVE wasm_media_add_option(libvlc_media_t *media, const char *option) {
+    libvlc_media_add_option(media, option);
+}
+
 void EMSCRIPTEN_KEEPALIVE wasm_media_retain( libvlc_media_t *media) {
   libvlc_media_retain(media);
 }

@@ -14,13 +14,12 @@
 #include <emscripten/html5.h>
 
 // Singleton, defined in main.c
-extern libvlc_instance_t *libvlc;
 
-libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new() {
+libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new(libvlc_instance_t *libvlc) {
   return libvlc_media_player_new(libvlc);
 }
 
-libvlc_media_list_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_list_player_new() {
+libvlc_media_list_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_list_player_new(libvlc_instance_t *libvlc) {
   return libvlc_media_list_player_new(libvlc);
 }
 
@@ -267,7 +266,7 @@ void EMSCRIPTEN_KEEPALIVE wasm_video_viewpoint_set(libvlc_video_viewpoint_t *vp,
   vp->f_field_of_view = fov;
 }
 
-int EMSCRIPTEN_KEEPALIVE wasm_libvlc_init(size_t size, char const *argv[]) {
+libvlc_instance_t* EMSCRIPTEN_KEEPALIVE wasm_libvlc_init(size_t size, char const *argv[]) {
     /*
     char const *vlc_argv[] = {
         "-vvv",
@@ -279,11 +278,11 @@ int EMSCRIPTEN_KEEPALIVE wasm_libvlc_init(size_t size, char const *argv[]) {
         "--ignore-config",
     };
     */
-    libvlc = libvlc_new( size, argv );
+    libvlc_instance_t *libvlc = libvlc_new( size, argv );
     if (libvlc == NULL)
     {
         fprintf( stderr, "unable to create libvlc instance" );
-        return -1;
+        return NULL;
     }
-    return 0;
+    return libvlc;
 }

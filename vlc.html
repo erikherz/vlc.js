@@ -22,6 +22,7 @@
           <ul id="menu">
             <div>
               <input type="text" size=60 id="opts" name="opts"></input>
+              <input type="text" size=60 id="media" name="media"></input>
               <button id="reload" class="menu-button">Save</button>
               <button id="reset-options" class="menu-button">Default values</button>
             </div>
@@ -40,8 +41,8 @@
       </div>
       <div id="stack">
         <canvas
-          class="emscripten"
-          id="canvas"
+          class="emscripten canvas"
+          id="pouet"
           oncontextmenu="event.preventDefault()"
           tabindex=-1
           width=1280
@@ -110,6 +111,16 @@
           </div>
         </div>
       </div>
+      <div id="stack">
+        <canvas
+          class="emscripten canvas"
+          id="pouet2"
+          oncontextmenu="event.preventDefault()"
+          tabindex=-1
+          width=1280
+          height=720
+        ></canvas>
+      </div>
       <div class="file-picker">
           <input type="file" id="fpicker_btn" required>
       </div>
@@ -135,6 +146,7 @@
         const volume = document.getElementById("volume");
         const progressVolume = document.getElementById("bottom-progress-volume");
         const options = document.getElementById("opts");
+        const media = document.getElementById("media");
         const reloadBtn = document.getElementById('reload');
         const resetBtn = document.getElementById('reset-options');
         const buttonBarPlayButton = document.getElementById('bottom-bar-play-button-svg');
@@ -149,6 +161,7 @@
 
         resetBtn.addEventListener('click', () => {
           localStorage.setItem('options', '--codec=webcodec --aout=emworklet_audio -vvv');
+          localStorage.setItem('media', 'emjsfile://1');
           reloadBtn.click();
         });
 
@@ -156,6 +169,11 @@
 
         options.addEventListener('change', () => {
           localStorage.setItem('options', options.value);
+        });
+
+        media.value = localStorage.getItem('media') || 'emjsfile://1';
+        media.addEventListener('change', () => {
+          localStorage.setItem('media', media.value);
         });
 
         pOverlay.addEventListener('mouseenter', e => {
@@ -225,6 +243,7 @@
         } catch (e) {
           const validOptions = localStorage.getItem('valid-options');
           localStorage.setItem('options', validOptions);
+          console.log(e);
           //window.location.reload();
         }
       }
@@ -260,43 +279,54 @@
         let inputElement = document.getElementById("fpicker_btn");
         inputElement.addEventListener("change", handleFiles);
 
-        var media_player;
+        function createPlayer(input, options, canvas) {
+            let vlc_opts_array = options.split(' ');
+            vlc_opts_array.push(`--emscripten-canvas-id=${canvas}`)
+
+            let vlc_opts_size = 0;
+            for (let i in vlc_opts_array) {
+              vlc_opts_size += vlc_opts_array[i].length + 1;
+                console.log(vlc_opts_array[i])
+            }
+
+            var buffer = Module._malloc(vlc_opts_size);
+            var wrote_size = 0;
+            for (let i in vlc_opts_array) {
+              Module.writeAsciiToMemory(vlc_opts_array[i], buffer + wrote_size, false);
+              wrote_size += vlc_opts_array[i].length + 1;
+            }
+
+            var vlc_argv = Module._malloc(vlc_opts_array.length * 4 + 4);
+            var view_vlc_argv = new Uint32Array(
+              Module.wasmMemory.buffer,
+              vlc_argv,
+              vlc_opts_array.length
+            );
+
+            wrote_size = 0;
+            for (let i in vlc_opts_array) {
+              view_vlc_argv[i] = buffer + wrote_size;
+              wrote_size += vlc_opts_array[i].length + 1;
+            }
+            let libvlc = Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
+            return new MediaPlayer(libvlc, Module, input);
+        }
+
         let options_input = document.getElementById("opts");
         vlc_options = localStorage.getItem('options') || options_input.value;
         console.log("vlc.js: starting vlc.js with : " + vlc_options);
-        let vlc_opts_array = vlc_options.split(' ');
 
-        let vlc_opts_size = 0;
-        for (let i in vlc_opts_array) {
-          vlc_opts_size += vlc_opts_array[i].length + 1;
-        }
-
-        var buffer = Module._malloc(vlc_opts_size);
-        var wrote_size = 0;
-        for (let i in vlc_opts_array) {
-          Module.writeAsciiToMemory(vlc_opts_array[i], buffer + wrote_size, false);
-          wrote_size += vlc_opts_array[i].length + 1;
-        }
-
-        var vlc_argv = Module._malloc(vlc_opts_array.length * 4 + 4);
-        var view_vlc_argv = new Uint32Array(
-          Module.wasmMemory.buffer,
-          vlc_argv,
-          vlc_opts_array.length
-        );
-
-        wrote_size = 0;
-        for (let i in vlc_opts_array) {
-          view_vlc_argv[i] = buffer + wrote_size;
-          wrote_size += vlc_opts_array[i].length + 1;
-        }
-
-        Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
-        media_player = new MediaPlayer(Module, "emjsfile://1");
+        let vlc_input = localStorage.getItem('media') || media.value;
+        var media_player = createPlayer(vlc_input, vlc_options, "pouet");
         media_player.set_volume(80);
 
-        Module._set_global_media_player(media_player.media_player_ptr);
         window.media_player = media_player;
+        Module._set_global_media_player(media_player.media_player_ptr);
+
+        //var media_player2 = createPlayer(vlc_input, vlc_options, "pouet2");
+        //media_player2.set_volume(80);
+
+        //window.media_player2 = media_player2;
         window.on_overlay_click = on_overlay_click;
         window.update_overlay = update_overlay;
 
@@ -306,10 +336,11 @@
         const bPlayButton = document.getElementById('bottom-play-button');
 
         function handlePlayPause() {
-          if (globalThis.files) {
-            media_player.toggle_play();
-          } else {
+          if (globalThis.files === undefined && vlc_input == "emjsfile://1") {
             inputElement.click();
+          } else {
+            media_player.toggle_play();
+            //media_player2.toggle_play();
           }
         }
 
@@ -318,6 +349,7 @@
 
         bottomBarStopButton.addEvenListener('click', () => {
           window.media_player.stop();
+          //window.media_player2.stop();
           globalThis.files = undefined;
           Module['vlc_access_file'][1] = undefined;
           alert('STOP');
@@ -353,12 +385,14 @@
           const pitch = -0.05 * window.viewpoint.offset.y;
 
           window.media_player.set_viewpoint(yaw, pitch, 0, 80);
+          //window.media_player2.set_viewpoint(yaw, pitch, 0, 80);
         });
 
         const volumeSvgWrapper = document.getElementById('volume-svg-wrapper');
         volumeSvgWrapper.addEventListener('click', function() {
           if (!window.files || !window.files.length) return;
           media_player.toggle_mute();
+          //media_player2.toggle_mute();
           update_overlay();
         });
 
@@ -366,6 +400,7 @@
         progressTotal.addEventListener('click', function(event) {
           if (!window.files || !window.files.length) return;
           media_player.set_position(event.offsetX / progressTotal.clientWidth);
+          //media_player2.set_position(event.offsetX / progressTotal.clientWidth);
             update_overlay();
         });
 
@@ -374,6 +409,8 @@
           if (!window.files || !window.files.length) return;
           media_player.set_volume(event.offsetX / progressVolumeTotal.clientWidth * 100);
           media_player.set_mute(0);
+          //media_player2.set_volume(event.offsetX / progressVolumeTotal.clientWidth * 100);
+          //media_player2.set_mute(0);
           update_overlay();
         });
 
@@ -381,6 +418,7 @@
         nextChapter.addEventListener('click', () => {
           if (!window.files || !window.files.length) return;
           window.media_player.next_chapter();
+          //window.media_player2.next_chapter();
           update_overlay();
         });
 
@@ -388,6 +426,7 @@
         previousChapter.addEventListener('click', () => {
           if (!window.files || !window.files.length) return;
           window.media_player.previous_chapter();
+          //window.media_player2.previous_chapter();
           update_overlay();
         });
       };
