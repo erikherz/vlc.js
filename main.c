@@ -8,7 +8,6 @@
 #include <emscripten/html5.h>
 
 libvlc_media_player_t *mp = NULL;
-libvlc_instance_t *libvlc;
 libvlc_time_t t = -1;
 
 static void iter()

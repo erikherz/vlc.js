@@ -13,8 +13,7 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-// Singleton, defined in main.c
-extern libvlc_instance_t *libvlc;
+libvlc_instance_t *libvlc;
 
 libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new() {
   return libvlc_media_player_new(libvlc);
