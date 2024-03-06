@@ -1,0 +1,28 @@
+From 9194e19e11f2d645d56fe9a50660cc7a11818290 Mon Sep 17 00:00:00 2001
+From: Alaric Senat <alaric@videolabs.io>
+Date: Fri, 8 Mar 2024 15:08:07 +0100
+Subject: [PATCH 85/85] wasm: build: export bytecode modules with `-emit-llvm`
+
+The `-emit-llvm` option is needed to export bytecode together with a
+`.bc` extension on the output file since emscripten 3.1.50[^1].
+
+[^1] https://github.com/emscripten-core/emscripten/commit/94b36c04dd323af066f2c1ab6d13f26eb818eb0b
+---
+ extras/package/wasm-emscripten/build.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/extras/package/wasm-emscripten/build.sh b/extras/package/wasm-emscripten/build.sh
+index acd74591fc..29e8dac640 100755
+--- a/extras/package/wasm-emscripten/build.sh
++++ b/extras/package/wasm-emscripten/build.sh
+@@ -201,6 +201,6 @@ const void *vlc_static_modules[] = {
+ 
+ diagnostic "vlc static modules: compiling static modules entry points"
+ # compile vlc-modules.c
+-emcc -pthread -c "$BUILD_PATH"/vlc-modules.c -o "$BUILD_PATH"/vlc-modules.bc
++emcc -pthread -emit-llvm -c "$BUILD_PATH"/vlc-modules.c -o "$BUILD_PATH"/vlc-modules.bc
+ 
+ echo "VLC for wasm32-unknown-emscripten built!"
+-- 
+2.43.0
+

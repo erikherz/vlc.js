@@ -1,0 +1,31 @@
+From da86e0106079008afa0967a4730e9f0bf92d31ef Mon Sep 17 00:00:00 2001
+From: Johannes Kauffmann <johanneskauffmann@hotmail.com>
+Date: Mon, 12 Dec 2022 13:13:20 +0100
+Subject: [PATCH 84/85] text_renderer: freetype: fix function signature
+
+All other _GetFamily functions have the last argument as const. It fixes
+the following warning:
+
+../modules/text_renderer/freetype/platform_fonts.c:925:26: warning: incompatible function pointer types ... [-Wincompatible-function-pointer-types]
+    fs->pf_select_family = StaticMap_GetFamily;
+                         ^ ~~~~~~~~~~~~~~~~~~~
+---
+ modules/text_renderer/freetype/platform_fonts.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/text_renderer/freetype/platform_fonts.c b/modules/text_renderer/freetype/platform_fonts.c
+index 441907b23f..f6a4d37bdd 100644
+--- a/modules/text_renderer/freetype/platform_fonts.c
++++ b/modules/text_renderer/freetype/platform_fonts.c
+@@ -794,7 +794,7 @@ SelectAndLoadFace( filter_t *p_filter, const text_style_t *p_style, uni_char_t c
+ 
+ #ifndef HAVE_GET_FONT_BY_FAMILY_NAME
+ static int StaticMap_GetFamily( vlc_font_select_t *fs, const char *psz_lcname,
+-                                vlc_family_t **pp_result )
++                                const vlc_family_t **pp_result )
+ {
+     filter_t *p_filter = fs->p_filter;
+     filter_sys_t *p_sys = p_filter->p_sys;
+-- 
+2.43.0
+
