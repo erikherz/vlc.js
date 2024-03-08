@@ -1,0 +1,24 @@
+From 5b194ef1ee0caa40c4b569bc9d96aa0fb84a52ba Mon Sep 17 00:00:00 2001
+From: Alaric Senat <alaric@videolabs.io>
+Date: Fri, 8 Mar 2024 15:11:47 +0100
+Subject: [PATCH 82/85] contrib: glslang: rename master branch
+
+---
+ contrib/src/glslang/rules.mak | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/contrib/src/glslang/rules.mak b/contrib/src/glslang/rules.mak
+index fbf3710450..ea295ccb4b 100644
+--- a/contrib/src/glslang/rules.mak
++++ b/contrib/src/glslang/rules.mak
+@@ -1,6 +1,6 @@
+ # GLSLANG
+ GLSLANG_HASH := ef1f899b5d64a9628023f1bb129198674cba2b97
+-GLSLANG_BRANCH := master
++GLSLANG_BRANCH := main
+ GLSLANG_GITURL := https://github.com/KhronosGroup/glslang.git
+ GLSLANG_BASENAME := $(subst .,_,$(subst \,_,$(subst /,_,$(GLSLANG_HASH))))
+ 
+-- 
+2.43.0
+
