@@ -1,0 +1,393 @@
+From 962428a25e3b490a66e1530a04668f5c4272a897 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 09:35:05 +0100
+Subject: [PATCH 19/85] modules: Convert emscripten vout to C++
+
+We'll need to be able to use various emscripten features that are only
+available through C++
+---
+ modules/video_output/Makefile.am    |   2 +-
+ modules/video_output/emscripten.c   | 176 ----------------------------
+ modules/video_output/emscripten.cpp | 174 +++++++++++++++++++++++++++
+ 3 files changed, 175 insertions(+), 177 deletions(-)
+ delete mode 100644 modules/video_output/emscripten.c
+ create mode 100644 modules/video_output/emscripten.cpp
+
+diff --git a/modules/video_output/Makefile.am b/modules/video_output/Makefile.am
+index 3134528bc1..191992d887 100644
+--- a/modules/video_output/Makefile.am
++++ b/modules/video_output/Makefile.am
+@@ -346,7 +346,7 @@ EXTRA_LTLIBRARIES += libcaca_plugin.la
+ vout_LTLIBRARIES += $(LTLIBcaca)
+ 
+ ### Emscripten ###
+-libemscripten_window_plugin_la_SOURCES = video_output/emscripten.c
++libemscripten_window_plugin_la_SOURCES = video_output/emscripten.cpp
+ 
+ if HAVE_EMSCRIPTEN
+ vout_LTLIBRARIES += libemscripten_window_plugin.la
+diff --git a/modules/video_output/emscripten.c b/modules/video_output/emscripten.c
+deleted file mode 100644
+index 05c17d3179..0000000000
+--- a/modules/video_output/emscripten.c
++++ /dev/null
+@@ -1,176 +0,0 @@
+-/**
+- * @file emscripten.c
+- * @brief Emscripten webgl video output for VLC media player
+- */
+-/*****************************************************************************
+- * Copyright © 2020 VLC authors and VideoLAN
+- *
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU Lesser General Public License as published by
+- * the Free Software Foundation; either version 2.1 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU Lesser General Public License for more details.
+- *
+- * You should have received a copy of the GNU Lesser General Public License
+- * along with this program; if not, write to the Free Software Foundation,
+- * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+- *****************************************************************************/
+-
+-#ifdef HAVE_CONFIG_H
+-# include <config.h>
+-#endif
+-
+-#include <stdarg.h>
+-
+-#include <vlc_common.h>
+-#include <vlc_plugin.h>
+-#include <vlc_vout_window.h>
+-#include <vlc_vout_display.h>
+-#include <vlc_opengl.h>
+-
+-#include "./opengl/vout_helper.h"
+-
+-#include <emscripten.h>
+-#include <emscripten/html5.h>
+-#include <webgl/webgl2.h>
+-// eglGetProcAddress
+-#include <EGL/egl.h>
+-
+-extern emscripten_GetProcAddress(char *name);
+-
+-static const struct vout_window_operations ops = {
+-	//TODO: Implement canvas operations
+-	//vout_window_ReportSize() should be called from here
+-};
+-
+-typedef struct gl_sys_t
+-{
+-	unsigned width;
+-	unsigned height;
+-
+-	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
+-} gl_sys_t;
+-
+-static int OpenWindow(vout_window_t *wnd)
+-{
+-	wnd->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
+-	wnd->ops = &ops;
+-
+-	return VLC_SUCCESS;
+-}
+-
+-static void *GetProcAddress(vlc_gl_t *gl, const char *name)
+-{
+-	VLC_UNUSED(gl);
+-
+-	return eglGetProcAddress(name);
+-}
+-static int MakeCurrent(vlc_gl_t *gl)
+-{
+-	gl_sys_t *sys = gl->sys;
+-
+-	if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS)
+-        return VLC_EGENERIC;
+-	return VLC_SUCCESS;
+-}
+-
+-static void ReleaseCurrent(vlc_gl_t *gl)
+-{
+-	VLC_UNUSED(gl);
+-	emscripten_webgl_make_context_current(0);
+-}
+-
+-static void Swap(vlc_gl_t *gl)
+-{
+-	VLC_UNUSED(gl);
+-	emscripten_webgl_commit_frame();
+-}
+-
+-static void Resize(vlc_gl_t *gl, unsigned w, unsigned h)
+-{
+-	VLC_UNUSED(gl);
+-	VLC_UNUSED(w);
+-	VLC_UNUSED(h);
+-}
+-
+-static void Close (vlc_gl_t *gl)
+-{
+-	free(gl->sys);
+-}
+-
+-static int Open (vlc_gl_t *gl, unsigned width, unsigned height)
+-{  
+-	VLC_UNUSED(width), VLC_UNUSED(height);
+-  
+-	EmscriptenWebGLContextAttributes attr;
+-
+-	emscripten_webgl_init_context_attributes(&attr);
+-	attr.majorVersion=2;
+-	attr.minorVersion=0;
+-	attr.explicitSwapControl = 1;
+-	
+-	vout_window_t *wnd = gl->surface;
+-  
+-	if (wnd->type != VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
+-		goto error;
+-
+-	gl_sys_t *sys;
+-	
+-	gl->sys = sys = calloc(1, sizeof(*sys));
+-	if (!sys)
+-		return VLC_ENOMEM;
+-  
+-	sys->context = emscripten_webgl_create_context("#canvas", &attr);  
+-	if (!sys->context) {
+-		msg_Err(gl, "Failed to make context current");
+-		goto error;
+-	}
+-
+-	// Check that the WebGL context is valid
+-	if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS) {
+-		emscripten_log(EM_LOG_CONSOLE, "failed to make context current");
+-		goto error;
+-	}
+-
+-	// Release the context
+-	emscripten_webgl_make_context_current(0);
+-	wnd->handle.em_context = sys->context;
+-
+-	// Implement egl routines: 
+-	gl->make_current = MakeCurrent;
+-	gl->release_current = ReleaseCurrent;
+-	gl->resize = Resize;
+-	gl->swap = Swap;
+-	gl->get_proc_address = GetProcAddress;
+-	gl->destroy = Close;
+-
+-	return VLC_SUCCESS;
+-error:
+-	Close(gl);
+-	return VLC_EGENERIC;
+-}
+-
+-/*
+- * Module descriptor
+- */
+-vlc_module_begin()
+-	set_shortname(N_("Emscripten Window"))
+-	set_description(N_("Emscripten drawing area"))
+-	set_subcategory(SUBCAT_VIDEO_VOUT)
+-	set_capability("vout window", 10)
+-	set_callbacks(OpenWindow, NULL)
+-
+-	add_submodule ()
+-	set_shortname("Emscripten GL")
+-	set_description(N_("Emscripten extension for OpenGL"))
+-	set_subcategory(SUBCAT_VIDEO_VOUT)
+-	set_capability("opengl es2", 50)
+-	set_callback(Open)
+-	add_shortcut("em_webgl")
+-vlc_module_end()
+-
+diff --git a/modules/video_output/emscripten.cpp b/modules/video_output/emscripten.cpp
+new file mode 100644
+index 0000000000..857d921c27
+--- /dev/null
++++ b/modules/video_output/emscripten.cpp
+@@ -0,0 +1,174 @@
++/**
++ * @file emscripten.c
++ * @brief Emscripten webgl video output for VLC media player
++ */
++/*****************************************************************************
++ * Copyright © 2020 VLC authors and VideoLAN
++ *
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include <config.h>
++#endif
++
++#include <stdarg.h>
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_vout_window.h>
++#include <vlc_vout_display.h>
++#include <vlc_opengl.h>
++
++#include "./opengl/vout_helper.h"
++
++#include <emscripten.h>
++#include <emscripten/html5.h>
++#include <webgl/webgl2.h>
++// eglGetProcAddress
++#include <EGL/egl.h>
++
++static const struct vout_window_operations ops = {
++    //TODO: Implement canvas operations
++    //vout_window_ReportSize() should be called from here
++};
++
++typedef struct gl_sys_t
++{
++    unsigned width;
++    unsigned height;
++
++    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
++} gl_sys_t;
++
++static int OpenWindow(vout_window_t *wnd)
++{
++    wnd->type = VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL;
++    wnd->ops = &ops;
++
++    return VLC_SUCCESS;
++}
++
++static void *GetProcAddress(vlc_gl_t *gl, const char *name)
++{
++    VLC_UNUSED(gl);
++
++    return reinterpret_cast<void*>(eglGetProcAddress(name));
++}
++static int MakeCurrent(vlc_gl_t *gl)
++{
++    auto *sys = static_cast<gl_sys_t*>(gl->sys);
++
++    if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS)
++        return VLC_EGENERIC;
++    return VLC_SUCCESS;
++}
++
++static void ReleaseCurrent(vlc_gl_t *gl)
++{
++    VLC_UNUSED(gl);
++    emscripten_webgl_make_context_current(0);
++}
++
++static void Swap(vlc_gl_t *gl)
++{
++    VLC_UNUSED(gl);
++    emscripten_webgl_commit_frame();
++}
++
++static void Resize(vlc_gl_t *gl, unsigned w, unsigned h)
++{
++    VLC_UNUSED(gl);
++    VLC_UNUSED(w);
++    VLC_UNUSED(h);
++}
++
++static void Close (vlc_gl_t *gl)
++{
++    free(gl->sys);
++}
++
++static int Open (vlc_gl_t *gl, unsigned width, unsigned height)
++{
++    VLC_UNUSED(width), VLC_UNUSED(height);
++
++    EmscriptenWebGLContextAttributes attr;
++
++    emscripten_webgl_init_context_attributes(&attr);
++    attr.majorVersion=2;
++    attr.minorVersion=0;
++    attr.explicitSwapControl = 1;
++
++    vout_window_t *wnd = gl->surface;
++
++    if (wnd->type != VOUT_WINDOW_TYPE_EMSCRIPTEN_WEBGL)
++        goto error;
++
++    gl_sys_t *sys;
++
++    gl->sys = sys = static_cast<gl_sys_t*>(calloc(1, sizeof(*sys)));
++    if (!sys)
++        return VLC_ENOMEM;
++
++    sys->context = emscripten_webgl_create_context("#canvas", &attr);
++    if (!sys->context) {
++        msg_Err(gl, "Failed to make context current");
++        goto error;
++    }
++
++    // Check that the WebGL context is valid
++    if (emscripten_webgl_make_context_current(sys->context) != EMSCRIPTEN_RESULT_SUCCESS) {
++        emscripten_log(EM_LOG_CONSOLE, "failed to make context current");
++        goto error;
++    }
++
++    // Release the context
++    emscripten_webgl_make_context_current(0);
++    wnd->handle.em_context = sys->context;
++
++    // Implement egl routines:
++    gl->make_current = MakeCurrent;
++    gl->release_current = ReleaseCurrent;
++    gl->resize = Resize;
++    gl->swap = Swap;
++    gl->get_proc_address = GetProcAddress;
++    gl->destroy = Close;
++
++    return VLC_SUCCESS;
++error:
++    Close(gl);
++    return VLC_EGENERIC;
++}
++
++/*
++ * Module descriptor
++ */
++vlc_module_begin()
++    set_shortname(N_("Emscripten Window"))
++    set_description(N_("Emscripten drawing area"))
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++    set_capability("vout window", 10)
++    set_callbacks(OpenWindow, NULL)
++
++    add_submodule ()
++    set_shortname("Emscripten GL")
++    set_description(N_("Emscripten extension for OpenGL"))
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++    set_capability("opengl es2", 50)
++    set_callback(Open)
++    add_shortcut("em_webgl")
++vlc_module_end()
++
+-- 
+2.43.0
+

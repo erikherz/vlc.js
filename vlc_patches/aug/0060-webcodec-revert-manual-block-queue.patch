@@ -1,0 +1,107 @@
+From 58012b196fcd174d2e17fb65302628182edd2eef Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 12 May 2022 09:47:32 +0200
+Subject: [PATCH 60/85] webcodec: revert manual block queue
+
+---
+ modules/codec/webcodec.cpp | 43 +++++++-------------------------------
+ 1 file changed, 8 insertions(+), 35 deletions(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index 1967231999..9c39a5c2b4 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -95,8 +95,7 @@ EMSCRIPTEN_KEEPALIVE void releaseBlock( block_t* block )
+     block_Release( block );
+ }
+ 
+-// doesn't need to be extern anymore
+-void decodeBlock( block_t* block )
++EMSCRIPTEN_KEEPALIVE void decodeBlock( block_t* block )
+ {
+     auto chunkType = emval::global("EncodedVideoChunk");
+     auto chunkCfg = emval::object();
+@@ -127,24 +126,6 @@ void decodeBlock( block_t* block )
+     EM_ASM({Module.decoder.decode( Emval.toValue( $0 ) ); }, chunk.as_handle());
+ }
+ 
+-EMSCRIPTEN_KEEPALIVE void decodeBlocks( decoder_t* dec )
+-{
+-    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
+-    while ( true )
+-    {
+-        block_t* block;
+-        {
+-            vlc::threads::mutex_locker lock{ sys->mutex };
+-            if ( sys->blocks.empty() )
+-                return;
+-            block = sys->blocks.front();
+-            sys->blocks.pop();
+-        }
+-        decodeBlock( block );
+-        block_Release( block );
+-    }
+-}
+-
+ }
+ 
+ EM_ASYNC_JS(bool, probeConfig, (emscripten::EM_VAL cfg), {
+@@ -237,7 +218,9 @@ EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder, emscripten::EM_VAL decC
+     function onDecoderWorkerMessage(msg) {
+         const data = msg['data'];
+         if (data['customCmd'] == 'decode') {
+-            _decodeBlocks( Module.webCodecCtx );
++            let block = data['block'];
++            _decodeBlock( block );
++            _releaseBlock(block);
+         } else if ( data['customCmd'] == 'flush' ) {
+             Module.decoder.flush();
+         } else if ( data['customCmd'] == 'close' ) {
+@@ -328,10 +311,8 @@ static bool initDecoder( decoder_t* dec )
+     return true;
+ }
+ 
+-static void mainloop_tick( void* arg )
++static void mainloop_tick()
+ {
+-//    auto dec = static_cast<decoder_t*>( arg );
+-//    decodeBlocks( dec );
+ }
+ 
+ static void* WebcodecDecodeWorker( void* arg )
+@@ -356,7 +337,7 @@ static void* WebcodecDecodeWorker( void* arg )
+     auto vctxPrivate = static_cast<webcodec_context*>(
+             vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
+     vctxPrivate->decoder_worker = pthread_self();
+-    emscripten_set_main_loop_arg(mainloop_tick, dec, 1, true);
++    emscripten_set_main_loop(mainloop_tick, 1, true);
+     return NULL;
+ }
+ 
+@@ -388,21 +369,13 @@ EM_ASYNC_JS(void, initDecoderWorkerMessagePort, (decoder_t* dec), {
+ 
+ static int Decode( decoder_t* dec, block_t* block )
+ {
+-    if ( block == nullptr )
+-        fprintf(stderr, "NULL BLOCK\n");
+-    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
+     initDecoderWorkerMessagePort(dec);
+-    {
+-        vlc::threads::mutex_locker lock{ sys->mutex };
+-        sys->blocks.push( block );
+-        if ( sys->blocks.size() > 1 )
+-            return VLCDEC_SUCCESS;
+-    }
+     EM_ASM({
+         Module.decoderWorkerPort.postMessage({
+             customCmd: 'decode',
++            block: $0
+         });
+-    });
++    }, block);
+     return VLCDEC_SUCCESS;
+ }
+ 
+-- 
+2.43.0
+

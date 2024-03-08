@@ -1,0 +1,29 @@
+From 2a20ba188cda25e7ad873def710c83a9f6ebf89c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 12 May 2022 09:59:06 +0200
+Subject: [PATCH 64/85] webcodec: Minor simplification
+
+---
+ modules/codec/webcodec.cpp | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index e619cdde00..07b3690dab 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -253,9 +253,9 @@ EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder, emscripten::EM_VAL decC
+         function getPicture(dec, resolve) {
+             let pic = _tryGetPictureFromPool(dec);
+             if (!pic) {
+-                setTimeout( function(d, r) {
+-                      getPicture(d, r);
+-                  }, 1, dec, resolve );
++                setTimeout( function() {
++                      getPicture(dec, resolve);
++                  }, 1);
+                 return;
+             }
+             resolve(pic);
+-- 
+2.43.0
+

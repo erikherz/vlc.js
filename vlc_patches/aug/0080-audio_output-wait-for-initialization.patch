@@ -1,7 +1,7 @@
-From a0ef05907dc6865582333a9cc5d63d7d51b56dfb Mon Sep 17 00:00:00 2001
+From 7d99b09ebd159ef39db7c805003a560c0ddec9a8 Mon Sep 17 00:00:00 2001
 From: Alaric Senat <dev.asenat@posteo.net>
 Date: Fri, 7 Oct 2022 15:34:18 +0200
-Subject: [PATCH 1/2] audio_output: wait for initialization
+Subject: [PATCH 80/85] audio_output: wait for initialization
 
 The `Init()` function is called in the browser thread and sets up
 important variable that needs to be used in the `Start()` callback
@@ -78,5 +78,5 @@ index 3317c3eb84..d94a0dd234 100644
      atomic_init(&sys->sab->is_paused, 0);
      atomic_init(&sys->sab->head, 0);
 -- 
-2.37.3
+2.43.0
 

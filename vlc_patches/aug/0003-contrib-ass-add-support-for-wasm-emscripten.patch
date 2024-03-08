@@ -1,7 +1,7 @@
-From 035b067f845042fc0c87d80565783b21bfa50e6c Mon Sep 17 00:00:00 2001
+From 2f1fe49e369a16e25449fa0a3ca72150ddb3a060 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Sun, 30 May 2021 19:22:31 +0200
-Subject: [PATCH 03/77] contrib: ass: add support for wasm-emscripten
+Subject: [PATCH 03/85] contrib: ass: add support for wasm-emscripten
 
 ---
  contrib/src/ass/rules.mak                     |   5 +
@@ -153,5 +153,5 @@ index ae4b218fd2..5b4b15ca34 100644
  
  FONTCONFIG_CONF := $(HOSTCONF) \
 -- 
-2.35.1
+2.43.0
 

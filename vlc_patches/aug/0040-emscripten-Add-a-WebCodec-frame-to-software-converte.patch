@@ -1,0 +1,110 @@
+From 9618f2a9f6634313a82255c0be60b173765b4a86 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 12 Apr 2022 13:55:51 +0200
+Subject: [PATCH 40/85] emscripten: Add a WebCodec frame to software converter
+
+---
+ .../opengl/interop_emscripten.cpp             | 77 +++++++++++++++++++
+ 1 file changed, 77 insertions(+)
+
+diff --git a/modules/video_output/opengl/interop_emscripten.cpp b/modules/video_output/opengl/interop_emscripten.cpp
+index 123c1fdb25..53b52fabd6 100644
+--- a/modules/video_output/opengl/interop_emscripten.cpp
++++ b/modules/video_output/opengl/interop_emscripten.cpp
+@@ -28,6 +28,8 @@
+ 
+ #include <vlc_common.h>
+ #include <vlc_plugin.h>
++#include <vlc_filter.h>
++
+ #include "interop.h"
+ #include "gl_common.h"
+ #include <cassert>
+@@ -220,9 +222,84 @@ Open(vlc_object_t *obj)
+     return VLC_SUCCESS;
+ }
+ 
++EM_ASYNC_JS(void, CopyFrameToBuffer, (int pictureId, emscripten::EM_VAL infoHandle), {
++    let info = Emval.toValue(infoHandle);
++    let frame = await Module.awaitFrame(pictureId);
++    let copyOpts = {
++        rect: frame.codedRect,
++        layout: info.layout
++    };
++    await frame.copyTo(info.buffer, copyOpts);
++});
++
++static picture_t* vlc_webcodec_UploadVideoFrame(filter_t* filter, picture_t* src)
++{
++    auto pic = filter_NewPicture(filter);
++    if (unlikely(pic == nullptr))
++    {
++        picture_Release(src);
++        return nullptr;
++    }
++    auto pictureId = reinterpret_cast<uintptr_t>(src->p_sys);
++
++    size_t picSize = 0;
++    auto info = emscripten::val::object();
++    auto planesLayout = emscripten::val::array();
++    for ( auto i = 0; i < pic->i_planes; ++i )
++    {
++        auto p = pic->p[i];
++        auto layout = emscripten::val::object();
++        layout.set( "offset", picSize );
++        layout.set( "stride", p.i_pitch );
++        planesLayout.call<void>( "push", std::move( layout ) );
++        picSize += p.i_lines * p.i_pitch;
++    }
++
++    info.set( "buffer", emscripten::typed_memory_view( picSize, pic->p[0].p_pixels ) );
++    info.set( "layout", std::move( planesLayout ) );
++
++    CopyFrameToBuffer( pictureId, info.as_handle() );
++
++    pic->date = src->date;
++    picture_Release(src);
++    return pic;
++}
++
++static void vlc_webcodec_CloseConverter(filter_t*)
++{
++    closeMessagePort();
++}
++
++static const struct vlc_filter_operations video_frame_to_sw_ops = {
++    .filter_video = vlc_webcodec_UploadVideoFrame,
++    .close = vlc_webcodec_CloseConverter,
++};
++
++static int OpenConverter(filter_t* filter)
++{
++    if (filter->fmt_in.video.i_height != filter->fmt_out.video.i_height
++     || filter->fmt_in.video.i_width != filter->fmt_out.video.i_width
++     || filter->fmt_in.video.orientation != filter->fmt_out.video.orientation
++     || filter->fmt_in.video.i_chroma != VLC_CODEC_WEBCODEC_OPAQUE
++     || filter->fmt_out.video.i_chroma != VLC_CODEC_I420 )
++    {
++        return VLC_EGENERIC;
++    }
++    initGlConvWorker(WEBCODEC_MAX_PICTURES);
++    transferMessagePort(filter->vctx_in);
++
++    filter->ops = &video_frame_to_sw_ops;
++
++    return VLC_SUCCESS;
++}
++
+ vlc_module_begin ()
+     set_description("Emscripten OpenGL SurfaceTexture converter")
+     set_capability("glinterop", 1)
+     set_callback(Open)
+     set_subcategory(SUBCAT_VIDEO_VOUT)
++
++    add_submodule()
++        set_subcategory(SUBCAT_VIDEO_VFILTER)
++        set_callback_video_converter(OpenConverter, 10)
+ vlc_module_end ()
+-- 
+2.43.0
+

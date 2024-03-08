@@ -1,0 +1,266 @@
+From 300758517f0351e40e3852ee25e220ef3df556c9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 10:00:49 +0100
+Subject: [PATCH 27/85] vout: Add an emscripten/webcodec glinterop module
+
+---
+ modules/video_output/Makefile.am              |   7 +
+ .../opengl/interop_emscripten.cpp             | 228 ++++++++++++++++++
+ 2 files changed, 235 insertions(+)
+ create mode 100644 modules/video_output/opengl/interop_emscripten.cpp
+
+diff --git a/modules/video_output/Makefile.am b/modules/video_output/Makefile.am
+index 191992d887..ea3a0c6da9 100644
+--- a/modules/video_output/Makefile.am
++++ b/modules/video_output/Makefile.am
+@@ -305,6 +305,13 @@ vout_LTLIBRARIES += libegl_android_plugin.la libglinterop_android_plugin.la
+ endif
+ endif
+ 
++### Emscripten
++libglinterop_emscripten_plugin_la_SOURCES = video_output/opengl/interop_emscripten.cpp \
++	video_output/opengl/interop.h
++libglinterop_emscripten_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) -DUSE_OPENGL_ES2
++if HAVE_EMSCRIPTEN
++vout_LTLIBRARIES += libglinterop_emscripten_plugin.la
++endif
+ 
+ ### FrameBuffer ###
+ 
+diff --git a/modules/video_output/opengl/interop_emscripten.cpp b/modules/video_output/opengl/interop_emscripten.cpp
+new file mode 100644
+index 0000000000..123c1fdb25
+--- /dev/null
++++ b/modules/video_output/opengl/interop_emscripten.cpp
+@@ -0,0 +1,228 @@
++﻿/*****************************************************************************
++ * interop_emscripten.cpp: OpenGL Emscripten/Webcodec opaque converter
++ *****************************************************************************
++ * Copyright (C) 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++//#ifndef __EMSCRIPTEN__
++//# error this file must be built with emscripten
++//#endif
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include "interop.h"
++#include "gl_common.h"
++#include <cassert>
++#include "../emscripten/common.h"
++
++#include <emscripten.h>
++#include <emscripten/em_js.h>
++#include <emscripten/val.h>
++#include <emscripten/html5_webgl.h>
++
++struct EmscriptenInterop
++{
++    struct
++    {
++        PFNGLBINDTEXTUREPROC BindTexture;
++    } gl;
++};
++
++static int
++tc_emscripten_op_allocate_textures(const struct vlc_gl_interop *interop, GLuint *textures,
++                          const GLsizei *tex_width, const GLsizei *tex_height)
++{
++    (void) tex_width; (void) tex_height;
++    assert(textures[0] != 0);
++
++    return VLC_SUCCESS;
++}
++
++EM_ASYNC_JS(void, bindVideoFrame, (int pictureId), {
++    let frame = await Module.awaitFrame(pictureId);
++
++    let glCtx = Module.glCtx;
++    glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, frame.codedWidth, frame.codedHeight, 0,
++                glCtx.RGBA, glCtx.UNSIGNED_BYTE, frame);
++})
++
++static int
++tc_emscripten_op_update(const struct vlc_gl_interop *interop, GLuint *textures,
++               const GLsizei *tex_width, const GLsizei *tex_height,
++               picture_t *pic, const size_t *plane_offset)
++{
++    auto sys = static_cast<EmscriptenInterop *>( interop->priv );
++
++    sys->gl.BindTexture(interop->tex_target, textures[0]);
++
++    auto pictureId = reinterpret_cast<uintptr_t>( pic->p_sys );
++    bindVideoFrame(pictureId);
++
++    return VLC_SUCCESS;
++}
++
++extern "C"
++{
++EMSCRIPTEN_KEEPALIVE int getDecoderWorker(vlc_video_context* vctx)
++{
++    auto wcCtx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
++    if (!vctx)
++        return 0;
++    return wcCtx->decoder_worker;
++}
++}
++
++EM_JS(void, transferMessagePort, (vlc_video_context* vctx), {
++    function onDecoderMessage(msg) {
++        let data = msg['data'];
++        if (data.customCmd == 'displayFrame') {
++            let pictureId = data.pictureId;
++            let pictureIdx = pictureId % 32;
++            let frame = data['frame'];
++            console.log('SINK Received frame ' + pictureId );
++            if ( Module.glConv.promiseResolvers[pictureIdx] ) {
++                /* The interop is already waiting for this frame, resolve the promise */
++                console.log('SINK Renderer is already waiting for frame ' + pictureId );
++                Module.glConv.promiseResolvers[pictureIdx]( frame );
++            } else {
++                /* The frame hasn't arrived to the interop yet, queue it */
++                console.log('SINK No resolver, queuing frame ' + pictureId );
++                Module.glConv.frameQueue[pictureIdx] = frame;
++            }
++        }
++    };
++    Module.msgChannel = new MessageChannel();
++    Module.msgChannel.port1.onmessage = onDecoderMessage;
++    let workerId = _getDecoderWorker(vctx);
++    if (workerId == 0)
++        return;
++    self.postMessage({
++        customCmd: 'transferMessagePort',
++        targetThread: workerId,
++        transferList: [Module.msgChannel.port2],
++    }, [Module.msgChannel.port2]);
++});
++
++EM_JS(void, initGlConvWorker, (int maxPictures), {
++    Module.glConv = {};
++    Module.glConv.promiseResolvers = [];
++    Module.glConv.frameQueue = [];
++    Module.glConv.lastFrame = {
++        pictureId: -1,
++        frame: undefined
++    };
++
++    Module.awaitFrame = async function(pictureId) {
++        console.log('CONSUME Fetching frame ' + pictureId);
++        if (Module.glConv.lastFrame.pictureId == pictureId) {
++            console.log('Reusing last frame');
++            return Module.glConv.lastFrame.frame;
++        }
++        let pictureIndex = pictureId % 32;
++        let p = new Promise((resolve, reject) => {
++            if ( Module.glConv.frameQueue[pictureIndex] ) {
++                console.log('CONSUME Frame ', pictureId, '(index ', pictureIndex,
++                            ') was already queued');
++                let frame = Module.glConv.frameQueue[pictureIndex];
++                resolve(frame);
++                Module.glConv.frameQueue[pictureIndex] = undefined;
++            } else {
++                console.log('CONSUME Frame ', pictureId, '(index ', pictureIndex,
++                            ') not available yet; exposing resolver' );
++                Module.glConv.promiseResolvers[pictureIndex] = resolve;
++            }
++        });
++        let frame = await p;
++        Module.glConv.promiseResolvers[pictureId] = undefined;
++        if (Module.glConv.lastFrame.frame)
++            Module.glConv.lastFrame.frame.close();
++        Module.glConv.lastFrame.frame = frame;
++        Module.glConv.lastFrame.pictureId = pictureId;
++        console.log('CONSUME got frame');
++        return frame;
++    }
++})
++
++EM_JS(void, closeMessagePort, (void), {
++    if (Module.msgChannel)
++        delete Module.msgChannel;
++});
++
++static void
++Close(struct vlc_gl_interop *)
++{
++    closeMessagePort();
++}
++
++static int
++Open(vlc_object_t *obj)
++{
++    auto interop = reinterpret_cast<vlc_gl_interop*>( obj );
++
++    if (interop->fmt_in.i_chroma != VLC_CODEC_WEBCODEC_OPAQUE)
++        return VLC_EGENERIC;
++
++    EmscriptenInterop *sys = (decltype(sys))
++        vlc_obj_malloc(VLC_OBJECT(interop), sizeof *sys);
++    if (sys == NULL)
++        return VLC_EGENERIC;
++    sys->gl.BindTexture = (decltype(sys->gl.BindTexture))
++        vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
++    if (sys->gl.BindTexture == NULL)
++        return VLC_EGENERIC;
++
++    static const struct vlc_gl_interop_ops ops = {
++        .allocate_textures = tc_emscripten_op_allocate_textures,
++        .update_textures = tc_emscripten_op_update,
++        .close = Close,
++    };
++    interop->ops = &ops;
++    initGlConvWorker(WEBCODEC_MAX_PICTURES);
++    transferMessagePort(interop->vctx);
++
++    interop->tex_target = GL_TEXTURE_2D;
++    interop->fmt_out.i_chroma = VLC_CODEC_RGBA;
++    interop->fmt_out.space = COLOR_SPACE_UNDEF;
++    interop->tex_count = 1;
++    interop->texs[0] = vlc_gl_interop::vlc_gl_tex_cfg{
++            /*.w =*/ { 1, 1 },
++            /*.h =*/ { 1, 1 },
++            /*.internal =*/ GL_RGBA,
++            /*.format = */GL_RGBA,
++            /*.type = */GL_UNSIGNED_BYTE,
++    };
++    interop->fmt_out.i_rmask = 0xFF0000;
++    interop->fmt_out.i_gmask = 0x00FF00;
++    interop->fmt_out.i_bmask = 0x0000FF;
++    interop->priv = sys;
++
++    interop->fmt_out.orientation = ORIENT_VFLIPPED;
++
++    return VLC_SUCCESS;
++}
++
++vlc_module_begin ()
++    set_description("Emscripten OpenGL SurfaceTexture converter")
++    set_capability("glinterop", 1)
++    set_callback(Open)
++    set_subcategory(SUBCAT_VIDEO_VOUT)
++vlc_module_end ()
+-- 
+2.43.0
+

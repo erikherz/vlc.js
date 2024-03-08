@@ -1,0 +1,291 @@
+From 6e69107c2420280acf786a18648575a40c75c836 Mon Sep 17 00:00:00 2001
+From: Olivier FAURE <couteaubleu@gmail.com>
+Date: Sun, 30 May 2021 15:15:22 +0200
+Subject: [PATCH 10/85] Replace untyped js_index_load/store functions with C++
+ atomics
+
+---
+ modules/audio_output/emscripten.cpp | 116 ++++++++++++++--------------
+ 1 file changed, 59 insertions(+), 57 deletions(-)
+
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+index 625dda30c0..fa0f5bd3e4 100644
+--- a/modules/audio_output/emscripten.cpp
++++ b/modules/audio_output/emscripten.cpp
+@@ -22,6 +22,8 @@
+ # include "config.h"
+ #endif
+ 
++#include <atomic>
++
+ #include <assert.h>
+ #include <vlc_common.h>
+ #include <vlc_plugin.h>
+@@ -45,6 +47,18 @@ using namespace emscripten;
+ namespace {
+ 	EM_BOOL requestAnimationFrame_cb( double time, void *userData );
+ 
++	typedef struct sound_buffer_t
++	{
++    // TODO - should be bool?
++    std::atomic<uint32_t> is_paused;
++    std::atomic<uint32_t> head;
++    std::atomic<uint32_t> tail;
++    std::atomic<uint32_t> can_write;
++    std::atomic<uint32_t> volume;
++    int8_t storage[STORAGE_SIZE];
++
++	} sound_buffer_t;
++
+ 	class AWNodeWrapper {
+ 	public:
+ 		val context = val::undefined();
+@@ -55,10 +69,6 @@ namespace {
+ 		uintptr_t getSabPtr() const { return sab_ptr; };
+ 		void setSabPtr(uintptr_t p_sab) { sab_ptr = p_sab; };
+ 
+-		size_t sab_size;
+-		size_t getSabSize() const { return sab_size; };
+-		void setSabSize(size_t s_size) { sab_size = s_size; };
+-
+ 		int8_t channels;
+ 		int8_t getChannels() const { return channels; };
+ 		void setChannels(int8_t chan) { channels = chan; };
+@@ -90,19 +100,26 @@ namespace {
+       val Int32Array = val::global("Int32Array");
+       val Float32Array = val::global("Float32Array");
+ 
+-      auto wasm_memory_buffer = val::module_property("wasmMemory")["buffer"];
+-      uint32_t storage_capacity = sab_size / 4;
++      auto wasm_mem = val::module_property("wasmMemory")["buffer"];
+ 
+ 			//Prepare postMessage message
+ 			val msg = val::object();
+ 			msg.set("type", std::string("recv-audio-queue"));
+ 
+-			msg.set("flag", Uint32Array.new_(wasm_memory_buffer, sab_ptr + 0, 1));
+-			msg.set("head", Uint32Array.new_(wasm_memory_buffer, sab_ptr + 4, 1));
+-			msg.set("tail", Uint32Array.new_(wasm_memory_buffer, sab_ptr + 8, 1));
+-			msg.set("can_write", Int32Array.new_(wasm_memory_buffer, sab_ptr + 12, 1));
+-			msg.set("volume", Int32Array.new_(wasm_memory_buffer, sab_ptr + 16, 1));
+-			msg.set("storage", Float32Array.new_(wasm_memory_buffer, sab_ptr + 20, storage_capacity));
++      msg.set("is_paused",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, is_paused), 1));
++      msg.set("head",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, head), 1));
++      msg.set("tail",
++        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, tail), 1));
++      msg.set("can_write",
++        Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, can_write), 1));
++      msg.set("volume",
++        Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, volume), 1));
++
++      uint32_t storage_capacity = STORAGE_SIZE / 4;
++      msg.set("storage",
++        Float32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, storage), storage_capacity));
+ 
+ 			AudioNode["port"].call<val>("postMessage", msg);
+ 			AudioNode.call<val>("connect", context["destination"]);
+@@ -118,25 +135,25 @@ namespace {
+ 			.constructor<int>()
+ 			.property("context", &AWNodeWrapper::getCtx, &AWNodeWrapper::setCtx)
+ 			.property("sab_ptr", &AWNodeWrapper::getSabPtr, &AWNodeWrapper::setSabPtr)
+-			.property("sab_size", &AWNodeWrapper::getSabSize, &AWNodeWrapper::setSabSize)
+ 			.property("channels", &AWNodeWrapper::getChannels, &AWNodeWrapper::setChannels)
+ 			.function("awn_call", &AWNodeWrapper::operator());
+ 	};
+ 
+ 	typedef struct aout_sys_t
+ 	{
+-		int8_t *sab;
+-		size_t sab_size;
++		sound_buffer_t *sab; // TODO - rename to sound_buff
+ 		AWNodeWrapper *awn_inst;
+ 		float volume;
+ 
+ 	} aout_sys_t;
+ 
+ 	EM_BOOL requestAnimationFrame_cb( double time, void *userData ) {
+-		(void) time;
++		VLC_UNUSED(time);
++    // FIXME - this function seems to mix two different views on the
++    // same memory, not sure why
+ 		AWNodeWrapper *inst = reinterpret_cast<AWNodeWrapper *>(userData);
+ 		uint32_t *sab = reinterpret_cast<uint32_t *>(inst->getSabPtr());
+-		val view = val(typed_memory_view(inst->getSabSize(), sab));
++		val view = val(typed_memory_view(sizeof(sound_buffer_t), sab));
+ 		val context = inst->getCtx();
+ 		if ( view[0].as<int>() == 1 ) {
+ 			context.call<val>("resume");
+@@ -146,34 +163,19 @@ namespace {
+ 		return EM_TRUE;
+ 	}
+ 
+-	// For Atomics.store() and .load() only integer types are supported
+-	unsigned int js_index_load(int8_t *sab_ptr, int8_t index, size_t sab_size){
+-		uint32_t *buffer_view = reinterpret_cast<uint32_t *>(sab_ptr);
+-		val buffer = val(typed_memory_view(sab_size, buffer_view));
+-
+-		return val::global("Atomics").call<unsigned int>("load", buffer, index);
+-	}
+-
+-	void js_index_store(int8_t *sab_ptr, int8_t index, unsigned int value, size_t sab_size) {
+-		uint32_t *buffer_view = reinterpret_cast<uint32_t *>(sab_ptr);
+-		val buffer = val(typed_memory_view(sab_size, buffer_view));
+-
+-		return val::global("Atomics").call<void>("store", buffer, index, value);
+-	}
+-
+ 	// careful when calling this, you cannot wait on any index
+ 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/wait
+-	unsigned int js_index_wait(int8_t *sab_ptr, int8_t index, size_t sab_size) {
++	uint32_t js_index_wait(sound_buffer_t *sab_ptr, int8_t index) {
+ 		int32_t *buffer_view = reinterpret_cast<int32_t *>(sab_ptr);
+-		val buffer = val(typed_memory_view(sab_size, buffer_view));
++		val buffer = val(typed_memory_view(STORAGE_SIZE, buffer_view));
+ 
+-		return val::global("Atomics").call<unsigned int>("wait", buffer, index);
++		return val::global("Atomics").call<uint32_t>("wait", buffer, index);
+ 	}
+ 
+ 	void Flush( audio_output_t *aout )
+ 	{
+ 		aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		bzero(sys->sab + (5 * sizeof(int32_t)), STORAGE_SIZE);
++		bzero(&sys->sab->storage, sizeof(sys->sab->storage));
+ 	}
+ 
+ 	int Start( audio_output_t *aout, audio_sample_format_t *restrict fmt )
+@@ -188,8 +190,8 @@ namespace {
+ 		fmt->i_rate = AUDIO_WORKLET_SAMPLE_RATE;
+ 
+ 		// resume audio context (first start, it is paused when initialized)
+-		js_index_store(sys->sab, 4, (int)(sys->volume * 100), sys->sab_size);
+-		js_index_store(sys->sab, 0, 1, sys->sab_size);
++		sys->sab->volume.store((int)(sys->volume * 100));
++		sys->sab->is_paused.store(1);
+ 
+ 		return VLC_SUCCESS;
+ 	}
+@@ -199,10 +201,10 @@ namespace {
+ 		Flush(aout);
+ 	}
+ 
+-	int audio_worklet_push (audio_output_t *aout, const int8_t *data, unsigned data_size) {
++	int audio_worklet_push (audio_output_t *aout, const int8_t *data, uint32_t data_size) {
+ 		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		int8_t *sab_view = sys->sab + 5 * sizeof(int32_t);
+-		unsigned head = js_index_load(sys->sab, 1, sys->sab_size);
++		int8_t *sab_view = sys->sab->storage;
++		uint32_t head = sys->sab->head.load();
+ 
+ 		// TODO: check that we do not write on unconsumed data.
+ 		if (head + data_size > STORAGE_SIZE) {
+@@ -220,7 +222,7 @@ namespace {
+ 			memcpy(sab_view + head, data, data_size);
+ 			head += data_size;
+ 		}
+-		js_index_store(sys->sab, 1, head, sys->sab_size);
++		sys->sab->head.store(head);
+ 		return 0;  // return success to indicate successful push.
+ 	}
+ 
+@@ -231,18 +233,18 @@ namespace {
+ 		const int8_t* data = (int8_t *)block->p_buffer;
+ 		size_t data_size = block->i_buffer;
+ 
+-		unsigned head = js_index_load(sys->sab, 1, sys->sab_size);
+-		unsigned tail = js_index_load(sys->sab, 2, sys->sab_size);
+-		unsigned new_head = (head + data_size) % STORAGE_SIZE;
++		uint32_t head = sys->sab->head.load();
++		uint32_t tail = sys->sab->tail.load();
++		uint32_t new_head = (head + data_size) % STORAGE_SIZE;
+ 		if (new_head > tail)
+ 		{
+ 			// the worklet processor keeps rendering  until tail matches head
+ 			// it will be notified by an Atomics.notify() from the process() callback
+-			js_index_wait(sys->sab, 3, sys->sab_size);
++			js_index_wait(sys->sab, 3);
+ 		}
+ 
+ 		// set volume
+-		js_index_store(sys->sab, 4, (int)(sys->volume * 100), sys->sab_size);
++		sys->sab->volume.store((int)(sys->volume * 100));
+ 
+ 		audio_worklet_push(aout, data, data_size);
+ 		block_Release(block);
+@@ -250,14 +252,14 @@ namespace {
+ 
+ 	void Pause( audio_output_t *aout, bool paused, vlc_tick_t date )
+ 	{
++		VLC_UNUSED(date);
+ 		aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+ 		if (paused == false) {
+-			js_index_store(sys->sab, 0, 0, sys->sab_size);
++			sys->sab->is_paused.store(0);
+ 		}
+ 		else {
+-			js_index_store(sys->sab, 0, 1, sys->sab_size);
++			sys->sab->is_paused.store(1);
+ 		}
+-		VLC_UNUSED(date);
+ 		Flush(aout);
+ 	}
+ 
+@@ -271,6 +273,7 @@ namespace {
+ 		audio_output_t *aout = (audio_output_t *)obj;
+ 		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
+ 
++    // FIXME
+ 		delete sys->awn_inst;
+ 		free(sys->sab);
+ 		free(sys);
+@@ -296,9 +299,10 @@ namespace {
+ 		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
+ 
+ 		if (mute == 0)
+-			js_index_store(sys->sab, 4, 0, sys->sab_size);
++			sys->sab->volume.store(0);
+ 		else
+-			js_index_store(sys->sab, 4, (int)sys->volume * 100, sys->sab_size);
++			sys->sab->volume.store((int)(sys->volume * 100));
++
+ 		aout_MuteReport(aout, mute);
+ 		return 0;
+ 	}
+@@ -324,13 +328,12 @@ namespace {
+ 		aout->mute_set = Mute_Set;
+ 
+ 		sys->awn_inst = new AWNodeWrapper(AUDIO_WORKLET_SAMPLE_RATE);
+-		sys->sab_size = 5 * sizeof(int32_t) + STORAGE_SIZE;
+-		sys->sab = reinterpret_cast<int8_t *>(malloc( sys->sab_size ));
++		sys->sab = (sound_buffer_t*)malloc(sizeof(sound_buffer_t));
+ 		sys->volume = 1.0f;
+ 
+ 		if ( unlikely(sys->sab == NULL) )
+ 			return VLC_ENOMEM;
+-		bzero(sys->sab, sys->sab_size);
++		bzero(sys->sab, sizeof(sound_buffer_t));
+ 
+ 		val webaudio_context = sys->awn_inst->getCtx();
+ 
+@@ -343,7 +346,7 @@ namespace {
+ 		super(); \
+ 		this.port.onmessage = e => { \
+ 			if (e.data.type === 'recv-audio-queue') { \
+-				this.flag = e.data.flag; \
++				this.is_paused = e.data.is_paused; \
+ 				this.head = e.data.head; \
+ 				this.tail = e.data.tail; \
+ 				this.can_write = e.data.can_write; \
+@@ -393,7 +396,6 @@ registerProcessor('worklet-processor', Processor);";
+ 		val cb_caller = val::module_property("awn_cb_wrapper").new_(AUDIO_WORKLET_SAMPLE_RATE);
+ 		cb_caller.set("context", val(webaudio_context));
+ 		cb_caller.set("sab_ptr", val(reinterpret_cast<uintptr_t>(sys->sab)));
+-		cb_caller.set("sab_size", val(sys->sab_size));
+ 		cb_caller.set("channels", val(AUDIO_WORKLET_NB_CHANNELS));
+ 		val awn_caller = cb_caller["awn_call"];
+ 		val awn_cb = awn_caller.call<val>("bind", cb_caller);
+-- 
+2.43.0
+

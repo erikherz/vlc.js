@@ -1,7 +1,7 @@
-From 54b9e53c6709ed2f15720f3e66396adeef8359ce Mon Sep 17 00:00:00 2001
+From d253a03cf88e2e2018985b6936ed7618461a4559 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Wed, 3 Aug 2022 13:17:46 +0200
-Subject: [PATCH 70/77] adapt to new emscripten version
+Subject: [PATCH 70/85] adapt to new emscripten version
 
 ---
  modules/access/emjsfile.c           | 2 +-
@@ -35,5 +35,5 @@ index 9fd34350b5..e22342e894 100644
              let msg = e['data'];
              if (msg.customCmd == 'getVoutMessagePort') {
 -- 
-2.35.1
+2.43.0
 

@@ -1,7 +1,7 @@
-From 540a5ac3eb4d987805e74a8b3d2d585186c2a0c4 Mon Sep 17 00:00:00 2001
+From bffea6f25f8448f5a1c7cd0601d32db8c07de65b Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Sun, 30 May 2021 21:22:40 +0200
-Subject: [PATCH 05/77] contrib: gmp: add support for wasm-emscripten
+Subject: [PATCH 05/85] contrib: gmp: add support for wasm-emscripten
 
 ---
  contrib/src/gmp/rules.mak | 3 +++
@@ -22,5 +22,5 @@ index 11fe8acdfa..d6cd702ce0 100644
  ifdef HAVE_WIN32
  ifeq ($(ARCH),arm)
 -- 
-2.35.1
+2.43.0
 

@@ -1,8 +1,8 @@
-From 10d9967d653220f5ccc9a0c7973c3a738e6b9838 Mon Sep 17 00:00:00 2001
+From 88f38be29aaa18e4d6107a5d54acc0f5f814fd1e Mon Sep 17 00:00:00 2001
 From: Alaric Senat <dev.asenat@posteo.net>
 Date: Fri, 7 Oct 2022 15:36:18 +0200
-Subject: [PATCH 2/2] audio_output: force downmixing when browser chan count is
- lower
+Subject: [PATCH 81/85] audio_output: force downmixing when browser chan count
+ is lower
 
 ---
  modules/audio_output/emscripten.c | 26 ++++++++++++++++++++++++++
@@ -46,5 +46,5 @@ index d94a0dd234..8819c34f9b 100644
          fmt->i_rate = sys->sample_rate;
      }
 -- 
-2.37.3
+2.43.0
 

@@ -1,7 +1,7 @@
-From 000a50334fe09da173a986455c796d97c348108c Mon Sep 17 00:00:00 2001
+From 94d6917b955b5fe30a192be31438fab94b5e76eb Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Mon, 8 Aug 2022 13:55:50 +0200
-Subject: [PATCH 72/77] Revert "emscripten: add js File access plugin"
+Subject: [PATCH 72/85] Revert "emscripten: add js File access plugin"
 
 This reverts commit 49f585a2a5fbbc04d85fbccbf63881d2a659cc54.
 ---
@@ -332,5 +332,5 @@ index 0fea11afc4..0000000000
 -    set_callbacks( EmFileOpen, EmFileClose )
 -vlc_module_end()
 -- 
-2.35.1
+2.43.0
 

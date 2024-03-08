@@ -1,7 +1,7 @@
-From f7dd09332178239f698dacfd1c73ce1502e9f8f8 Mon Sep 17 00:00:00 2001
-From: root <root@compile-vlc-wasm.local>
+From 536c4878df8fa407c0278949e097d0f73514e4b4 Mon Sep 17 00:00:00 2001
+From: metehan-arslan <99metehanarslan@gmail.com>
 Date: Wed, 31 Aug 2022 16:03:27 +0000
-Subject: [PATCH] replace audio output module
+Subject: [PATCH 79/85] replace audio output module
 
 ---
  modules/audio_output/Makefile.am              |   2 +-
@@ -1077,5 +1077,5 @@ index 0000000000..f291470478
 +    },
 +})
 -- 
-2.30.2
+2.43.0
 

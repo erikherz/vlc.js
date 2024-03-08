@@ -1,0 +1,60 @@
+From 5aaee17a38661e67bfad7f0e3f282b938c5d6820 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Tue, 26 Apr 2022 13:45:07 +0200
+Subject: [PATCH 59/85] wip: setjmp/lgjmp requires atomics
+
+I suppose this is because we can use it for coroutines. Non atomic operations could create race conditions.
+---
+ contrib/src/aribb24/rules.mak | 4 ++++
+ contrib/src/png/rules.mak     | 4 ++++
+ contrib/src/zlib/rules.mak    | 4 ++++
+ 3 files changed, 12 insertions(+)
+
+diff --git a/contrib/src/aribb24/rules.mak b/contrib/src/aribb24/rules.mak
+index 0c0ba9ff91..ba8a70b6d5 100644
+--- a/contrib/src/aribb24/rules.mak
++++ b/contrib/src/aribb24/rules.mak
+@@ -25,6 +25,10 @@ aribb24: aribb24-$(ARIBB24_VERSION).tar.gz .sum-aribb24
+ 
+ DEPS_aribb24 = png
+ 
++ifdef HAVE_EMSCRIPTEN
++CFLAGS+="-pthread"
++endif
++
+ .aribb24: aribb24
+ 	$(REQUIRE_GPL)
+ 	$(REQUIRE_GNUV3)
+diff --git a/contrib/src/png/rules.mak b/contrib/src/png/rules.mak
+index 7a8db11d5a..f1c93b835b 100644
+--- a/contrib/src/png/rules.mak
++++ b/contrib/src/png/rules.mak
+@@ -7,6 +7,10 @@ ifeq ($(call need_pkg,"libpng >= 1.5.4"),)
+ PKGS_FOUND += png
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++HOSTVARS += CFLAGS="$(CFLAGS) -pthread"
++endif
++
+ $(TARBALLS)/libpng-$(PNG_VERSION).tar.xz:
+ 	$(call download_pkg,$(PNG_URL),png)
+ 
+diff --git a/contrib/src/zlib/rules.mak b/contrib/src/zlib/rules.mak
+index 4f7fc7397a..166d6b528a 100644
+--- a/contrib/src/zlib/rules.mak
++++ b/contrib/src/zlib/rules.mak
+@@ -7,6 +7,10 @@ ifeq ($(call need_pkg,"zlib"),)
+ PKGS_FOUND += zlib
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++CFLAGS+="-pthread"
++endif
++
+ ifeq ($(shell uname),Darwin) # zlib tries to use libtool on Darwin
+ ifdef HAVE_CROSS_COMPILE
+ ZLIB_CONFIG_VARS=CHOST=$(HOST)
+-- 
+2.43.0
+

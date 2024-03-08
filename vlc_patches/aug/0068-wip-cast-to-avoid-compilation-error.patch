@@ -1,0 +1,23 @@
+From 228b07d1431cf6e915ebf084fca479cc825cc58e Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 10 Aug 2022 13:43:34 +0200
+Subject: [PATCH 68/85] wip: cast to avoid compilation error
+
+---
+ src/emscripten/thread.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/emscripten/thread.c b/src/emscripten/thread.c
+index 8496174278..8fb8c5bb57 100644
+--- a/src/emscripten/thread.c
++++ b/src/emscripten/thread.c
+@@ -28,5 +28,5 @@
+ unsigned long vlc_thread_id(void)
+ {
+     static_assert(sizeof(pthread_t) <= sizeof(unsigned long),"invalid pthread_t size");
+-    return pthread_self();
++    return (unsigned long) pthread_self();
+ }
+-- 
+2.43.0
+

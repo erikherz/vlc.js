@@ -1,0 +1,50 @@
+From bbf3c9bfb75656b23d8f7cbfd1a301333c691792 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 12 May 2022 09:58:01 +0200
+Subject: [PATCH 63/85] emscripten: Handle late displayFrame messages after a
+ flush
+
+---
+ modules/codec/webcodec.cpp                         | 12 ++++++++++++
+ modules/video_output/opengl/interop_emscripten.cpp |  2 ++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index a7b67d4ef6..e619cdde00 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -190,6 +190,18 @@ EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder, emscripten::EM_VAL decC
+             let picIdx = data['pictureIdx'];
+             let frame = Module.framesReady[picIdx];
+             Module.framesReady[picIdx] = undefined;
++            if (!frame) {
++                /* We may receive a late message after a flush, in which case
++                 * we still need to reply to the interop, but we don't have
++                 * anything to provide to it
++                 */
++                Module.voutPort.postMessage({
++                    customCmd: 'displayFrame',
++                    frame: undefined,
++                    pictureId: picIdx
++                });
++                return;
++            }
+             Module.voutPort.postMessage({
+                 customCmd: 'displayFrame',
+                 frame: frame,
+diff --git a/modules/video_output/opengl/interop_emscripten.cpp b/modules/video_output/opengl/interop_emscripten.cpp
+index e9905ac1a3..f745fcfef4 100644
+--- a/modules/video_output/opengl/interop_emscripten.cpp
++++ b/modules/video_output/opengl/interop_emscripten.cpp
+@@ -60,6 +60,8 @@ tc_emscripten_op_allocate_textures(const struct vlc_gl_interop *interop, GLuint
+ 
+ EM_ASYNC_JS(void, bindVideoFrame, (int pictureIdx), {
+     let frame = await Module.awaitFrame(pictureIdx);
++    if (!frame)
++        return;
+ 
+     let glCtx = Module.glCtx;
+     glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, frame.codedWidth, frame.codedHeight, 0,
+-- 
+2.43.0
+

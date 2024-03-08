@@ -1,7 +1,7 @@
-From 46e99994434a293d92b11bdf7b5089e9c38b5aa2 Mon Sep 17 00:00:00 2001
+From e318ea2e61865a06281c0e622e3dd38098bddccd Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Sun, 30 May 2021 20:38:46 +0200
-Subject: [PATCH 04/77] contrib: gcrypt: add support for wasm-emscripten
+Subject: [PATCH 04/85] contrib: gcrypt: add support for wasm-emscripten
 
 ---
  contrib/src/gcrypt/rules.mak           |  6 ++++
@@ -89,5 +89,5 @@ index 0ceb75d7a3..5d4236b77f 100644
  	cp -f -- "$(SRC)/gpg-error/lock-obj-pub.posix.h" \
  		"$(UNPACK_DIR)/src/lock-obj-pub.native.h"
 -- 
-2.35.1
+2.43.0
 

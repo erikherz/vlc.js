@@ -1,7 +1,7 @@
-From 77373ae9ca4cb51cadc14a12e2d5d928c5328727 Mon Sep 17 00:00:00 2001
+From 3fe75cc8dbed6da7c73f17b074b1adb611d26099 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Thu, 9 Jun 2022 21:05:04 +0200
-Subject: [PATCH 73/77] emscripten: add js File access plugin
+Subject: [PATCH 73/85] emscripten: add js File access plugin
 
 Emscripten currently does not support picking a file from the DOM with the element, and reading it from a webassembly application.
 
@@ -364,5 +364,5 @@ index 0000000000..139b12b68a
 +    set_callbacks( EmFileOpen, EmFileClose )
 +vlc_module_end()
 -- 
-2.35.1
+2.43.0
 

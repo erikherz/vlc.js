@@ -1,0 +1,480 @@
+From a4a9e26c34a5197e827826b6817d83a37e5909fb Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 09:54:14 +0100
+Subject: [PATCH 26/85] codec: Add a webcodec decoder
+
+---
+ modules/codec/Makefile.am                |   6 +
+ modules/codec/webcodec.cpp               | 392 +++++++++++++++++++++++
+ modules/video_output/emscripten/common.h |  46 +++
+ 3 files changed, 444 insertions(+)
+ create mode 100644 modules/codec/webcodec.cpp
+ create mode 100644 modules/video_output/emscripten/common.h
+
+diff --git a/modules/codec/Makefile.am b/modules/codec/Makefile.am
+index 6bdc40b491..31ec138bd0 100644
+--- a/modules/codec/Makefile.am
++++ b/modules/codec/Makefile.am
+@@ -644,3 +644,9 @@ noinst_LTLIBRARIES += libhxxxhelper_testdec_plugin.la
+ libvlc_vtutils_la_SOURCES = codec/vt_utils.c codec/vt_utils.h
+ libvlc_vtutils_la_LDFLAGS = -static -no-undefined
+ EXTRA_LTLIBRARIES += libvlc_vtutils.la
++
++libwebcodec_plugin_la_SOURCES = codec/webcodec.cpp
++libwebcodec_plugin_la_LDFLAGS = $(AM_LDFLAGS)
++if HAVE_EMSCRIPTEN
++codec_LTLIBRARIES += libwebcodec_plugin.la
++endif
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+new file mode 100644
+index 0000000000..a75d3f7897
+--- /dev/null
++++ b/modules/codec/webcodec.cpp
+@@ -0,0 +1,392 @@
++/*****************************************************************************
++ * webcodec.cpp: Decoder module using browser provided codec implementations
++ *****************************************************************************
++ * Copyright © 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_codec.h>
++#include <vlc_threads.h>
++#include <vlc_cxx_helpers.hpp>
++#include <vlc_block.h>
++#include <vlc_tick.h>
++#include <vlc_picture.h>
++
++#include "../video_output/emscripten/common.h"
++
++#include <emscripten/emscripten.h>
++#include <emscripten/val.h>
++#include <emscripten/bind.h>
++#include <emscripten/em_js.h>
++#include <emscripten/wire.h>
++#include <memory>
++#include <functional>
++#include <cstdint>
++#include <queue>
++
++using emval = emscripten::val;
++
++struct decoder_sys_t
++{
++    emval decoder = emval::undefined();
++    std::queue<block_t*> blocks;
++    vlc::threads::mutex mutex;
++    vlc::threads::condition_variable cond;
++    vlc_thread_t th;
++
++    vlc_video_context* vctx;
++};
++
++extern "C"
++{
++
++EMSCRIPTEN_KEEPALIVE picture_t* createAndQueuePicture(decoder_t* dec, int pictureId,
++                                                      int64_t timestamp)
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    if ( decoder_UpdateVideoOutput( dec, sys->vctx ) )
++    {
++        msg_Err( dec, "Failure during UpdateVideoOutput! FIXME" );
++        return NULL;
++    }
++
++    auto pic = decoder_NewPicture(dec);
++    if (pic == nullptr)
++        return nullptr;
++    pic->date = VLC_TICK_FROM_US(timestamp);
++    pic->b_progressive = true;
++    pic->p_sys = reinterpret_cast<void*>( static_cast<uintptr_t>( pictureId ) );
++    decoder_QueueVideo(dec, pic);
++    return pic;
++}
++
++}
++
++EM_JS(void, initModuleContext, (void* ctx), {
++    globalThis.Module.webCodecCtx = ctx;
++});
++
++EM_ASYNC_JS(void, declareCallbacks, (), {
++    async function getVoutMessagePort() {
++        let p = new Promise((resolve, reject) => {
++            self.addEventListener('message', function(e) {
++                let msg = e['data'];
++                if (msg.customCmd == 'transferMessagePort') {
++                    let port = msg['transferList'][0];
++                    if (!port)
++                        reject();
++                    Module.voutPort = port;
++                    resolve();
++                }
++            });
++        });
++        await p;
++    }
++
++    Module.pictureId = 0;
++    globalThis.Module.boundOutputCb = async function(frame) {
++        Module.pictureId = (Module.pictureId + 1);
++        _createAndQueuePicture(globalThis.Module.webCodecCtx, Module.pictureId,
++                    frame.timestamp);
++        if (Module.voutPort === undefined)
++            await getVoutMessagePort();
++        console.log('Posting frame', Module.pictureId);
++        Module.voutPort.postMessage({
++            customCmd: 'displayFrame',
++            frame: frame,
++            pictureId: Module.pictureId,
++          }, [frame]);
++    };
++    globalThis.Module.boundErrorCb = function(err) {
++        console.log('Error while decoding: ');
++        console.log(err);
++    };
++});
++
++EM_ASYNC_JS(bool, probeConfig, (emscripten::EM_VAL cfg), {
++    var decoderCfg = Emval.toValue(cfg);
++    var res = await VideoDecoder.isConfigSupported(decoderCfg).catch((err) => {
++        console.log(err);
++        return {'supported': false};
++    });
++    return res['supported'];
++});
++
++emval blockToEncodedVideoChunk( decoder_t* dec, block_t* block )
++{
++    auto chunkType = emval::global("EncodedVideoChunk");
++    auto chunkCfg = emval::object();
++
++    static bool first = true;
++
++    if ( first == true )
++    {
++        chunkCfg.set( "type", "key" );
++        first = false;
++    }
++    else
++        chunkCfg.set( "type", (block->i_flags & BLOCK_FLAG_TYPE_I) ? "key" : "delta" );
++    auto timestamp = block->i_pts ? block->i_pts : block->i_dts;
++    chunkCfg.set( "timestamp", (long int)US_FROM_VLC_TICK( timestamp ) );
++    //if ( block->i_length > 0 )
++    //    chunkCfg.set( "duration", (long int)US_FROM_VLC_TICK( block->i_length ) );
++    chunkCfg.set( "data", emscripten::typed_memory_view( block->i_buffer, block->p_buffer ) );
++    return chunkType.new_( std::move( chunkCfg ) );
++}
++
++static emval getDecoderConfig( decoder_t* dec, bool includeExtraData )
++{
++    auto decoderConfig = emval::object();
++    switch( dec->fmt_in.i_codec )
++    {
++    case VLC_CODEC_VP8:
++        decoderConfig.set( "codec", "vp8" );
++        break;
++    case VLC_CODEC_VP9:
++        decoderConfig.set( "codec", "vp09.*" );
++        break;
++    case VLC_CODEC_H264:
++    {
++        char codec[12];
++        snprintf(codec, sizeof(codec), "avc1.%.2X%.2X%.2X", dec->fmt_in.i_profile,
++                 0, dec->fmt_in.i_level);
++        decoderConfig.set( "codec", codec );
++
++        //decoderConfig.set("codec", "avc1.64000b" );
++        break;
++    }
++    case VLC_CODEC_AV1:
++        decoderConfig.set( "codec", "av01" );
++        break;
++    default:
++        return emval::undefined();
++    }
++    decoderConfig.set( "codedWidth", dec->fmt_in.video.i_width );
++    decoderConfig.set( "codedHeight", dec->fmt_in.video.i_height );
++    decoderConfig.set( "displayAspectWidth", dec->fmt_in.video.i_visible_width );
++    decoderConfig.set( "displayAspectHeight", dec->fmt_in.video.i_visible_height );
++    decoderConfig.set( "optimizeForLatency", true );
++    if ( includeExtraData )
++    {
++        msg_Err( dec, "i_extra: %u", dec->fmt_in.i_extra );
++        if ( dec->fmt_in.i_extra > 0 )
++        {
++            decoderConfig.set( "description",
++                               emscripten::typed_memory_view(
++                                    dec->fmt_in.i_extra,
++                                   static_cast<uint8_t*>( dec->fmt_in.p_extra ) )
++                               );
++        }
++    }
++    return decoderConfig;
++}
++
++static bool initDecoder( decoder_t* dec )
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    initModuleContext(dec);
++    declareCallbacks();
++
++    auto initCfg = emval::object();
++
++    auto outputCb = emval::module_property("boundOutputCb");
++    if ( outputCb.isUndefined() )
++    {
++        msg_Err( dec, "Failed to find output callback" );
++        return false;
++    }
++    initCfg.set("output", outputCb);
++
++    auto errorCb = emval::module_property("boundErrorCb");
++    if ( errorCb.isUndefined() )
++    {
++        msg_Err( dec, "Failed to find error callback" );
++        return false;
++    }
++    initCfg.set("error", errorCb);
++
++    auto decoderType = emval::global("VideoDecoder");
++    sys->decoder = decoderType.new_(initCfg);
++    if ( sys->decoder.isUndefined() )
++    {
++        msg_Err( dec, "Failed to instantiate VideoDecoder" );
++        return false;
++    }
++
++    sys->decoder.call<void>( "configure", getDecoderConfig( dec, true ) );
++
++    return true;
++}
++
++static void WebcodecDecodeWorkerTick( void* arg )
++{
++    auto dec = static_cast<decoder_t*>( arg );
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    block_t* block;
++
++    vlc::threads::mutex_locker lock{ sys->mutex };
++    while ( sys->blocks.empty() == false )
++    {
++        block = sys->blocks.front();
++        sys->blocks.pop();
++
++        auto chunk = blockToEncodedVideoChunk( dec, block );
++        block_Release(block);
++        msg_Err(dec, "Decoding a sample...");
++        sys->decoder.call<void>( "decode", chunk );
++
++        auto queueSize = sys->decoder["decodeQueueSize"];
++        auto state = sys->decoder["state"];
++        msg_Err( dec, "Decoder state: %s ; queue size: %ld", state.as<std::string>().c_str(), queueSize.as<long int>());
++    }
++}
++
++static void* WebcodecDecodeWorker( void* arg )
++{
++    /*
++     * We need to be able to yield back to the browser main loop after we
++     * queue some blocks for decoding, otherwise the callback will never be
++     * invoked.
++     * In order to do so, we spawn a dedidated thread that will run a "main loop"
++     * which consist of dequeuing a single block and passing it to webcodec.
++     * After doing so, it yields back to the message loop and so on. If no
++     * blocks are queued for decoding, we can block as there nothing else being
++     * done from this worker.
++     */
++    auto dec = static_cast<decoder_t*>( arg );
++    if ( !initDecoder( dec ) )
++    {
++        msg_Err( dec, "Failed to initialize decoder: FIXME" );
++        return NULL;
++    }
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    auto vctxPrivate = static_cast<webcodec_context*>(
++            vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
++    vctxPrivate->decoder_worker = pthread_self();
++    emscripten_set_main_loop_arg( &WebcodecDecodeWorkerTick, dec, 0, false );
++    /*
++     * We want our tick function to be invoked ASAP even if we'd only be blocking
++     * waiting for a new block to be queued
++     */
++    emscripten_set_main_loop_timing( EM_TIMING_SETTIMEOUT, 1 );
++    return NULL;
++}
++
++static int Decode( decoder_t* dec, block_t* block )
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    vlc::threads::mutex_locker lock{ sys->mutex };
++    sys->blocks.push( block );
++    sys->cond.signal();
++    return VLCDEC_SUCCESS;
++}
++
++static void Flush( decoder_t* dec )
++{
++    //FIXME: Needs to be called from the decoder thread
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    sys->decoder.call<emval>("flush").await();
++}
++
++static int Open( vlc_object_t* obj )
++{
++    auto dec = reinterpret_cast<decoder_t*>(obj);
++
++    if ( dec->fmt_in.i_cat != VIDEO_ES )
++        return VLC_EGENERIC;
++
++    auto decoderType = emval::global("VideoDecoder");
++    if ( !decoderType.as<bool>() )
++    {
++        msg_Err( obj, "Can't get VideoDecoder type, webcodec is probably not "
++                      "supported on this browser" );
++        return false;
++    }
++    auto sys = std::make_unique<decoder_sys_t>();
++    dec->p_sys = sys.get();
++
++    auto decoderConfig = getDecoderConfig( dec, false );
++    if ( decoderConfig.isUndefined() )
++        return VLC_EGENERIC;
++    auto isSupported = probeConfig(decoderConfig.as_handle());
++
++    if ( isSupported == false )
++    {
++        msg_Err( dec, "VideoDecoder doesn't support this configuration" );
++        return VLC_EGENERIC;
++    }
++
++    if ( es_format_Copy( &dec->fmt_out, &dec->fmt_in ) != VLC_SUCCESS )
++        return VLC_ENOMEM;
++    dec->fmt_out.i_codec = dec->fmt_out.video.i_chroma = VLC_CODEC_WEBCODEC_OPAQUE;
++
++    auto dec_dev = decoder_GetDecoderDevice(dec);
++    sys->vctx = vlc_video_context_Create(dec_dev, VLC_VIDEO_CONTEXT_WEBCODEC,
++                                         sizeof(webcodec_context), nullptr);
++    auto vctxPrivate = static_cast<webcodec_context*>(
++            vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
++    new (vctxPrivate) webcodec_context();
++
++    if ( vlc_clone( &sys->th, &WebcodecDecodeWorker, dec, 0 ) != VLC_SUCCESS )
++    {
++        msg_Err( obj, "Failed to create webcodec thread" );
++        return VLC_EGENERIC;
++    }
++
++    dec->pf_decode = &Decode;
++    dec->pf_flush = &Flush;
++
++    sys.release();
++    return VLCDEC_SUCCESS;
++}
++
++static void Close( decoder_t* dec )
++{
++    auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
++    sys->decoder.call<void>("close");
++    delete sys;
++}
++
++static int
++OpenDecDevice(vlc_decoder_device *device, vout_window_t *)
++{
++    static const struct vlc_decoder_device_operations ops =
++    {
++        nullptr,
++    };
++    device->ops = &ops;
++    device->type = VLC_DECODER_DEVICE_WEBCODEC;
++
++    return VLC_SUCCESS;
++}
++
++vlc_module_begin ()
++    set_description("Video decoder using browser provided implementation")
++    set_subcategory(SUBCAT_INPUT_VCODEC)
++    set_section(N_("Decoding"), NULL)
++    set_capability("video decoder", 100)
++    set_callbacks(Open, Close)
++    add_shortcut("webcodec")
++
++    add_submodule()
++        set_callback_dec_device(OpenDecDevice, 1)
++vlc_module_end ()
+diff --git a/modules/video_output/emscripten/common.h b/modules/video_output/emscripten/common.h
+new file mode 100644
+index 0000000000..3a2d3c9099
+--- /dev/null
++++ b/modules/video_output/emscripten/common.h
+@@ -0,0 +1,46 @@
++/*****************************************************************************
++ * common.h: Emscripten decoder/vout common code
++ *****************************************************************************
++ * Copyright (C) 2021 VLC authors and VideoLAN
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifndef EMSCRIPTEN_COMMON_H
++#define EMSCRIPTEN_COMMON_H
++
++#ifndef __cplusplus
++# error This only supports C++
++#endif
++
++#include <vlc_threads.h>
++#include <vlc_picture.h>
++
++#include <emscripten/html5_webgl.h>
++//#include <emscripten/val.h>
++
++#define WEBCODEC_MAX_PICTURES 32
++
++struct webcodec_context
++{
++    pthread_t decoder_worker;
++};
++
++struct webcodec_picture_sys_t
++{
++    int pictureId;
++};
++
++#endif // EMSCRIPTEN_COMMON_H
+-- 
+2.43.0
+

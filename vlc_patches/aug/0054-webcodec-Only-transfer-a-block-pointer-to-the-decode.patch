@@ -1,0 +1,100 @@
+From 1db874023cdffed52441e9511ba5ccd367b52c20 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 10 May 2022 10:25:00 +0200
+Subject: [PATCH 54/85] webcodec: Only transfer a block pointer to the decoder
+ worker
+
+It's unclear how performant it is to transfer an entire object and its
+embedded memory view
+---
+ modules/codec/webcodec.cpp | 47 +++++++++++++++++++++++---------------
+ 1 file changed, 28 insertions(+), 19 deletions(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index 983084103e..51f63a2089 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -93,18 +93,7 @@ EMSCRIPTEN_KEEPALIVE void releaseBlock( block_t* block )
+     block_Release( block );
+ }
+ 
+-}
+-
+-EM_ASYNC_JS(bool, probeConfig, (emscripten::EM_VAL cfg), {
+-    var decoderCfg = Emval.toValue(cfg);
+-    var res = await VideoDecoder.isConfigSupported(decoderCfg).catch((err) => {
+-        console.log(err);
+-        return {'supported': false};
+-    });
+-    return res['supported'];
+-});
+-
+-emval blockToEncodedVideoChunk( decoder_t* dec, block_t* block )
++EMSCRIPTEN_KEEPALIVE void decodeBlock( block_t* block )
+ {
+     auto chunkType = emval::global("EncodedVideoChunk");
+     auto chunkCfg = emval::object();
+@@ -123,9 +112,30 @@ emval blockToEncodedVideoChunk( decoder_t* dec, block_t* block )
+     //if ( block->i_length > 0 )
+     //    chunkCfg.set( "duration", (long int)US_FROM_VLC_TICK( block->i_length ) );
+     chunkCfg.set( "data", emscripten::typed_memory_view( block->i_buffer, block->p_buffer ) );
+-    return chunkType.new_( std::move( chunkCfg ) );
++    auto chunk = chunkType.new_( std::move( chunkCfg ) );
++
++    /* We can't return a javascript object from the stack back to the JS caller
++     * as the object would be destroyed when falling out of scope.
++     * We can't also pass an object by reference as the only way to get a
++     * emscripten::val instance is to take ownership from the javascript object
++     * so we couldn't use it back in the JS
++     * As a work around, we access the JS decoder instance straight from the C++ code
++     */
++    EM_ASM({Module.decoder.decode( Emval.toValue( $0 ) ); }, chunk.as_handle());
+ }
+ 
++
++}
++
++EM_ASYNC_JS(bool, probeConfig, (emscripten::EM_VAL cfg), {
++    var decoderCfg = Emval.toValue(cfg);
++    var res = await VideoDecoder.isConfigSupported(decoderCfg).catch((err) => {
++        console.log(err);
++        return {'supported': false};
++    });
++    return res['supported'];
++});
++
+ static emval getDecoderConfig( decoder_t* dec, bool includeExtraData )
+ {
+     auto decoderConfig = emval::object();
+@@ -207,8 +217,9 @@ EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder, emscripten::EM_VAL decC
+     function onDecoderWorkerMessage(msg) {
+         const data = msg['data'];
+         if (data['customCmd'] == 'decode') {
+-            Module.decoder.decode( data['chunk'] );
+-            _releaseBlock( data['block'] );
++            let block = data['block'];
++            _decodeBlock( block );
++            _releaseBlock( block );
+         } else if ( data['customCmd'] == 'flush' ) {
+             Module.decoder.flush();
+         } else if ( data['customCmd'] == 'close' ) {
+@@ -360,14 +371,12 @@ EM_ASYNC_JS(void, initDecoderWorkerMessagePort, (decoder_t* dec), {
+ static int Decode( decoder_t* dec, block_t* block )
+ {
+     initDecoderWorkerMessagePort(dec);
+-    auto chunk = blockToEncodedVideoChunk( dec, block );
+     EM_ASM({
+         Module.decoderWorkerPort.postMessage({
+             customCmd: 'decode',
+-            chunk: Emval.toValue($0),
+-            block: $1
++            block: $0
+         });
+-    }, chunk.as_handle(), block);
++    }, block);
+     return VLCDEC_SUCCESS;
+ }
+ 
+-- 
+2.43.0
+

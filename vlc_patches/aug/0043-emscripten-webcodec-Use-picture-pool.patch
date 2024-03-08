@@ -1,0 +1,104 @@
+From c0ca39149b221130ddab4155ec852ed0120219e9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 3 May 2022 11:12:13 +0200
+Subject: [PATCH 43/85] emscripten: webcodec: Use picture pool
+
+---
+ modules/codec/Makefile.am  |  2 +-
+ modules/codec/webcodec.cpp | 30 ++++++++++++++++--------------
+ 2 files changed, 17 insertions(+), 15 deletions(-)
+
+diff --git a/modules/codec/Makefile.am b/modules/codec/Makefile.am
+index 31ec138bd0..59079ebce6 100644
+--- a/modules/codec/Makefile.am
++++ b/modules/codec/Makefile.am
+@@ -645,7 +645,7 @@ libvlc_vtutils_la_SOURCES = codec/vt_utils.c codec/vt_utils.h
+ libvlc_vtutils_la_LDFLAGS = -static -no-undefined
+ EXTRA_LTLIBRARIES += libvlc_vtutils.la
+ 
+-libwebcodec_plugin_la_SOURCES = codec/webcodec.cpp
++libwebcodec_plugin_la_SOURCES = codec/webcodec.cpp video_output/emscripten/common.cpp
+ libwebcodec_plugin_la_LDFLAGS = $(AM_LDFLAGS)
+ if HAVE_EMSCRIPTEN
+ codec_LTLIBRARIES += libwebcodec_plugin.la
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index a75d3f7897..cd902851b0 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -59,24 +59,23 @@ struct decoder_sys_t
+ extern "C"
+ {
+ 
+-EMSCRIPTEN_KEEPALIVE picture_t* createAndQueuePicture(decoder_t* dec, int pictureId,
+-                                                      int64_t timestamp)
++EMSCRIPTEN_KEEPALIVE int32_t createAndQueuePicture(decoder_t* dec, int64_t timestamp)
+ {
+     auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
+     if ( decoder_UpdateVideoOutput( dec, sys->vctx ) )
+     {
+         msg_Err( dec, "Failure during UpdateVideoOutput! FIXME" );
+-        return NULL;
++        return -1;
+     }
+-
+-    auto pic = decoder_NewPicture(dec);
++    auto vctx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC) );
++    auto pic = picture_pool_Wait(vctx->pool);
+     if (pic == nullptr)
+-        return nullptr;
++        return -1;
+     pic->date = VLC_TICK_FROM_US(timestamp);
+     pic->b_progressive = true;
+-    pic->p_sys = reinterpret_cast<void*>( static_cast<uintptr_t>( pictureId ) );
+     decoder_QueueVideo(dec, pic);
+-    return pic;
++    return PictureContextPrivate(pic->context)->pictureIdx;
+ }
+ 
+ }
+@@ -102,18 +101,15 @@ EM_ASYNC_JS(void, declareCallbacks, (), {
+         await p;
+     }
+ 
+-    Module.pictureId = 0;
+     globalThis.Module.boundOutputCb = async function(frame) {
+-        Module.pictureId = (Module.pictureId + 1);
+-        _createAndQueuePicture(globalThis.Module.webCodecCtx, Module.pictureId,
+-                    frame.timestamp);
++        let picIdx = _createAndQueuePicture(globalThis.Module.webCodecCtx, frame.timestamp);
+         if (Module.voutPort === undefined)
+             await getVoutMessagePort();
+-        console.log('Posting frame', Module.pictureId);
++        console.log('Posting frame', picIdx);
+         Module.voutPort.postMessage({
+             customCmd: 'displayFrame',
+             frame: frame,
+-            pictureId: Module.pictureId,
++            pictureId: picIdx,
+           }, [frame]);
+     };
+     globalThis.Module.boundErrorCb = function(err) {
+@@ -346,6 +342,9 @@ static int Open( vlc_object_t* obj )
+             vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC));
+     new (vctxPrivate) webcodec_context();
+ 
++    if ( webcodec_CreatePool(sys->vctx, &dec->fmt_out.video) != VLC_SUCCESS )
++        return VLC_EGENERIC;
++
+     if ( vlc_clone( &sys->th, &WebcodecDecodeWorker, dec, 0 ) != VLC_SUCCESS )
+     {
+         msg_Err( obj, "Failed to create webcodec thread" );
+@@ -363,6 +362,9 @@ static void Close( decoder_t* dec )
+ {
+     auto sys = static_cast<decoder_sys_t*>( dec->p_sys );
+     sys->decoder.call<void>("close");
++    auto vctx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_WEBCODEC ) );
++    picture_pool_Release(vctx->pool);
+     delete sys;
+ }
+ 
+-- 
+2.43.0
+

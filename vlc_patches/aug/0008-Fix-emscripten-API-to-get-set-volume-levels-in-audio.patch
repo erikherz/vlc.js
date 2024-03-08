@@ -1,0 +1,54 @@
+From a57f1a2fd94c75224da1e41860e8f578b7f721f6 Mon Sep 17 00:00:00 2001
+From: Olivier FAURE <couteaubleu@gmail.com>
+Date: Sun, 30 May 2021 12:14:26 +0200
+Subject: [PATCH 08/85] Fix emscripten API to get/set volume levels in
+ audio_output module
+
+---
+ modules/audio_output/emscripten.cpp | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+index b704b90699..3fefa60065 100644
+--- a/modules/audio_output/emscripten.cpp
++++ b/modules/audio_output/emscripten.cpp
+@@ -162,7 +162,7 @@ namespace {
+ 	void Flush( audio_output_t *aout )
+ 	{
+ 		aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		bzero(sys->sab, sys->sab_size);
++		bzero(sys->sab + (5 * sizeof(int32_t)), STORAGE_SIZE);
+ 	}
+ 
+ 	int Start( audio_output_t *aout, audio_sample_format_t *restrict fmt )
+@@ -177,7 +177,7 @@ namespace {
+ 		fmt->i_rate = AUDIO_WORKLET_SAMPLE_RATE;
+ 
+ 		// resume audio context (first start, it is paused when initialized)
+-		js_index_store(sys->sab, 4, (int)sys->volume * 100, sys->sab_size);
++		js_index_store(sys->sab, 4, (int)(sys->volume * 100), sys->sab_size);
+ 		js_index_store(sys->sab, 0, 1, sys->sab_size);
+ 
+ 		return VLC_SUCCESS;
+@@ -229,6 +229,10 @@ namespace {
+ 			// it will be notified by an Atomics.notify() from the process() callback
+ 			js_index_wait(sys->sab, 3, sys->sab_size);
+ 		}
++
++		// set volume
++		js_index_store(sys->sab, 4, (int)(sys->volume * 100), sys->sab_size);
++
+ 		audio_worklet_push(aout, data, data_size);
+ 		block_Release(block);
+ 	}
+@@ -271,7 +275,6 @@ namespace {
+ 			volume = 0.0f;
+ 		// TODO: implement gain
+ 		sys->volume = volume;
+-		js_index_store(sys->sab, 4, (int)volume * 100, sys->sab_size);
+ 		aout_VolumeReport(aout, volume);
+ 
+ 		return 0;
+-- 
+2.43.0
+

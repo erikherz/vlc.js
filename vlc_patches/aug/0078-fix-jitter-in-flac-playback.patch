@@ -1,7 +1,7 @@
-From 41b4a0210077f0e9c677b94823a5d7c070fb08ab Mon Sep 17 00:00:00 2001
+From 12e3eeda1504fee4709e424c1505685b64268d2d Mon Sep 17 00:00:00 2001
 From: metehan-arslan <99metehanarslan@gmail.com>
 Date: Fri, 26 Aug 2022 22:50:21 +0300
-Subject: [PATCH] fix jitter in flac playback
+Subject: [PATCH 78/85] fix jitter in flac playback
 
 ---
  modules/audio_output/emscripten.cpp | 51 +++++++++++++++++++++--------
@@ -132,5 +132,5 @@ index a7e9fb0d4d..de442e2b73 100644
  		val awn_cb = awn_caller.call<val>("bind", cb_caller);
  
 -- 
-2.37.2
+2.43.0
 

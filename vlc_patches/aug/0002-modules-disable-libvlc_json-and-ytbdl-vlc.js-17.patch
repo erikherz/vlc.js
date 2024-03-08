@@ -1,7 +1,7 @@
-From bcc3fabcc3dadb03cd0768daa137d019fc45d4c5 Mon Sep 17 00:00:00 2001
+From c28bc1c8c4b32683ea0811898fac66a6e8d25816 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Fri, 16 Apr 2021 11:32:33 +0200
-Subject: [PATCH 02/77] modules: disable libvlc_json and ytbdl vlc.js#17
+Subject: [PATCH 02/85] modules: disable libvlc_json and ytbdl vlc.js#17
 
 The libjson library is not linkable with emsdk v2.0.17,
 this commit should be reverted when the ticket is resolved.
@@ -21,5 +21,5 @@ index 86dfd8abee..3e64246e4d 100644
  noinst_LTLIBRARIES += libvlc_json.la
 +endif
 -- 
-2.35.1
+2.43.0
 
