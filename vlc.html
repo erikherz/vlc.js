@@ -41,7 +41,7 @@
       <div id="stack">
         <canvas
           class="emscripten"
-          id="canvas"
+          id="pouet"
           oncontextmenu="event.preventDefault()"
           tabindex=-1
           width=1280
@@ -283,7 +283,7 @@
         }
 
         Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
-        media_player = new MediaPlayer(Module, "emjsfile://1");
+        media_player = new MediaPlayer(Module, "emjsfile://1", "pouet");
         media_player.set_volume(80);
 
         Module._set_global_media_player(media_player.media_player_ptr);
