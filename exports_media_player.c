@@ -35,6 +35,11 @@ void EMSCRIPTEN_KEEPALIVE wasmc_media_player_retain(libvlc_media_player_t *media
   libvlc_media_player_retain(media_player);
 }
 
+void EMSCRIPTEN_KEEPALIVE wasm_media_player_set_canvas_id(
+    libvlc_media_player_t *media_player, const char *id) {
+  libvlc_media_player_set_canvas_id(media_player, id);
+}
+
 void EMSCRIPTEN_KEEPALIVE wasm_media_player_set_media(libvlc_media_player_t *media_player, libvlc_media_t *media) {
   libvlc_media_player_set_media(media_player, media);
 }
