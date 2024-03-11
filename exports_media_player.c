@@ -24,7 +24,7 @@ libvlc_media_list_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_list_player_new() {
 }
 
 libvlc_media_player_t* EMSCRIPTEN_KEEPALIVE wasm_media_player_new_from_media(libvlc_media_t* media) {
-    return libvlc_media_player_new_from_media(media);
+    return libvlc_media_player_new_from_media(libvlc, media);
 }
 
 void EMSCRIPTEN_KEEPALIVE wasm_media_player_release(libvlc_media_player_t *media_player) {
@@ -224,11 +224,13 @@ int EMSCRIPTEN_KEEPALIVE wasm_audio_set_volume(libvlc_media_player_t *media_play
 }
 
 int EMSCRIPTEN_KEEPALIVE wasm_audio_get_channel(libvlc_media_player_t *media_player) {
-  return libvlc_audio_get_channel(media_player);
+  //return libvlc_audio_get_channel(media_player);
+  return 0;
 }
 
 int EMSCRIPTEN_KEEPALIVE wasm_audio_set_channel(libvlc_media_player_t *media_player, int channel) {
-  return libvlc_audio_set_channel(media_player, channel);
+  //return libvlc_audio_set_channel(media_player, channel);
+  return 0;
 }
 
 int EMSCRIPTEN_KEEPALIVE wasm_audio_get_delay(libvlc_media_player_t *media_player) {

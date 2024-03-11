@@ -21,16 +21,15 @@
           <span></span>
           <ul id="menu">
             <div>
-              <input type="text" size=60 id="opts" name="opts"></input>
-              <button id="reload" class="menu-button">Save</button>
-              <button id="reset-options" class="menu-button">Default values</button>
+              <input type="text" size=30 id="url" name="url"></input>
+              <button id="play" class="menu-button">Play</button>
             </div>
           </ul>
         </div>
       </nav>
       <div class="title">
-        <h1 class="main-title">VLC.js</h1>
-        <h3>Webassembly powered VLC</h3>
+        <h1 class="main-title">Videolabs</h1>
+        <h3>OLA Client demo</h3>
         <h3>
           <a class="vlc-link" target="_blank" href="https://code.videolan.org/jbk/vlc.js">
             <img class="gitlab-logo" src="./assets/gitlab-logo-black-and-white.png" />
@@ -47,60 +46,6 @@
           width=1280
           height=720
         ></canvas>
-        <div id="p-overlay" class="p-overlay">
-          <div id="play-button" class="play-button eject-svg">
-            <div>
-              <svg>
-                <!-- <path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path> -->
-                <path d="M7.27 1.047a1 1 0 0 1 1.46 0l6.345 6.77c.6.638.146 1.683-.73 1.683H1.656C.78 9.5.326 8.455.926 7.816L7.27 1.047zM.5 11.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-1z"/>
-              </svg>
-            </div>
-          </div>
-          <div id="bottom-bar" class="bottom-bar">
-
-            <div id="bottom-play-button" class="bottom-bar-play-button">
-              <svg id="bottom-bar-play-button-svg" class="bottom-bar-play-button-svg bottom-bar-eject-button-svg">
-                <!-- <path d="M6 1H3c-.6 0-1 .4-1 1v14c0 .6.4 1 1 1h3c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1zm6 0c-.6 0-1 .4-1 1v14c0 .6.4 1 1 1h3c.6 0 1-.4 1-1V2c0-.6-.4-1-1-1h-3z"></path> -->
-                <!-- <path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path> -->
-                <path d="M7.27 1.047a1 1 0 0 1 1.46 0l6.345 6.77c.6.638.146 1.683-.73 1.683H1.656C.78 9.5.326 8.455.926 7.816L7.27 1.047zM.5 11.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-1z"/>
-              </svg>
-            </div>
-            <div class="bottom-progress-bar">
-              <div id="bottom-progress" class="progress-zone">
-                <div class="bottom-progress">
-                  <div id="bottom-progress-value" class="bottom-progress-value"></div>
-                </div>
-              </div>
-            </div>
-            <div id="time" class="bottom-bar-timer"></div>
-            <div id="volume" class="bottom-bar-volume">
-              <div id="volume-svg-wrapper" class="volume-svg-wrapper">
-                <svg id="volume-svg"><path d="M15.6 3.3c-.4-.4-1-.4-1.4 0-.4.4-.4 1 0 1.4C15.4 5.9 16 7.4 16 9c0 1.6-.6 3.1-1.8 4.3-.4.4-.4 1 0 1.4.2.2.5.3.7.3.3 0 .5-.1.7-.3C17.1 13.2 18 11.2 18 9s-.9-4.2-2.4-5.7z"></path><path d="M11.282 5.282a.909.909 0 000 1.316c.735.735.995 1.458.995 2.402 0 .936-.425 1.917-.995 2.487a.909.909 0 000 1.316c.145.145.636.262 1.018.156a.725.725 0 00.298-.156C13.773 11.733 14.13 10.16 14.13 9c0-.17-.002-.34-.011-.51-.053-.992-.319-2.005-1.522-3.208a.909.909 0 00-1.316 0zm-7.496.726H.714C.286 6.008 0 6.31 0 6.76v4.512c0 .452.286.752.714.752h3.072l4.071 3.858c.5.3 1.143 0 1.143-.602V2.752c0-.601-.643-.977-1.143-.601L3.786 6.008z"></path></svg>
-              </div>
-              <div id="bottom-progress-volume" style="max-width: 100px;" class="progress-zone hide-volume">
-                <div class="bottom-progress-volume">
-                  <div id="bottom-progress-volume-value" class="bottom-progress-volume-value"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div id="chapter-buttons" class="chapter-buttons">
-            <div id="previous-chapter" class="chapter-button chapter-button-left">
-              <div>
-                <svg viewBox="0 0 20 20">
-                  <path d="M.5 3.5A.5.5 0 0 0 0 4v8a.5.5 0 0 0 1 0V8.753l6.267 3.636c.54.313 1.233-.066 1.233-.697v-2.94l6.267 3.636c.54.314 1.233-.065 1.233-.696V4.308c0-.63-.693-1.01-1.233-.696L8.5 7.248v-2.94c0-.63-.692-1.01-1.233-.696L1 7.248V4a.5.5 0 0 0-.5-.5z"/>
-                </svg>
-              </div>
-            </div>
-            <div id="next-chapter" class="chapter-button chapter-button-right">
-              <div>
-                <svg viewBox="0 0 20 20">
-                  <path d="M15.5 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V8.753l-6.267 3.636c-.54.313-1.233-.066-1.233-.697v-2.94l-6.267 3.636C.693 12.703 0 12.324 0 11.693V4.308c0-.63.693-1.01 1.233-.696L7.5 7.248v-2.94c0-.63.693-1.01 1.233-.696L15 7.248V4a.5.5 0 0 1 .5-.5z"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
       <div class="file-picker">
         <input type="file" id="fpicker_btn" required>
@@ -109,10 +54,9 @@
     <script src="./lib/module-loader.js"></script>
     <script src="./experimental.js"></script>
     <script type="module">
-      import { update_overlay, on_overlay_click } from "./lib/overlay.js";
+      //import { update_overlay, on_overlay_click } from "./lib/overlay.js";
       import { MediaPlayer } from "./lib/libvlc.js";
 
-      var vlc_options = "";
 
       var showCanvas = new CustomEvent('toggleCanvas', { detail: { files: true } });
       var hideCanvas = new CustomEvent('toggleCanvas', { detail: { files: false } });
@@ -121,58 +65,53 @@
         const app = document.getElementById('app');
         const stack = document.getElementById('stack');
         const spinner = document.getElementById('spinner-lds');
-        const pOverlay = document.getElementById("p-overlay");
+        //const pOverlay = document.getElementById("p-overlay");
         const playButton = document.getElementById("play-button");
         const bottomBar = document.getElementById("bottom-bar");
         const volume = document.getElementById("volume");
-        const progressVolume = document.getElementById("bottom-progress-volume");
-        const options = document.getElementById("opts");
-        const reloadBtn = document.getElementById('reload');
-        const resetBtn = document.getElementById('reset-options');
+        //const progressVolume = document.getElementById("bottom-progress-volume");
+        const url = document.getElementById("url");
+        //const resetBtn = document.getElementById('reset-options');
         const buttonBarPlayButton = document.getElementById('bottom-bar-play-button-svg');
         const nextChapter = document.getElementById('next-chapter');
         const previousChapter = document.getElementById('previous-chapter');
         const chapterButtons = document.getElementById('chapter-buttons');
 
-        reloadBtn.addEventListener('click', () => {
-          window.location.reload();
+        //resetBtn.addEventListener('click', () => {
+        //  //localStorage.setItem('options', '--codec=webcodec --aout=emworklet_audio -vvv');
+        //  reloadBtn.click();
+        //});
+
+        url.value = localStorage.getItem('url') || 'emjsfile://1';
+
+        url.addEventListener('change', () => {
+          localStorage.setItem('url', url.value);
         });
 
-        resetBtn.addEventListener('click', () => {
-          localStorage.setItem('options', '--codec=webcodec --aout=emworklet_audio -vvv');
-          reloadBtn.click();
-        });
+        //pOverlay.addEventListener('mouseenter', e => {
+        //  if (window.files && window.files.length) {
+        //    playButton.classList.remove('eject-svg');
+        //    playButton.classList.remove('hide-button');
+        //    bottomBar.classList.remove('hide-bottom-bar');
+        //    chapterButtons.classList.remove('hide-chapters');
+        //  }
+        //});
 
-        options.value = localStorage.getItem('options') || '--codec=webcodec --aout=emworklet_audio -vvv';
+        //pOverlay.addEventListener('mouseleave', e => {
+        //  if (window.files && window.files.length) {
+        //    playButton.classList.add('hide-button');
+        //    bottomBar.classList.add('hide-bottom-bar');
+        //    chapterButtons.classList.add('hide-chapters');
+        //  }
+        //});
 
-        options.addEventListener('change', () => {
-          localStorage.setItem('options', options.value);
-        });
+        //volume.addEventListener('mouseenter', e => {
+        //  progressVolume.classList.remove('hide-volume');
+        //});
 
-        pOverlay.addEventListener('mouseenter', e => {
-          if (window.files && window.files.length) {
-            playButton.classList.remove('eject-svg');
-            playButton.classList.remove('hide-button');
-            bottomBar.classList.remove('hide-bottom-bar');
-            chapterButtons.classList.remove('hide-chapters');
-          }
-        });
-
-        pOverlay.addEventListener('mouseleave', e => {
-          if (window.files && window.files.length) {
-            playButton.classList.add('hide-button');
-            bottomBar.classList.add('hide-bottom-bar');
-            chapterButtons.classList.add('hide-chapters');
-          }
-        });
-
-        volume.addEventListener('mouseenter', e => {
-          progressVolume.classList.remove('hide-volume');
-        });
-
-        volume.addEventListener('mouseleave', e => {
-          progressVolume.classList.add('hide-volume');
-        });
+        //volume.addEventListener('mouseleave', e => {
+        //  progressVolume.classList.add('hide-volume');
+        //});
 
         body.addEventListener('isLoading', event => {
           if (event.detail.isLoading) {
@@ -186,23 +125,23 @@
           }
         });
 
-        body.addEventListener('toggleCanvas', event => {
-          if (event.detail.files) {
-            chapterButtons.classList.remove('hide-chapters');
-            playButton.classList.remove('eject-svg');
-            playButton.classList.remove('hide-button');
-            playButton.innerHTML = '<div><svg><path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path></svg></div>';
-            buttonBarPlayButton.innerHTML = '<path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path>';
-            buttonBarPlayButton.classList.remove('bottom-bar-eject-button-svg');
-            playButton.click();
-          } else {
-            chapterButtons.classList.add('hide-chapters');
-            playButton.innerHTML = '<div><svg><path d="M7.27 1.047a1 1 0 0 1 1.46 0l6.345 6.77c.6.638.146 1.683-.73 1.683H1.656C.78 9.5.326 8.455.926 7.816L7.27 1.047zM.5 11.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-1z"/></div></svg>';
-            playButton.classList.add('eject-svg');
-            buttonBarPlayButton.innerHTML = '<path d="M15,290.01h270c8.284,0,15-6.716,15-15s-6.716-15-15-15H15c-8.284,0-15,6.716-15,15   S6.716,290.01,15,290.01z"/><path d="M15,210.01h270c0.006-0.001,0.013-0.001,0.02,0c8.285,0,15-6.716,15-15c0-3.774-1.394-7.223-3.695-9.859   L161.746,15.682c-2.845-3.583-7.17-5.672-11.746-5.672c-4.576,0-8.901,2.088-11.746,5.672l-135,170   c-3.58,4.508-4.265,10.666-1.762,15.85C3.995,206.716,9.244,210.01,15,210.01z"/>';
-            buttonBarPlayButton.classList.add('bottom-bar-eject-button-svg');
-          }
-        });
+        //body.addEventListener('toggleCanvas', event => {
+        //  if (event.detail.files) {
+        //    chapterButtons.classList.remove('hide-chapters');
+        //    playButton.classList.remove('eject-svg');
+        //    playButton.classList.remove('hide-button');
+        //    playButton.innerHTML = '<div><svg><path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path></svg></div>';
+        //    buttonBarPlayButton.innerHTML = '<path d="M15.562 8.1L3.87.225c-.818-.562-1.87 0-1.87.9v15.75c0 .9 1.052 1.462 1.87.9L15.563 9.9c.584-.45.584-1.35 0-1.8z"></path>';
+        //    buttonBarPlayButton.classList.remove('bottom-bar-eject-button-svg');
+        //    playButton.click();
+        //  } else {
+        //    chapterButtons.classList.add('hide-chapters');
+        //    playButton.innerHTML = '<div><svg><path d="M7.27 1.047a1 1 0 0 1 1.46 0l6.345 6.77c.6.638.146 1.683-.73 1.683H1.656C.78 9.5.326 8.455.926 7.816L7.27 1.047zM.5 11.5a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-13a1 1 0 0 1-1-1v-1z"/></div></svg>';
+        //    playButton.classList.add('eject-svg');
+        //    buttonBarPlayButton.innerHTML = '<path d="M15,290.01h270c8.284,0,15-6.716,15-15s-6.716-15-15-15H15c-8.284,0-15,6.716-15,15   S6.716,290.01,15,290.01z"/><path d="M15,210.01h270c0.006-0.001,0.013-0.001,0.02,0c8.285,0,15-6.716,15-15c0-3.774-1.394-7.223-3.695-9.859   L161.746,15.682c-2.845-3.583-7.17-5.672-11.746-5.672c-4.576,0-8.901,2.088-11.746,5.672l-135,170   c-3.58,4.508-4.265,10.666-1.762,15.85C3.995,206.716,9.244,210.01,15,210.01z"/>';
+        //    buttonBarPlayButton.classList.add('bottom-bar-eject-button-svg');
+        //  }
+        //});
 
         try {
           // VlcModule is a function generated by emscripten in experimental.js,
@@ -212,11 +151,11 @@
           // the returned Module.
           globalThis.Module = await initModule(VlcModuleExt);
           createHandlers();
-          localStorage.setItem('valid-options', options.value);
+          //localStorage.setItem('valid-options', options.value);
         } catch (e) {
-          const validOptions = localStorage.getItem('valid-options');
-          localStorage.setItem('options', validOptions);
-          window.location.reload();
+          //const validOptions = localStorage.getItem('valid-options');
+          //localStorage.setItem('options', validOptions);
+          console.error(e);
         }
       }
 
@@ -251,9 +190,8 @@
         let inputElement = document.getElementById("fpicker_btn");
         inputElement.addEventListener("change", handleFiles);
 
-        var media_player;
         let options_input = document.getElementById("opts");
-        vlc_options = localStorage.getItem('options') || options_input.value;
+        let vlc_options = '--codec=webcodec --aout=none --no-audio --adaptive-use-access --clock-master=input -vv';
         console.log("vlc.js: starting vlc.js with : " + vlc_options);
         let vlc_opts_array = vlc_options.split(' ');
 
@@ -283,65 +221,77 @@
         }
 
         Module._wasm_libvlc_init(vlc_opts_array.length, vlc_argv);
-        media_player = new MediaPlayer(Module, "emjsfile://1", "pouet");
-        media_player.set_volume(80);
+        Module.players = [];
 
-        Module._set_global_media_player(media_player.media_player_ptr);
-        window.media_player = media_player;
-        window.on_overlay_click = on_overlay_click;
-        window.update_overlay = update_overlay;
-
-        update_overlay();
-
-        const playButton = document.getElementById('play-button');
-        const bPlayButton = document.getElementById('bottom-play-button');
-
-        function handlePlayPause() {
-          if (globalThis.files) {
-            media_player.toggle_play();
-          } else {
-            inputElement.click();
-          }
-        }
-
-        playButton.addEventListener('click', handlePlayPause);
-        bPlayButton.addEventListener('click', handlePlayPause);
-
-        const volumeSvgWrapper = document.getElementById('volume-svg-wrapper');
-        volumeSvgWrapper.addEventListener('click', function() {
-          if (!window.files || !window.files.length) return;
-          media_player.toggle_mute();
-          update_overlay();
+        const play = document.getElementById('play');
+        play.addEventListener('click', () => {
+            if (!Module.players[0]) {
+                const url = document.getElementById("url");
+                Module.players[0] = new MediaPlayer(Module, url.value, "pouet");
+                Module.players[0].set_volume(80);
+            }
+            Module.players[0].toggle_play();
+            console.dir(play);
+            if (play.innerHTML === 'Play')
+                play.innerHTML = "Pause";
+            else
+                play.innerHTML = "Play";
         });
 
-        const progressTotal = document.getElementById('bottom-progress');
-        progressTotal.addEventListener('click', function(event) {
-          if (!window.files || !window.files.length) return;
-          media_player.set_position(event.offsetX / progressTotal.clientWidth);
-            update_overlay();
-        });
+        //window.on_overlay_click = on_overlay_click;
+        //window.update_overlay = update_overlay;
 
-        const progressVolumeTotal = document.getElementById('bottom-progress-volume');
-        progressVolumeTotal.addEventListener('click', function(event) {
-          if (!window.files || !window.files.length) return;
-          media_player.set_volume(event.offsetX / progressVolumeTotal.clientWidth * 100);
-          media_player.set_mute(0);
-          update_overlay();
-        });
+        //update_overlay();
 
-        const nextChapter = document.getElementById('next-chapter');
-        nextChapter.addEventListener('click', () => {
-          if (!window.files || !window.files.length) return;
-          window.media_player.next_chapter();
-          update_overlay();
-        });
+        //const playButton = document.getElementById('play-button');
+        //const bPlayButton = document.getElementById('bottom-play-button');
 
-        const previousChapter = document.getElementById('previous-chapter');
-        previousChapter.addEventListener('click', () => {
-          if (!window.files || !window.files.length) return;
-          window.media_player.previous_chapter();
-          update_overlay();
-        });
+        //function handlePlayPause() {
+        //  if (globalThis.files) {
+        //    media_player.toggle_play();
+        //  } else {
+        //    inputElement.click();
+        //  }
+        //}
+
+        //playButton.addEventListener('click', handlePlayPause);
+        //bPlayButton.addEventListener('click', handlePlayPause);
+
+        //const volumeSvgWrapper = document.getElementById('volume-svg-wrapper');
+        //volumeSvgWrapper.addEventListener('click', function() {
+        //  if (!window.files || !window.files.length) return;
+        //  media_player.toggle_mute();
+        //  update_overlay();
+        //});
+
+        //const progressTotal = document.getElementById('bottom-progress');
+        //progressTotal.addEventListener('click', function(event) {
+        //  if (!window.files || !window.files.length) return;
+        //  media_player.set_position(event.offsetX / progressTotal.clientWidth);
+        //    update_overlay();
+        //});
+
+        //const progressVolumeTotal = document.getElementById('bottom-progress-volume');
+        //progressVolumeTotal.addEventListener('click', function(event) {
+        //  if (!window.files || !window.files.length) return;
+        //  media_player.set_volume(event.offsetX / progressVolumeTotal.clientWidth * 100);
+        //  media_player.set_mute(0);
+        //  update_overlay();
+        //});
+
+        //const nextChapter = document.getElementById('next-chapter');
+        //nextChapter.addEventListener('click', () => {
+        //  if (!window.files || !window.files.length) return;
+        //  window.media_player.next_chapter();
+        //  update_overlay();
+        //});
+
+        //const previousChapter = document.getElementById('previous-chapter');
+        //previousChapter.addEventListener('click', () => {
+        //  if (!window.files || !window.files.length) return;
+        //  window.media_player.previous_chapter();
+        //  update_overlay();
+        //});
       };
 
       window.onload = function () {

@@ -14,13 +14,6 @@ static void iter()
 {
     if (!mp)
         return;
-    if (libvlc_media_player_get_time(mp) == t) {
-        // when enable, the js does not respond.
-        //libvlc_media_player_release( mp );
-        //libvlc_release( libvlc );
-        emscripten_cancel_main_loop();
-    }
-    t = libvlc_media_player_get_time(mp);
 }
 
 void EMSCRIPTEN_KEEPALIVE set_global_media_player(libvlc_media_player_t *media_player) {
@@ -33,10 +26,10 @@ static void on_position_changed(const libvlc_event_t *p_event, void *p_data){
     VLC_UNUSED(p_event);
     VLC_UNUSED(p_data);
 
-    MAIN_THREAD_ASYNC_EM_ASM({
-        const overlay = document.getElementById("overlay");
-        update_overlay(overlay);
-    });
+    //MAIN_THREAD_ASYNC_EM_ASM({
+    //    const overlay = document.getElementById("overlay");
+    //    update_overlay(overlay);
+    //});
 }
 
 int main() {
