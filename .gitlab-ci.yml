@@ -23,10 +23,9 @@ compile-job:
       - vlc.css             # CSS page
       - vlc_media_list_poc.html
       - lib/*               # libvlc.js, module-loader.js, overlay.js, wasm-imports.js
-      - ./vlc/modules/gui/qt/pixmaps/toolbar/volume-muted.png
-      - ./vlc/modules/gui/qt/pixmaps/pause.png
-      - ./vlc/modules/gui/qt/pixmaps/toolbar/volume-medium.png
-      - ./vlc/modules/gui/qt/pixmaps/play.png
-      - ./vlc/modules/gui/qt/pixmaps/play_button.svg
+      - ./vlc/modules/gui/qt/pixmaps/icons/ic_fluent_play_filled.svg
+      - ./vlc/modules/gui/qt/pixmaps/icons/ic_pause_filled.svg
+      - ./vlc/modules/gui/qt/pixmaps/icons/volume_medium.svg
+      - ./vlc/modules/gui/qt/pixmaps/icons/volume_muted.svg
       - ./vlc/modules/audio_output/webaudio/audio-worklet-processor.js
     expire_in: 1 week       # Expiration date
