@@ -1,7 +1,7 @@
-From cdd64a1c6c680245cd89a66c957347318be707ec Mon Sep 17 00:00:00 2001
+From 6d619b3a59fc2a51b2a7c57b32cb17b8a92a95cd Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Tue, 27 Apr 2021 15:34:23 +0200
-Subject: [PATCH 01/77] configure: improve testing unsupported GL functions for
+Subject: [PATCH 01/63] configure: improve testing unsupported GL functions for
  emscripten
 
 The build system assumes OpenGL functions are implemented if the headers are defined.
@@ -14,10 +14,10 @@ in wasm-emscripten this function will appear supported even if it is not.
  1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/configure.ac b/configure.ac
-index a5771e36f4..5bde060fb7 100644
+index ae3951d1b6..fef9f185fb 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -3140,13 +3140,17 @@ have_gl="no"
+@@ -3271,13 +3271,17 @@ have_gl="no"
  PKG_CHECK_MODULES([GL], [gl], [
    have_gl="yes"
  ], [
@@ -39,5 +39,5 @@ index a5771e36f4..5bde060fb7 100644
      GL_CFLAGS=""
      AS_IF([test "${SYS}" != "mingw32"], [
 -- 
-2.35.1
+2.43.0
 

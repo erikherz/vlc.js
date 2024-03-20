@@ -1,30 +1,27 @@
-From 035b067f845042fc0c87d80565783b21bfa50e6c Mon Sep 17 00:00:00 2001
+From 8c10e61e326f04245b07fdecccaa6504234fd651 Mon Sep 17 00:00:00 2001
 From: Mehdi Sabwat <mehdi@videolabs.io>
 Date: Sun, 30 May 2021 19:22:31 +0200
-Subject: [PATCH 03/77] contrib: ass: add support for wasm-emscripten
+Subject: [PATCH 03/63] contrib: ass: add support for wasm-emscripten
 
 ---
- contrib/src/ass/rules.mak                     |   5 +
+ contrib/src/ass/rules.mak                     |   2 +
  ...nitial-support-for-wasm32-emscripten.patch | 105 ++++++++++++++++++
  contrib/src/fontconfig/rules.mak              |   4 +
- 3 files changed, 114 insertions(+)
+ 3 files changed, 111 insertions(+)
  create mode 100644 contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
 
 diff --git a/contrib/src/ass/rules.mak b/contrib/src/ass/rules.mak
-index 05c7679896..be465bf409 100644
+index 06444e6b2d..55cd779f2b 100644
 --- a/contrib/src/ass/rules.mak
 +++ b/contrib/src/ass/rules.mak
-@@ -25,6 +25,11 @@ WITH_DWRITE = 1
+@@ -22,6 +22,8 @@ WITH_DWRITE = 1
  else
- WITH_FONTCONFIG = 1
- WITH_HARFBUZZ = 1
-+ifdef HAVE_EMSCRIPTEN
-+WITH_FONTCONFIG = 1
+ ifdef HAVE_EMSCRIPTEN
+ WITH_FONTCONFIG = 0
 +WITH_HARFBUZZ = 1
 +WITH_ASS_ASM = 0
-+endif
- endif
- endif
+ else
+ WITH_FONTCONFIG = 1
  endif
 diff --git a/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch b/contrib/src/fontconfig/add-initial-support-for-wasm32-emscripten.patch
 new file mode 100644
@@ -138,12 +135,12 @@ index 0000000000..b1308fb19e
 +2.32.0
 +
 diff --git a/contrib/src/fontconfig/rules.mak b/contrib/src/fontconfig/rules.mak
-index ae4b218fd2..5b4b15ca34 100644
+index dacf26a11d..e2d25f2713 100644
 --- a/contrib/src/fontconfig/rules.mak
 +++ b/contrib/src/fontconfig/rules.mak
-@@ -23,6 +23,10 @@ ifdef HAVE_WIN32
- endif
- 	$(RM) $(UNPACK_DIR)/src/fcobjshash.gperf
+@@ -21,6 +21,10 @@ fontconfig: fontconfig-$(FONTCONFIG_VERSION).tar.gz .sum-fontconfig
+ 	# include the generated fcobjshash.h, not the one from src/
+ 	sed -i.orig -e 's,"fcobjshash.h",<fcobjshash.h>,' $(UNPACK_DIR)/src/fcobjs.c
  	$(call pkg_static, "fontconfig.pc.in")
 +ifdef HAVE_EMSCRIPTEN
 +	$(APPLY) $(SRC)/fontconfig/add-initial-support-for-wasm32-emscripten.patch
@@ -151,7 +148,7 @@ index ae4b218fd2..5b4b15ca34 100644
 +endif
  	$(MOVE)
  
- FONTCONFIG_CONF := $(HOSTCONF) \
+ FONTCONFIG_CONF := --enable-libxml2 --disable-docs
 -- 
-2.35.1
+2.43.0
 

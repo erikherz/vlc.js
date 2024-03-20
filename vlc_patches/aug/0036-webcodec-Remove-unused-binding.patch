@@ -1,0 +1,24 @@
+From 8625ba20cd639892fe0d21126303428bcfad2cb4 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Mon, 9 May 2022 11:58:08 +0200
+Subject: [PATCH 36/63] webcodec: Remove unused binding
+
+---
+ modules/codec/webcodec.cpp | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index dfb1570aca..dd1b44dfdf 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -429,7 +429,3 @@ vlc_module_begin ()
+     add_submodule()
+         set_callback_dec_device(OpenDecDevice, 1)
+ vlc_module_end ()
+-
+-EMSCRIPTEN_BINDINGS(vlc_picture) {
+-    emscripten::class_<picture_t>("picture_t");
+-}
+-- 
+2.43.0
+

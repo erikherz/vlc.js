@@ -1,0 +1,87 @@
+From fb6c64fd3b1c95f4036d8f7cd1f48a8ced117c48 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Fri, 21 Jan 2022 09:59:35 +0100
+Subject: [PATCH 60/63] [HACK] vout: start from the vout thread
+
+Temporary patch to ensure the vout is started from a pthread thread and
+not from the decoder worker. The emscripten vout needs to be launched
+in a pthread to have access to proper main thread communication.
+---
+ src/video_output/video_output.c | 38 +++++++++++++++++++++++++++------
+ 1 file changed, 31 insertions(+), 7 deletions(-)
+
+diff --git a/src/video_output/video_output.c b/src/video_output/video_output.c
+index 604dee1601..95e23a390f 100644
+--- a/src/video_output/video_output.c
++++ b/src/video_output/video_output.c
+@@ -110,6 +110,13 @@ typedef struct vout_thread_sys_t
+     vout_control_t  control;
+     atomic_bool     control_is_terminated; // shutdown the vout thread
+     vlc_thread_t    thread;
++    vlc_sem_t       thread_ready_sem;
++    bool            thread_success;
++
++    // Begin lazy ass chouquette test:
++    vlc_video_context* vctx_vout_start;
++    const vout_configuration_t *cfg_vout_start;
++    //end of lazy ass chouquette test. don't use this for anything else than vout_start
+ 
+     struct {
+         vlc_tick_t  date;
+@@ -1820,6 +1827,8 @@ error:
+     return VLC_EGENERIC;
+ }
+ 
++
++static void vout_DisableWindow(vout_thread_sys_t *sys);
+ /*****************************************************************************
+  * Thread: video output thread
+  *****************************************************************************
+@@ -1834,6 +1843,17 @@ static void *Thread(void *object)
+ 
+     vlc_thread_set_name("vlc-vout");
+ 
++    if (vout_Start(vout, sys->vctx_vout_start, sys->cfg_vout_start))
++    {
++        sys->thread_success = false;
++        msg_Err(&vout->obj, "video output display creation failed");
++        vout_DisableWindow(vout);
++        vlc_sem_post(&sys->thread_ready_sem);
++        return NULL;
++    }
++    sys->thread_success = true;
++    vlc_sem_post(&sys->thread_ready_sem);
++
+     vlc_tick_t deadline = VLC_TICK_INVALID;
+ 
+     for (;;) {
+@@ -2277,15 +2297,19 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
+     vlc_clock_Unlock(sys->clock);
+ 
+     sys->delay = 0;
++    vlc_sem_init(&sys->thread_ready_sem, 0);
++
++    sys->cfg_vout_start = cfg;
++    sys->vctx_vout_start = vctx;
+ 
+-    if (vout_Start(vout, vctx, cfg))
+-    {
+-        msg_Err(cfg->vout, "video output display creation failed");
+-        goto error_display;
+-    }
+     atomic_store(&sys->control_is_terminated, false);
+-    if (vlc_clone(&sys->thread, Thread, vout))
+-        goto error_thread;
++
++    if (vlc_clone(&sys->thread, Thread, vout)) {
++        vout_ReleaseDisplay(vout);
++        vout_DisableWindow(vout);
++        return -1;
++    }
++    vlc_sem_wait(&sys->thread_ready_sem);
+ 
+     if (input != NULL && sys->spu)
+         spu_Attach(sys->spu, input);
+-- 
+2.43.0
+

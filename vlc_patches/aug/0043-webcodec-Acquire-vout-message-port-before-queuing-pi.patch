@@ -1,0 +1,30 @@
+From f69fe4e2ad7533274cd4261759b1b60b0930e328 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 10 May 2022 10:31:33 +0200
+Subject: [PATCH 43/63] webcodec: Acquire vout message port before queuing
+ pictures
+
+---
+ modules/codec/webcodec.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index baed03bed6..774db972d2 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -277,10 +277,10 @@ EM_JS(emscripten::EM_VAL, initDecoderJS, (void* decoder, emscripten::EM_VAL decC
+                 frame.close();
+                 return;
+             }
+-            let p = await getPictureAsync(Module.webCodecCtx);
+-            let picIdx = _queuePicture(Module.webCodecCtx, p, frame.timestamp);
+             if (Module.voutPort === undefined)
+                 await getVoutMessagePort();
++            let p = await getPictureAsync(Module.webCodecCtx);
++            let picIdx = _queuePicture(Module.webCodecCtx, p, frame.timestamp);
+             if ( Module.framesReady[picIdx] ) {
+                 /*
+                  *  If we end up overriding a frame, it means it was dropped
+-- 
+2.43.0
+

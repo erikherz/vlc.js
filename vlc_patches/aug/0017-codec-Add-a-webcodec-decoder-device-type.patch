@@ -1,0 +1,24 @@
+From 39ed63891ca88d7646fa8a64734c6aaf38ec46c1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 09:47:13 +0100
+Subject: [PATCH 17/63] codec: Add a webcodec decoder device type
+
+---
+ include/vlc_codec.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/vlc_codec.h b/include/vlc_codec.h
+index acae2700e3..596eba8034 100644
+--- a/include/vlc_codec.h
++++ b/include/vlc_codec.h
+@@ -589,6 +589,7 @@ enum vlc_decoder_device_type
+     VLC_DECODER_DEVICE_NVDEC,
+     VLC_DECODER_DEVICE_MMAL,
+     VLC_DECODER_DEVICE_GSTDECODE,
++    VLC_DECODER_DEVICE_WEBCODEC,
+ };
+ 
+ struct vlc_decoder_device_operations
+-- 
+2.43.0
+

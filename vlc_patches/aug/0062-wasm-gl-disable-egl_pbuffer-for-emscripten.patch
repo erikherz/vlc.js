@@ -1,0 +1,37 @@
+From 9a3650ce1bd37c6cfe70653d61d39576a556ac56 Mon Sep 17 00:00:00 2001
+From: Alaric Senat <dev.asenat@posteo.net>
+Date: Wed, 6 Mar 2024 11:28:50 +0100
+Subject: [PATCH 62/63] wasm: gl: disable egl_pbuffer for emscripten
+
+Emscripten does not provide `eglCreatePbufferSurface` and the module is
+built for every EGL supporting platforms since
+75b62f44d8d08aac581e67dea4b4658b3736ce9f.
+This was not failing on the CI as we don't link for now. Only the symbol
+is missing from the implementation.
+---
+ modules/video_output/opengl/Makefile.am | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/modules/video_output/opengl/Makefile.am b/modules/video_output/opengl/Makefile.am
+index 91e65ae225..4ab50b21b9 100644
+--- a/modules/video_output/opengl/Makefile.am
++++ b/modules/video_output/opengl/Makefile.am
+@@ -221,6 +221,7 @@ libegl_pbuffer_filter_plugin_la_SOURCES = video_filter/egl_pbuffer.c \
+ libegl_pbuffer_filter_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(EGL_FLAGS)
+ libegl_pbuffer_filter_plugin_la_LIBADD = $(EGL_LIBS)
+ 
++if !HAVE_EMSCRIPTEN
+ if HAVE_EGL
+ if HAVE_GL
+ libegl_pbuffer_filter_plugin_la_LIBADD += libvlc_opengl.la $(GL_LIBS)
+@@ -233,6 +234,7 @@ vout_LTLIBRARIES += libegl_pbuffer_filter_plugin.la
+ endif
+ endif
+ endif
++endif
+ 
+ libegl_surfacetexture_plugin_la_SOURCES = video_filter/egl_surfacetexture.c
+ libegl_surfacetexture_plugin_la_CFLAGS = $(AM_CFLAGS) $(EGL_CFLAGS) -DUSE_OPENGL_ES2
+-- 
+2.43.0
+

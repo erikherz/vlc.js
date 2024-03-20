@@ -1,0 +1,40 @@
+From 6c97e0fcf1f18dd82b783201a287d8a5a54ddf63 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 09:51:05 +0100
+Subject: [PATCH 19/63] fourcc: Add an opaque webcodec fourcc
+
+---
+ include/vlc_fourcc.h | 3 +++
+ src/misc/fourcc.c    | 2 ++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/include/vlc_fourcc.h b/include/vlc_fourcc.h
+index 685550c223..613ed08f84 100644
+--- a/include/vlc_fourcc.h
++++ b/include/vlc_fourcc.h
+@@ -488,6 +488,9 @@
+ /* GStreamer Memory opaque buffer type */
+ #define VLC_CODEC_GST_MEM_OPAQUE  VLC_FOURCC('G','S','T','M')
+ 
++/* Webcodec opaque VideoFrame types */
++#define VLC_CODEC_WEBCODEC_OPAQUE VLC_FOURCC('W','C','O','P')
++
+ /* Image codec (video) */
+ #define VLC_CODEC_PNG             VLC_FOURCC('p','n','g',' ')
+ #define VLC_CODEC_PPM             VLC_FOURCC('p','p','m',' ')
+diff --git a/src/misc/fourcc.c b/src/misc/fourcc.c
+index 610ab87d4b..e59c17d350 100644
+--- a/src/misc/fourcc.c
++++ b/src/misc/fourcc.c
+@@ -838,6 +838,8 @@ static const vlc_chroma_description_t p_list_chroma_description[] = {
+ 
+     { VLC_CODEC_VAAPI_420,             FAKE_FMT() },
+     { VLC_CODEC_VAAPI_420_10BPP,       FAKE_FMT() },
++
++    { VLC_CODEC_WEBCODEC_OPAQUE,       FAKE_FMT() },
+ };
+ 
+ #undef PACKED_FMT
+-- 
+2.43.0
+

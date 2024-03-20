@@ -1,0 +1,25 @@
+From 30df01411558e4b948b83132833e7acbaf2bbd4f Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 3 Aug 2022 13:17:46 +0200
+Subject: [PATCH 53/63] adapt to new emscripten version
+
+---
+ modules/video_output/emscripten.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/video_output/emscripten.cpp b/modules/video_output/emscripten.cpp
+index 7f5c32edb9..3289dcded7 100644
+--- a/modules/video_output/emscripten.cpp
++++ b/modules/video_output/emscripten.cpp
+@@ -196,7 +196,7 @@ static int Open (vlc_gl_t *gl, unsigned width, unsigned height, const struct vlc
+                 bmp.close();
+             }
+         }
+-        let w = Module.PThread.pthreads[$0].worker;
++        let w = Module.PThread.pthreads[$0];
+         w.addEventListener('message', function (e) {
+             let msg = e['data'];
+             if (msg.customCmd == 'getVoutMessagePort') {
+-- 
+2.43.0
+

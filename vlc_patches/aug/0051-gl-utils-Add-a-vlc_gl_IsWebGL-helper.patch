@@ -1,0 +1,29 @@
+From 231ab44691d00123b87927f2bfc07ce10f18f4ad Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 19 Jul 2022 11:24:01 +0200
+Subject: [PATCH 51/63] gl: utils: Add a vlc_gl_IsWebGL helper
+
+---
+ modules/video_output/opengl/gl_util.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/modules/video_output/opengl/gl_util.h b/modules/video_output/opengl/gl_util.h
+index 4bacc1c524..12b55964ff 100644
+--- a/modules/video_output/opengl/gl_util.h
++++ b/modules/video_output/opengl/gl_util.h
+@@ -148,4 +148,12 @@ vlc_gl_HasExtension(
+     return false;
+ }
+ 
++static inline bool vlc_gl_IsWebGL(struct vlc_gl_extension_vt *vt)
++{
++    const GLubyte *version = vt->GetString(GL_VERSION);
++    if (!version)
++        return false;
++    return strcasestr((const char*)version, "WebGL") != NULL;
++}
++
+ #endif
+-- 
+2.43.0
+

@@ -1,0 +1,27 @@
+From 6bcd1a9c66af607868d343c144745ccfc94d06a9 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Fri, 6 May 2022 08:22:17 +0200
+Subject: [PATCH 33/63] emscripten: vout: Fix memory leak
+
+---
+ modules/video_output/emscripten.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/modules/video_output/emscripten.cpp b/modules/video_output/emscripten.cpp
+index dce6a2cc67..7f5c32edb9 100644
+--- a/modules/video_output/emscripten.cpp
++++ b/modules/video_output/emscripten.cpp
+@@ -191,7 +191,9 @@ static int Open (vlc_gl_t *gl, unsigned width, unsigned height, const struct vlc
+         function onVoutMessage(msg) {
+             let data = msg['data'];
+             if (data.customCmd == 'commitFrame') {
+-                Module.canvasCtx.drawImage(data['bitmap'], 0, 0);
++                let bmp = data['bitmap'];
++                Module.canvasCtx.drawImage(bmp, 0, 0);
++                bmp.close();
+             }
+         }
+         let w = Module.PThread.pthreads[$0].worker;
+-- 
+2.43.0
+

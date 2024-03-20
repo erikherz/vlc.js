@@ -1,0 +1,37 @@
+From 0f3d7dd21e279ca936ca582949b13fe69d53bdab Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Mon, 17 Jan 2022 15:56:42 +0100
+Subject: [PATCH 15/63] module: vout: Allow C++ OpenGL modules
+
+---
+ modules/video_output/opengl/sampler.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/modules/video_output/opengl/sampler.h b/modules/video_output/opengl/sampler.h
+index 533761319e..7db0060071 100644
+--- a/modules/video_output/opengl/sampler.h
++++ b/modules/video_output/opengl/sampler.h
+@@ -38,6 +38,11 @@ extern "C"
+ {
+ #endif
+ 
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++
+ /**
+  * The purpose of a sampler is to provide pixel values of a VLC input picture,
+  * stored in any format.
+@@ -209,4 +214,8 @@ vlc_gl_sampler_SelectPlane(struct vlc_gl_sampler *sampler, unsigned plane);
+ }
+ #endif
+ 
++#ifdef __cplusplus
++}
++#endif
++
+ #endif
+-- 
+2.43.0
+

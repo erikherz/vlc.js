@@ -1,0 +1,1081 @@
+From 7c8844e41be5aabce0abf23a8b3c72906a03ea26 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Wed, 31 Aug 2022 16:03:27 +0000
+Subject: [PATCH 57/63] wasm: replace audio output module
+
+This is a complete rewrite of the audio output in plain C. It is much
+simpler to understand and features a separate audio worklet to pass the
+data to the browser.
+
+Co-Authored-By: Metehan Arslan <99metehanarslan@gmail.com>
+---
+ modules/audio_output/Makefile.am              |   2 +-
+ modules/audio_output/emscripten.c             | 249 ++++++++++
+ modules/audio_output/emscripten.cpp           | 444 ------------------
+ .../webaudio/audio-worklet-processor.js       |  68 +++
+ modules/audio_output/webaudio/webaudio.c      |  58 +++
+ modules/audio_output/webaudio/webaudio.h      |  62 +++
+ modules/audio_output/webaudio/webaudio.js     | 122 +++++
+ 7 files changed, 560 insertions(+), 445 deletions(-)
+ create mode 100644 modules/audio_output/emscripten.c
+ delete mode 100644 modules/audio_output/emscripten.cpp
+ create mode 100644 modules/audio_output/webaudio/audio-worklet-processor.js
+ create mode 100644 modules/audio_output/webaudio/webaudio.c
+ create mode 100644 modules/audio_output/webaudio/webaudio.h
+ create mode 100644 modules/audio_output/webaudio/webaudio.js
+
+diff --git a/modules/audio_output/Makefile.am b/modules/audio_output/Makefile.am
+index 45978f1ff2..c1fb212dc8 100644
+--- a/modules/audio_output/Makefile.am
++++ b/modules/audio_output/Makefile.am
+@@ -135,7 +135,7 @@ if HAVE_XROS
+ aout_LTLIBRARIES += libaudiounit_ios_plugin.la
+ endif
+ 
+-libemworklet_audio_plugin_la_SOURCES = audio_output/emscripten.cpp
++libemworklet_audio_plugin_la_SOURCES = audio_output/emscripten.c audio_output/webaudio/webaudio.c audio_output/webaudio/webaudio.h
+ if HAVE_EMSCRIPTEN
+ aout_LTLIBRARIES += libemworklet_audio_plugin.la
+ endif
+diff --git a/modules/audio_output/emscripten.c b/modules/audio_output/emscripten.c
+new file mode 100644
+index 0000000000..738c655e92
+--- /dev/null
++++ b/modules/audio_output/emscripten.c
+@@ -0,0 +1,249 @@
++/*****************************************************************************
++ * emscripten.c: Emscripten webaudio output
++ *****************************************************************************
++ * Copyright © 2022 VLC authors, VideoLAN and Videolabs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifdef HAVE_CONFIG_H
++# include "config.h"
++#endif
++
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_aout.h>
++
++#include <assert.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdatomic.h>
++
++#include <emscripten.h>
++#include <emscripten/html5.h>
++#include <emscripten/threading.h>
++
++#include "webaudio/webaudio.h"
++
++typedef struct aout_sys_t
++{
++    /*
++      Shared structure, that allows the AudioWorkletProcessor (AWP)
++      to interact with vlc's decoder thread.
++
++      is_paused : control the AWP process loop,
++      head : write index in the ring buffer,
++      tail : read index in the ring buffer,
++      can_write : control if you can write to the ring buffer or not,
++      storage[STORAGE_SIZE] : ring buffer,
++    */
++    webaudio_buffer_t *sab;
++    /*
++      channels, and sample rate are needed here to allow dispatching
++      them in an opaque pointer to the main thread.
++    */
++    unsigned channels;
++    unsigned sample_rate;
++    /*
++      We don't want to create an AudioContext each time we play the media,
++      and we can't init the context in Open() because we don't have
++      access to audio_sample_format_t.
++    */
++    bool init;
++
++    // required by volume.h
++    bool soft_mute;
++    float soft_gain;
++} aout_sys_t;
++
++#include "volume.h"
++
++/*
++  This function will clear the ring buffer in the shared array buffer.
++ */
++static void Flush(audio_output_t *aout)
++{
++    aout_sys_t *sys = (aout_sys_t *) aout->sys;
++    emscripten_futex_wait(&sys->sab->can_write, 0, ATOMIC_WAIT_TIMEOUT);
++    memset(sys->sab->storage, 0, sizeof(sys->sab->storage));
++    atomic_store(&sys->sab->head, 0);
++    atomic_store(&sys->sab->tail, 0);
++}
++
++static void Play(audio_output_t *aout, block_t *block, vlc_tick_t date)
++{
++    VLC_UNUSED(date);
++    aout_sys_t *sys = (aout_sys_t *) aout->sys;
++    int8_t *data = (int8_t *) block->p_buffer;
++    size_t data_size = block->i_buffer;
++    uint32_t head = atomic_load(&sys->sab->head);
++    uint32_t tail = atomic_load(&sys->sab->tail);
++    uint32_t new_head = (head + data_size) % STORAGE_SIZE;
++
++    if (new_head > tail) {
++        /* 
++           The worklet processor keeps rendering  until tail matches head
++           it will be notified by an Atomics.notify() from the process() 
++           callback.
++        */
++        emscripten_futex_wait(&sys->sab->can_write, 0, ATOMIC_WAIT_TIMEOUT);
++    }
++    webaudio_worklet_push(sys->sab, data, data_size);
++    block_Release(block);
++}
++
++static void Pause(audio_output_t *aout, bool paused, vlc_tick_t date)
++{
++    VLC_UNUSED(date);
++    aout_sys_t * sys = (aout_sys_t *) aout->sys;
++
++    if (paused == false)
++        atomic_store(&sys->sab->is_paused, 0);
++    else
++        atomic_store(&sys->sab->is_paused, 1);
++    Flush(aout);
++}
++
++static void Close(vlc_object_t *obj)
++{
++    audio_output_t *aout = (audio_output_t *) obj;
++    aout_sys_t *sys = (aout_sys_t *) aout->sys;
++
++    free(sys->sab);
++    free(sys);
++}
++
++/*
++  To allow reusing the AudioWorklet, we stop the process() callback,
++  from running by setting is_paused to 1.
++*/
++static void Stop(audio_output_t *aout)
++{
++    Flush(aout);
++    aout_sys_t * sys = (aout_sys_t *) aout->sys;
++    atomic_store(&sys->sab->is_paused, 1);
++}
++
++/*
++  Init Function will set the AudioContext, and try to get the sample rate and
++  number of channels. 
++
++  If they are not supported, we fallback to the supported ones.
++
++  It can only run in the main thread.
++*/
++static void Init(void *userData)
++{
++    audio_output_t *aout = (audio_output_t *) userData;
++    aout_sys_t *sys = (aout_sys_t *) aout->sys;
++
++    webaudio_init(sys->sample_rate, sys->channels, sys->sab, WEBAUDIO_LATENCY_PLAYBACK);
++    unsigned rate = webaudio_getSampleRate();
++    unsigned channels = webaudio_getChannels();
++
++    if ((rate == 0) || (channels == 0)) {
++        sys->sample_rate = 0;
++        sys->channels = 0;
++        msg_Err(aout, "error: broken webaudio device, could not get a valid sample rate or channelNumber");
++        return;
++    }
++
++    if (rate != sys->sample_rate)
++        sys->sample_rate = rate;
++    if (channels != sys->channels)
++        sys->channels = channels;
++}
++
++static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
++{
++    aout_sys_t *sys = (aout_sys_t *) aout->sys;
++    unsigned nbChannels = aout_FormatNbChannels(fmt);
++
++    aout_SoftVolumeStart(aout);
++    if (( nbChannels == 0 ) || !AOUT_FMT_LINEAR(fmt))
++        return VLC_EGENERIC;
++    fmt->i_format = VLC_CODEC_FL32;
++    if (sys->init == 0) {
++        sys->channels = nbChannels;
++        sys->sample_rate = fmt->i_rate;
++
++        int ret = emscripten_dispatch_to_thread(
++            emscripten_main_browser_thread_id(),
++            EM_FUNC_SIG_VI,
++            Init, 0, aout );
++        if (ret != 0) {
++            msg_Err(aout, "error: could not dispatch Init to main thread!");
++            return VLC_EGENERIC;
++        }
++        if ((sys->channels == 0) && (sys->sample_rate == 0))
++            return VLC_EGENERIC;
++        fmt->i_channels = sys->channels;
++        fmt->i_rate = sys->sample_rate;
++        sys->init = 1;
++    }
++    atomic_store(&sys->sab->is_paused, 0);
++
++    return VLC_SUCCESS;
++}
++
++/*
++  Allocate the Shared Array Buffer, and init aout_sys_t.
++*/
++static int Open(vlc_object_t *obj)
++{
++    audio_output_t * aout = (audio_output_t *) obj;
++
++    aout_sys_t *sys = (aout_sys_t *) malloc(sizeof(aout_sys_t));
++    if (unlikely(sys == NULL))
++        return VLC_ENOMEM;
++
++    aout->sys = sys;
++    aout->start = Start;
++    aout->stop = Stop;
++    aout->play = Play;
++    aout->pause = Pause;
++    aout->flush = Flush;
++    aout->time_get = NULL;
++    sys->channels = 0;
++    sys->sample_rate = 0;
++    sys->init = 0;
++    sys->sab = (webaudio_buffer_t *) malloc(sizeof(webaudio_buffer_t));
++    atomic_init(&sys->sab->is_paused, 0);
++    atomic_init(&sys->sab->head, 0);
++    atomic_init(&sys->sab->tail, 0);
++    atomic_init(&sys->sab->can_write, 0);
++    if (unlikely (!sys->sab))
++        return VLC_ENOMEM;    
++
++    memset(sys->sab, 0, sizeof(webaudio_buffer_t));
++    /*
++      we can't use the volume field in the shared array buffer, because
++      we need to have a lock, and we can't have atomic.wait in the
++      worklet, or atomics.store on a float value.
++    */
++    aout_SoftVolumeInit(aout);
++
++    return VLC_SUCCESS;
++}
++
++vlc_module_begin ()
++    set_description( N_("Emscripten Worklet audio output") )
++    set_shortname( "emworklet" )
++    add_sw_gain ()
++    set_capability( "audio output", 100 )
++    set_subcategory( SUBCAT_AUDIO_AOUT )
++    set_callbacks( Open, Close )
++vlc_module_end ()
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+deleted file mode 100644
+index de442e2b73..0000000000
+--- a/modules/audio_output/emscripten.cpp
++++ /dev/null
+@@ -1,444 +0,0 @@
+-/*****************************************************************************
+- * emscripten.c: audio output module using audio worklets
+- *****************************************************************************
+- * Copyright © 2020 VLC authors and VideoLAN
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software Foundation, Inc.,
+- * 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
+- *****************************************************************************/
+-
+-#ifdef HAVE_CONFIG_H
+-# include "config.h"
+-#endif
+-
+-#include <atomic>
+-
+-#include <assert.h>
+-#include <vlc_common.h>
+-#include <vlc_plugin.h>
+-#include <vlc_aout.h>
+-
+-#include <emscripten.h>
+-#include <emscripten/val.h>
+-#include <emscripten/bind.h>
+-#include <emscripten/html5.h>
+-
+-#include <cstdint>
+-#include <stdlib.h>
+-
+-#define STORAGE_SIZE 1024 * 1024
+-// Sample rate might change, and it would be good to be able to change it during playback.
+-#define AUDIO_WORKLET_SAMPLE_RATE 44100
+-
+-
+-using namespace emscripten;
+-namespace {
+-	EM_BOOL requestAnimationFrame_cb( double time, void *userData );
+-
+-	typedef struct sound_buffer_t
+-	{
+-    // TODO - should be bool?
+-    std::atomic<uint32_t> is_paused;
+-    std::atomic<uint32_t> head;
+-    std::atomic<uint32_t> tail;
+-    std::atomic<uint32_t> can_write;
+-    std::atomic<uint32_t> volume;
+-    std::atomic<uint32_t> is_muted;
+-    int8_t storage[STORAGE_SIZE];
+-
+-	} sound_buffer_t;
+-
+-	class AWNodeWrapper {
+-	public:
+-		val context = val::undefined();
+-		val getCtx() const { return context; };
+-		void setCtx(val v_context) { context = v_context; };
+-
+-		uintptr_t sab_ptr;
+-		uintptr_t getSabPtr() const { return sab_ptr; };
+-		void setSabPtr(uintptr_t p_sab) { sab_ptr = p_sab; };
+-
+-		unsigned channels;
+-		unsigned getChannels() const { return channels; };
+-		void setChannels(int8_t chan) { channels = chan; };
+-
+-		AWNodeWrapper(unsigned long sample_rate) {
+-			// Prepare audio context options
+-			val audio_ctx_options = val::object();
+-			audio_ctx_options.set("sampleRate", sample_rate);
+-
+-			context = val::global("AudioContext").new_(audio_ctx_options);
+-			context.call<void>("suspend");
+-		}
+-
+-		val operator()( val undefined_promise_argument ) {
+-			(val)undefined_promise_argument;
+-
+-			// Prepare AWN Options
+-			val awn_options = val::object();
+-			val awn_opt_outputChannelCount = val::array();
+-			awn_opt_outputChannelCount.call<val>("push", channels);
+-			awn_options.set("outputChannelCount", awn_opt_outputChannelCount);
+-			awn_options.set("numberOfInputs", 0);
+-			awn_options.set("numberOfOutputs", 1);
+-
+-			val AudioNode = val::global("AudioWorkletNode").new_(context, std::string("worklet-processor"), awn_options);
+-			AudioNode.set("channelCount", channels);
+-
+-      val Uint32Array = val::global("Uint32Array");
+-      val Int32Array = val::global("Int32Array");
+-      val Float32Array = val::global("Float32Array");
+-
+-      auto wasm_mem = val::module_property("wasmMemory")["buffer"];
+-
+-			//Prepare postMessage message
+-			val msg = val::object();
+-			msg.set("type", std::string("recv-audio-queue"));
+-
+-      msg.set("is_paused",
+-        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, is_paused), 1));
+-      msg.set("head",
+-        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, head), 1));
+-      msg.set("tail",
+-        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, tail), 1));
+-      msg.set("can_write",
+-        Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, can_write), 1));
+-      msg.set("volume",
+-        Int32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, volume), 1));
+-      msg.set("is_muted",
+-        Uint32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, is_muted), 1));
+-
+-      uint32_t storage_capacity = STORAGE_SIZE / 4;
+-      msg.set("storage",
+-        Float32Array.new_(wasm_mem, sab_ptr + offsetof(sound_buffer_t, storage), storage_capacity));
+-
+-			AudioNode["port"].call<val>("postMessage", msg);
+-			AudioNode.call<val>("connect", context["destination"]);
+-
+-			emscripten_request_animation_frame_loop(requestAnimationFrame_cb, this);
+-
+-			return val::undefined();
+-		}
+-	};
+-
+-	EMSCRIPTEN_BINDINGS(AWWSCOPE) {
+-		class_<AWNodeWrapper>("awn_cb_wrapper")
+-			.constructor<int>()
+-			.property("context", &AWNodeWrapper::getCtx, &AWNodeWrapper::setCtx)
+-			.property("sab_ptr", &AWNodeWrapper::getSabPtr, &AWNodeWrapper::setSabPtr)
+-			.property("channels", &AWNodeWrapper::getChannels, &AWNodeWrapper::setChannels)
+-			.function("awn_call", &AWNodeWrapper::operator());
+-	};
+-
+-	typedef struct aout_sys_t
+-	{
+-		sound_buffer_t *sab; // TODO - rename to sound_buff
+-		AWNodeWrapper *awn_inst;
+-		
+-		// let's see if it changes channels to 2 and samplerate to 44100;
+-	    unsigned i_channelCount = 0;
+-        unsigned long i_sampleRate = 48000;
+-	} aout_sys_t;
+-
+-	EM_BOOL requestAnimationFrame_cb( double time, void *userData ) {
+-		VLC_UNUSED(time);
+-    // FIXME - this function seems to mix two different views on the
+-    // same memory, not sure why
+-		AWNodeWrapper *inst = reinterpret_cast<AWNodeWrapper *>(userData);
+-		uint32_t *sab = reinterpret_cast<uint32_t *>(inst->getSabPtr());
+-		val view = val(typed_memory_view(sizeof(sound_buffer_t), sab));
+-		val context = inst->getCtx();
+-		if ( view[0].as<int>() == 1 ) {
+-			context.call<val>("resume");
+-			sab[0] = 0;
+-			return EM_FALSE;
+-		}
+-		return EM_TRUE;
+-	}
+-
+-	// careful when calling this, you cannot wait on any index
+-	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/wait
+-	void js_index_wait(sound_buffer_t *sab_ptr, int8_t index) {
+-		int32_t *buffer_view = reinterpret_cast<int32_t *>(sab_ptr);
+-		val buffer = val(typed_memory_view(STORAGE_SIZE, buffer_view));
+-
+-		val::global("Atomics").call<val>("wait", buffer, index, 0);
+-	}
+-
+-	void Flush( audio_output_t *aout )
+-	{
+-		aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		memset(&sys->sab->storage, 0, sizeof(sys->sab->storage));
+-	}
+-
+-	int Start( audio_output_t *aout, audio_sample_format_t *restrict fmt )
+-	{
+-		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		unsigned nbChannels = aout_FormatNbChannels(fmt);
+-
+-		if (( nbChannels == 0 ) || !AOUT_FMT_LINEAR(fmt))
+-			return VLC_EGENERIC;
+-		fmt->i_format = VLC_CODEC_FL32;
+-		fmt->i_channels = sys->i_channelCount;
+-		fmt->i_rate = sys->i_sampleRate;
+-
+-		// resume audio context (first start, it is paused when initialized)
+-		sys->sab->is_paused.store(1);
+-
+-		return VLC_SUCCESS;
+-	}
+-
+-	void Stop (audio_output_t *aout)
+-	{
+-		Flush(aout);
+-	}
+-
+-	int audio_worklet_push (audio_output_t *aout, const int8_t *data, uint32_t data_size) {
+-		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		int8_t *sab_view = sys->sab->storage;
+-		uint32_t head = sys->sab->head.load();
+-
+-		// TODO: check that we do not write on unconsumed data.
+-		if (head + data_size > STORAGE_SIZE) {
+-			// Copy the part of the data at the buffer end
+-			unsigned data_size_copy_end = STORAGE_SIZE - head;
+-			memcpy(sab_view + head, data, data_size_copy_end);
+-			head = 0;
+-
+-			// Copy the part of the data at the buffer start
+-			unsigned data_size_copy_start = data_size - data_size_copy_end;
+-			memcpy(sab_view + head, data + data_size_copy_end, data_size_copy_start);
+-			head = data_size_copy_start;
+-		}
+-		else {
+-			memcpy(sab_view + head, data, data_size);
+-			head += data_size;
+-		}
+-		sys->sab->head.store(head);
+-		return 0;  // return success to indicate successful push.
+-	}
+-
+-	void Play( audio_output_t *aout, block_t *block, vlc_tick_t date)
+-	{
+-		VLC_UNUSED(date);
+-		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		const int8_t* data = (int8_t *)block->p_buffer;
+-		size_t data_size = block->i_buffer;
+-
+-		uint32_t head = sys->sab->head.load();
+-		uint32_t tail = sys->sab->tail.load();
+-		uint32_t new_head = (head + data_size) % STORAGE_SIZE;
+-		if (new_head > tail)
+-		{
+-			// the worklet processor keeps rendering  until tail matches head
+-			// it will be notified by an Atomics.notify() from the process() callback
+-			// FIXME - This is layout-dependent, which isn't ideal
+-			js_index_wait(sys->sab, 3);
+-		}
+-
+-		audio_worklet_push(aout, data, data_size);
+-		block_Release(block);
+-	}
+-
+-	void Pause( audio_output_t *aout, bool paused, vlc_tick_t date )
+-	{
+-		VLC_UNUSED(date);
+-		aout_sys_t * sys = reinterpret_cast<aout_sys_t *>(aout->sys);
+-		if (paused == false) {
+-			sys->sab->is_paused.store(0);
+-		}
+-		else {
+-			sys->sab->is_paused.store(1);
+-		}
+-		Flush(aout);
+-	}
+-
+-	int Time_Get( audio_output_t *aout, vlc_tick_t *delay)
+-	{
+-		return aout_TimeGetDefault(aout, delay);
+-	}
+-
+-	void Close( vlc_object_t *obj )
+-	{
+-		audio_output_t *aout = (audio_output_t *)obj;
+-		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
+-
+-    // FIXME
+-		delete sys->awn_inst;
+-		free(sys->sab);
+-		free(sys);
+-	}
+-
+-	int Volume_Set( audio_output_t *aout, float volume)
+-	{
+-		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
+-
+-		if (volume > 1.0f)
+-			volume = 1.0f;
+-		else if (volume < 0.0f)
+-			volume = 0.0f;
+-		// TODO: implement gain
+-		// Note: We store volume as an integer between 0..100 because
+-		// for some reason Float32Array doesn't allow atomic operations
+-		sys->sab->volume.store((int)(volume * 100));
+-		aout_VolumeReport(aout, volume);
+-
+-		return 0;
+-	}
+-
+-	int Mute_Set( audio_output_t *aout, bool mute)
+-	{
+-		struct aout_sys_t *sys = reinterpret_cast<struct aout_sys_t *>(aout->sys);
+-
+-		sys->sab->is_muted.store(mute);
+-		aout_MuteReport(aout, mute);
+-
+-		return 0;
+-	}
+-
+-
+-	int Open( vlc_object_t *obj )
+-	{
+-		audio_output_t * aout = (audio_output_t *) obj;
+-
+-		/* Allocate structures */
+-		aout_sys_t *sys = reinterpret_cast<aout_sys_t *>(malloc( sizeof( *sys ) ));
+-		if( unlikely(sys == NULL) )
+-			return VLC_ENOMEM;
+-
+-		aout->sys = sys;
+-		aout->start = Start;
+-		aout->stop = Stop;
+-		aout->play = Play;
+-		aout->pause = Pause;
+-		aout->flush = Flush;
+-		aout->time_get = Time_Get;
+-		aout->volume_set = Volume_Set;
+-		aout->mute_set = Mute_Set;
+-		
+-        // Audio output is breaking when we implement i_sampleRate in here.
+-		sys->awn_inst = new AWNodeWrapper(AUDIO_WORKLET_SAMPLE_RATE);
+-		sys->sab = (sound_buffer_t*)malloc(sizeof(sound_buffer_t));
+-
+-		if ( unlikely(sys->sab == NULL) )
+-			return VLC_ENOMEM;
+-		memset(sys->sab, 0, sizeof(sound_buffer_t));
+-		sys->sab->volume = 100;
+-
+-		val webaudio_context = sys->awn_inst->getCtx();
+-
+-        //These EM_ASM values needs to be re-written with Emval. (WiP)
+-        EM_ASM(
+-        let actx = new AudioContext();
+-        console.log("maxChannelCount: " + actx.destination.maxChannelCount);
+-        );
+-
+-        sys->i_channelCount = EM_ASM_INT(
+-        let actx = new AudioContext();
+-        console.log("channelCount: " + actx.destination.channelCount);
+-        return actx.destination.maxChannelCount;
+-        );
+-        msg_Info(aout, "i_channelCount: %d", sys->i_channelCount);
+-
+-        sys->i_sampleRate = EM_ASM_INT(
+-        let actx = new AudioContext();
+-        console.log("sampleRate: " + actx.destination.context.sampleRate );
+-        return actx.destination.context.sampleRate;
+-        );
+-        msg_Info(aout, "i_sampleRate: %lu", sys->i_sampleRate);
+-
+-		// Prepare audioWorkletProcessor blob
+-		val document = val::global("document");
+-		val script = document.call<val>("createElement", std::string("SCRIPT"));
+-		script.set("type", std::string("worklet"));
+-		std::string processorStr = "class Processor extends AudioWorkletProcessor { \
+-	constructor() { \
+-		super(); \
+-		this.port.onmessage = e => { \
+-			if (e.data.type === 'recv-audio-queue') { \
+-				this.is_paused = e.data.is_paused; \
+-				this.head = e.data.head; \
+-				this.tail = e.data.tail; \
+-				this.can_write = e.data.can_write; \
+-				this.volume = e.data.volume; \
+-				this.is_muted = e.data.is_muted; \
+-				this.storage = e.data.storage; \
+-			} else { \
+-				throw 'unexpected.'; \
+-			} \
+-		}; \
+-	} \
+-	process(inputs, outputs, parameters) { \
+-		const output = outputs[0]; \
+-		const nbChannels = output.length; \
+-		const nbSamples = output[0].length; \
+-		if (this.head.buffer.byteLength == 0) { \
+-			throw new Error('wasmMemory grew'); \
+-		} \
+-		var head = Atomics.load(this.head, 0) / 4; \
+-		var tail = Atomics.load(this.tail, 0) / 4; \
+-		var i = 0; \
+-		var volume = Atomics.load(this.volume, 0) / 100; \
+-		if (Atomics.load(this.is_paused, 0) != 0 || Atomics.load(this.is_muted, 0) != 0) { \
+-			volume = 0; \
+-		} \
+-		while (tail != head && i < nbSamples) \
+-		{ \
+-			for (let c = 0; c < nbChannels; ++c) { \
+-				output[c][i] = this.storage[tail] * volume; \
+-				tail++; \
+-				if (tail == this.storage.length) { \
+-					tail = 0; \
+-				} \
+-			} \
+-			i++; \
+-		} \
+-		Atomics.store(this.tail, 0, tail * 4); \
+-		Atomics.store(this.can_write, 0, 1); \
+-		Atomics.notify(this.can_write, 0);   \
+-		return true; \
+-	} \
+-} \
+-registerProcessor('worklet-processor', Processor);";
+-		script.set("innerText", processorStr);
+-		val ProcessorTextArray = val::array();
+-		ProcessorTextArray.call<val>("push", script["innerText"]);
+-		val BlobObject = val::object();
+-		BlobObject.set("type", std::string("application/javascript"));
+-		val WorkletModuleUrl = val::global("URL").call<val>("createObjectURL", val::global("Blob").new_(ProcessorTextArray, BlobObject));
+-
+-		// Prepare audioWorkletProcessor callback
+-		val cb_caller = val::module_property("awn_cb_wrapper").new_(sys->i_sampleRate);
+-		cb_caller.set("context", val(webaudio_context));
+-		cb_caller.set("sab_ptr", val(reinterpret_cast<uintptr_t>(sys->sab)));
+-		cb_caller.set("channels", val(sys->i_channelCount));
+-		val awn_caller = cb_caller["awn_call"];
+-		val awn_cb = awn_caller.call<val>("bind", cb_caller);
+-
+-		// start audio worklet (since the context is suspended, sound won't start now
+-		// Since the WebAudio Context cannot be created in a worker, we create
+-		// it in the main_thread and use the SAB to signal it when we want it to start
+-		webaudio_context["audioWorklet"].call<val>("addModule", WorkletModuleUrl).call<val>("then", awn_cb);
+-
+-		return VLC_SUCCESS;
+-	}
+-}
+-
+-vlc_module_begin ()
+-	set_description( N_("Emscripten Worklet audio output") )
+-	set_shortname( "emworklet" )
+-	set_capability( "audio output", 100 )
+-	set_subcategory( SUBCAT_AUDIO_AOUT )
+-	set_callbacks( Open, Close )
+-vlc_module_end ()
+diff --git a/modules/audio_output/webaudio/audio-worklet-processor.js b/modules/audio_output/webaudio/audio-worklet-processor.js
+new file mode 100644
+index 0000000000..5ec5c74921
+--- /dev/null
++++ b/modules/audio_output/webaudio/audio-worklet-processor.js
+@@ -0,0 +1,68 @@
++/*****************************************************************************
++ * emscripten.c: Emscripten webaudio output
++ *****************************************************************************
++ * Copyright © 2022 VLC authors, VideoLAN and Videolabs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++class Processor extends AudioWorkletProcessor {
++    constructor() {
++        super();
++        this.port.onmessage = e => {
++            if (e.data.type === "recv-audio-queue") {
++                this.is_paused = e.data.is_paused;
++                this.head = e.data.head;
++                this.tail = e.data.tail;
++                this.can_write = e.data.can_write;
++                this.storage = e.data.storage;
++                this.port.postMessage( 'ready' );
++            } else {
++                this.port.postMessage( 'error' );
++                throw new Error('unexpected: wrong init from AudioWorkletNode');
++            }
++        };
++    }
++    
++    process(inputs, outputs, parameters) {
++        const output = outputs[0];
++        const nbChannels = output.length;
++        const nbSamples = output[0].length;
++        if (this.head.buffer.byteLength === 0) {
++            throw new Error('wasmMemory grew');
++        }
++        var head = Atomics.load(this.head, 0) / 4;
++        var tail = Atomics.load(this.tail, 0) / 4;
++
++        var i = 0;
++
++        while (tail != head && i < nbSamples) {
++            for (let c = 0; c < nbChannels; ++c) {
++                output[c][i] = this.storage[tail];
++                tail++;
++                if (tail === this.storage.length) {
++                    tail = 0;
++                }
++            }
++            i++;
++        }
++        Atomics.store(this.tail, 0, tail * 4);
++        Atomics.store(this.can_write, 0, 1);
++        Atomics.notify(this.can_write, 0);
++        return true;
++    }
++}
++
++registerProcessor('worklet-processor', Processor);
+diff --git a/modules/audio_output/webaudio/webaudio.c b/modules/audio_output/webaudio/webaudio.c
+new file mode 100644
+index 0000000000..2ebeb8c3d0
+--- /dev/null
++++ b/modules/audio_output/webaudio/webaudio.c
+@@ -0,0 +1,58 @@
++/*****************************************************************************
++ * emscripten.c: Emscripten webaudio output
++ *****************************************************************************
++ * Copyright © 2022 VLC authors, VideoLAN and Videolabs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdbool.h>
++#include <stdatomic.h>
++
++#include <emscripten.h>
++#include <emscripten/threading.h>
++#include "webaudio.h"
++
++int webaudio_worklet_push(void *user_data, int8_t *buffer, size_t data_size)
++{
++    webaudio_buffer_t *sab = (webaudio_buffer_t *) user_data;
++    int8_t *sab_view = sab->storage;
++    uint32_t head = atomic_load(&sab->head);
++
++    if (head + data_size > STORAGE_SIZE)
++    {
++        // Copies the part of the data at the buffer end
++        unsigned data_size_copy_end = STORAGE_SIZE - head;
++        memcpy(sab_view + head, buffer, data_size_copy_end);
++        head = 0;
++
++        // Copies the part of the data at the buffer start
++        unsigned data_size_copy_start = data_size - data_size_copy_end;
++        memcpy(sab_view + head, buffer + data_size_copy_end, data_size_copy_start);
++        head = data_size_copy_start;
++    }
++    else
++    {
++        memcpy(sab_view + head, buffer, data_size);
++        head += data_size;
++    }
++    // Stores head
++    atomic_store(&sab->head, head);
++    return 0;
++}
+diff --git a/modules/audio_output/webaudio/webaudio.h b/modules/audio_output/webaudio/webaudio.h
+new file mode 100644
+index 0000000000..1553fea5f6
+--- /dev/null
++++ b/modules/audio_output/webaudio/webaudio.h
+@@ -0,0 +1,62 @@
++/*****************************************************************************
++ * emscripten.c: Emscripten webaudio output
++ *****************************************************************************
++ * Copyright © 2022 VLC authors, VideoLAN and Videolabs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++#ifndef WEBAUDIO_H
++#define WEBAUDIO_H
++
++#include <stdint.h>
++#include <stdbool.h>
++#include <stdlib.h>
++#include <stdatomic.h>
++
++#define STORAGE_SIZE 1024 * 1024
++#define ATOMIC_WAIT_TIMEOUT 5000
++
++typedef struct sound_buffer_t {
++    _Atomic uint32_t is_paused;
++    _Atomic uint32_t head;
++    _Atomic uint32_t tail;
++    _Atomic uint32_t can_write;
++    int8_t storage[STORAGE_SIZE];
++} webaudio_buffer_t;
++
++typedef enum indexes {
++    IS_PAUSED,
++    HEAD,
++    TAIL,
++    CAN_WRITE,
++    STORAGE,
++} indexes;
++
++typedef enum latency_hint {
++    // minimum power consumption, but high latency
++    WEBAUDIO_LATENCY_PLAYBACK,
++    // minimum latency, but high power consumption
++    WEBAUDIO_LATENCY_INTERACTIVE,
++    // best latency + power consumption mix
++    WEBAUDIO_LATENCY_BALANCED,
++} latency_hint;
++
++extern int webaudio_getSampleRate(void);
++extern int webaudio_getChannels(void);
++extern void webaudio_init(int rate, int channels, webaudio_buffer_t *buffer, latency_hint latency);
++int webaudio_worklet_push(void *user_data, int8_t *buffer, size_t data_size);
++
++#endif /*WEBAUDIO_H*/
+diff --git a/modules/audio_output/webaudio/webaudio.js b/modules/audio_output/webaudio/webaudio.js
+new file mode 100644
+index 0000000000..f291470478
+--- /dev/null
++++ b/modules/audio_output/webaudio/webaudio.js
+@@ -0,0 +1,122 @@
++/*****************************************************************************
++ * emscripten.c: Emscripten webaudio output
++ *****************************************************************************
++ * Copyright © 2022 VLC authors, VideoLAN and Videolabs
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation; either version 2.1 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with this program; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
++ *****************************************************************************/
++
++mergeInto(LibraryManager.library, {
++    webaudio_getSampleRate: function() {
++        if (Module.webaudioContext === undefined)
++            return 0;
++        return Module.webaudioContext.sampleRate;
++    },
++    webaudio_getChannels: function() {
++        if (Module.webaudioContext === undefined)
++            return 0;
++        return Module.webaudioContext.destination.channelCount;
++    },
++    webaudio_init: async function (rate, channels, webaudio_buffer, latency) {
++        /*
++          [mainThread]
++          - create the audio context
++          - set rate and channel numbers
++          - setup the AudioWorkletNode and workler
++        */
++        const STORAGE_SIZE = 1024 * 1024;
++        const STRUCT_SIZE = 20;
++	if (latency === 0) {
++	    latency = "playback";
++	}
++	else if (latency === 1) {
++	    latency = "interactive";
++	}
++	else if (latency === 2) {
++	    latency = "balanced";
++	}
++	else {
++	    console.error("error: bad latency setting!");
++	    return ;
++	}
++        var audioCtx = new AudioContext({
++            latencyHint: latency,
++            sampleRate: rate
++        });
++        audioCtx.suspend();
++        Module.webaudioContext = audioCtx;
++        
++        var msg = {};
++        msg["type"] = "recv-audio-queue";
++        
++        msg["is_paused"] = new Int32Array(wasmMemory.buffer, webaudio_buffer, 1);
++        msg["is_paused"][0] = 0;
++        // sizeof(type) * length
++        webaudio_buffer += 4
++        
++        msg["head"] = new Int32Array(wasmMemory.buffer, webaudio_buffer, 1);
++        webaudio_buffer += 4
++        
++        msg["tail"] = new Int32Array(wasmMemory.buffer, webaudio_buffer, 1);
++        webaudio_buffer += 4
++        
++        msg["can_write"] = new Int32Array(wasmMemory.buffer, webaudio_buffer, 1)
++        msg["can_write"][0] = 1;
++        webaudio_buffer += 4
++        
++        msg["storage"] = new Float32Array(wasmMemory.buffer, webaudio_buffer, STORAGE_SIZE / 4);
++        
++        if (audioCtx.sampleRate != rate) {
++            console.error("desired rate unsupported by the browser, actual sample rate is: " + audioCtx.sampleRate);
++        }
++        
++        if (audioCtx.destination.maxChannelCount < channels) {
++            console.error("Max number of channels of the browser is ", audioCtx.destination.maxChannelCount)
++            channels = audioCtx.destination.maxChannelCount;
++        }
++
++        try {
++            await audioCtx.audioWorklet.addModule('./vlc/modules/audio_output/webaudio/audio-worklet-processor.js');
++        } catch (error){
++            console.error('could not add worklet module error: ' + error);
++	    return ;
++        }
++        
++        const node = new AudioWorkletNode(audioCtx, 'worklet-processor', {
++            numberOfInputs: 0,
++            numberOfOutputs: 1,
++            outputChannelCount: [channels]
++        });
++
++        var resolvePromise, rejectPromise;
++        var p = new Promise(function(resolve, reject) {
++	    node["port"].onmessage = function(e) {
++		console.log("successfully constructed AudioWorkletProcessor");
++		if (e.data === "ready") {
++		    resolve();
++		}
++		else if (e.data === "error") {
++		    reject();
++		    return ;
++		}
++            }	    
++        });
++        node["port"].postMessage(msg);
++        await p;
++        
++        node.connect(audioCtx.destination);
++        audioCtx.resume();
++    },
++})
+-- 
+2.43.0
+

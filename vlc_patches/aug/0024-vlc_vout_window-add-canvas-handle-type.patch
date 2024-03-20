@@ -1,0 +1,24 @@
+From 75a82b8a1ec4edfc37debd361b91f9f7878298c2 Mon Sep 17 00:00:00 2001
+From: Alexandre Janniaux <ajanni@videolabs.io>
+Date: Tue, 22 Feb 2022 16:47:25 +0100
+Subject: [PATCH 24/63] vlc_vout_window: add canvas handle type
+
+---
+ include/vlc_window.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/vlc_window.h b/include/vlc_window.h
+index d5a11d25af..3d62b5dcba 100644
+--- a/include/vlc_window.h
++++ b/include/vlc_window.h
+@@ -400,6 +400,7 @@ typedef struct vlc_window {
+         void     *dcomp_visual;  /**<  Win32 direct composition visual */
+         uint32_t crtc;           /**< KMS CRTC identifier */
+         uint32_t em_context;     /* Emscripten webgl context */
++        const char *canvas;
+     } handle;
+ 
+     /** Display server (mandatory)
+-- 
+2.43.0
+

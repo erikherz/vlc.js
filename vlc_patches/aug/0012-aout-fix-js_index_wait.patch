@@ -1,0 +1,51 @@
+From 4d19ce661b7f60f3480e39c7c33ee73653da55dd Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Thu, 1 Jul 2021 11:28:53 +0200
+Subject: [PATCH 12/63] aout: fix js_index_wait
+
+- fix return type
+- notifying without changing the value won't update the value
+---
+ modules/audio_output/emscripten.cpp | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/modules/audio_output/emscripten.cpp b/modules/audio_output/emscripten.cpp
+index dd40fdd5cd..a7e9fb0d4d 100644
+--- a/modules/audio_output/emscripten.cpp
++++ b/modules/audio_output/emscripten.cpp
+@@ -167,11 +167,11 @@ namespace {
+ 
+ 	// careful when calling this, you cannot wait on any index
+ 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/wait
+-	uint32_t js_index_wait(sound_buffer_t *sab_ptr, int8_t index) {
++	void js_index_wait(sound_buffer_t *sab_ptr, int8_t index) {
+ 		int32_t *buffer_view = reinterpret_cast<int32_t *>(sab_ptr);
+ 		val buffer = val(typed_memory_view(STORAGE_SIZE, buffer_view));
+ 
+-		return val::global("Atomics").call<uint32_t>("wait", buffer, index);
++		val::global("Atomics").call<val>("wait", buffer, index, 0);
+ 	}
+ 
+ 	void Flush( audio_output_t *aout )
+@@ -241,7 +241,7 @@ namespace {
+ 		{
+ 			// the worklet processor keeps rendering  until tail matches head
+ 			// it will be notified by an Atomics.notify() from the process() callback
+-      // FIXME - This is layout-dependent, which isn't ideal
++			// FIXME - This is layout-dependent, which isn't ideal
+ 			js_index_wait(sys->sab, 3);
+ 		}
+ 
+@@ -382,7 +382,8 @@ namespace {
+ 			i++; \
+ 		} \
+ 		Atomics.store(this.tail, 0, tail * 4); \
+-		Atomics.notify(this.can_write, 0); \
++		Atomics.store(this.can_write, 0, 1); \
++		Atomics.notify(this.can_write, 0);   \
+ 		return true; \
+ 	} \
+ } \
+-- 
+2.43.0
+

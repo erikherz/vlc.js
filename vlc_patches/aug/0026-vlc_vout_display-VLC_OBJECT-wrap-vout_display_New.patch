@@ -1,0 +1,39 @@
+From 0b581fe8de86415dfb3d4157ec3d49a4eb7cf15e Mon Sep 17 00:00:00 2001
+From: Alexandre Janniaux <ajanni@videolabs.io>
+Date: Fri, 25 Feb 2022 15:08:04 +0100
+Subject: [PATCH 26/63] vlc_vout_display: VLC_OBJECT-wrap vout_display_New()
+
+---
+ include/vlc_vout_display.h | 2 ++
+ src/video_output/display.c | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/include/vlc_vout_display.h b/include/vlc_vout_display.h
+index bd08a56cfd..f7f4c43b90 100644
+--- a/include/vlc_vout_display.h
++++ b/include/vlc_vout_display.h
+@@ -406,6 +406,8 @@ vout_display_t *vout_display_New(vlc_object_t *,
+     const video_format_t *, vlc_video_context *,
+     const vout_display_cfg_t *, const char *module,
+     const vout_display_owner_t *);
++#define vout_display_New(O, ...) \
++    (vout_display_New)(VLC_OBJECT(O), __VA_ARGS__)
+ 
+ /**
+  * Destroys a video output display.
+diff --git a/src/video_output/display.c b/src/video_output/display.c
+index 3a33d83432..0a9dd28262 100644
+--- a/src/video_output/display.c
++++ b/src/video_output/display.c
+@@ -699,7 +699,7 @@ int vout_SetDisplayFormat(vout_display_t *vd, const video_format_t *fmt,
+     return VLC_SUCCESS;
+ }
+ 
+-vout_display_t *vout_display_New(vlc_object_t *parent,
++vout_display_t *(vout_display_New)(vlc_object_t *parent,
+                                  const video_format_t *source,
+                                  vlc_video_context *vctx,
+                                  const vout_display_cfg_t *cfg,
+-- 
+2.43.0
+

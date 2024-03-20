@@ -1,0 +1,157 @@
+From 2dc257cb03cee0948b4bdd6d4c009870f8eb8154 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Mon, 9 May 2022 10:15:45 +0200
+Subject: [PATCH 34/63] emscripten: interop: Query the frame to the decoder
+ from the interop
+
+Instead of maintaining a 2nd queue in parallel with the one from the
+vout
+---
+ .../opengl/interop_emscripten.cpp             | 63 ++++++++-----------
+ 1 file changed, 25 insertions(+), 38 deletions(-)
+
+diff --git a/modules/video_output/opengl/interop_emscripten.cpp b/modules/video_output/opengl/interop_emscripten.cpp
+index 930670b2b2..5bcc65f615 100644
+--- a/modules/video_output/opengl/interop_emscripten.cpp
++++ b/modules/video_output/opengl/interop_emscripten.cpp
+@@ -61,7 +61,6 @@ tc_emscripten_op_allocate_textures(const struct vlc_gl_interop *interop, GLuint
+ EM_ASYNC_JS(void, bindVideoFrame, (int pictureIdx), {
+     let frame = await Module.awaitFrame(pictureIdx);
+ 
+-    console.log('Binding texture for picture at index ' + pictureIdx);
+     let glCtx = Module.glCtx;
+     glCtx.texImage2D(glCtx.TEXTURE_2D, 0, glCtx.RGBA, frame.codedWidth, frame.codedHeight, 0,
+                 glCtx.RGBA, glCtx.UNSIGNED_BYTE, frame);
+@@ -95,22 +94,13 @@ EMSCRIPTEN_KEEPALIVE int getDecoderWorker(vlc_video_context* vctx)
+ }
+ }
+ 
+-EM_JS(void, transferMessagePort, (vlc_video_context* vctx), {
++EM_JS(void, setupMessagePort, (vlc_video_context* vctx), {
+     function onDecoderMessage(msg) {
+         let data = msg['data'];
+         if (data.customCmd == 'displayFrame') {
+             let pictureIdx = data.pictureId;
+             let frame = data['frame'];
+-            console.log('SINK Received frame with index ' + pictureIdx );
+-            if ( Module.glConv.promiseResolvers[pictureIdx] ) {
+-                /* The interop is already waiting for this frame, resolve the promise */
+-                console.log('SINK Renderer is already waiting for frame ' + pictureIdx );
+-                Module.glConv.promiseResolvers[pictureIdx]( frame );
+-            } else {
+-                /* The frame hasn't arrived to the interop yet, queue it */
+-                console.log('SINK No resolver, queuing frame ' + pictureIdx );
+-                Module.glConv.frameQueue[pictureIdx] = frame;
+-            }
++            Module.glConv.frameResolver( frame );
+         }
+     };
+     Module.msgChannel = new MessageChannel();
+@@ -127,39 +117,35 @@ EM_JS(void, transferMessagePort, (vlc_video_context* vctx), {
+ 
+ EM_JS(void, initGlConvWorker, (int maxPictures), {
+     Module.glConv = {};
+-    Module.glConv.promiseResolvers = [];
+-    Module.glConv.frameQueue = [];
+     Module.glConv.lastFrame = {
+         pictureIdx: -1,
+         frame: undefined
+     };
+ 
+-    Module.awaitFrame = async function(pictureIndex) {
+-        console.log('CONSUME Fetching frame ' + pictureIndex);
+-        if (Module.glConv.lastFrame.pictureIdx == pictureIndex) {
+-            console.log('Reusing last frame');
++    Module.awaitFrame = async function(pictureIdx) {
++        if (Module.glConv.lastFrame.pictureIdx == pictureIdx) {
+             return Module.glConv.lastFrame.frame;
+         }
+         let p = new Promise((resolve, reject) => {
+-            if ( Module.glConv.frameQueue[pictureIndex] ) {
+-                console.log('CONSUME Frame at index ', pictureIndex,
+-                            ' was already queued');
+-                let frame = Module.glConv.frameQueue[pictureIndex];
+-                resolve(frame);
+-                Module.glConv.frameQueue[pictureIndex] = undefined;
+-            } else {
+-                console.log('CONSUME Frame at index ', pictureIndex,
+-                            ') not available yet; exposing resolver' );
+-                Module.glConv.promiseResolvers[pictureIndex] = resolve;
+-            }
++                  if (Module.glConv.frameResolver)
++                        {
++                            alert('Duplicated interop promise');
++                        }
++            Module.glConv.frameResolver = resolve;
++            Module.msgChannel.port1.postMessage({
++                'customCmd': 'sendFrame',
++                'pictureIdx': pictureIdx,
++            });
++
+         });
++        console.log('Waiting for frame ', pictureIdx, ' in interop');
+         let frame = await p;
+-        Module.glConv.promiseResolvers[pictureIndex] = undefined;
++        Module.glConv.frameResolver = undefined;
++        console.log('Received frame ', pictureIdx, ' in interop');
+         if (Module.glConv.lastFrame.frame)
+             Module.glConv.lastFrame.frame.close();
+         Module.glConv.lastFrame.frame = frame;
+-        Module.glConv.lastFrame.pictureIdx = pictureIndex;
+-        console.log('CONSUME got frame');
++        Module.glConv.lastFrame.pictureIdx = pictureIdx;
+         return frame;
+     }
+ })
+@@ -199,7 +185,7 @@ Open(vlc_object_t *obj)
+     };
+     interop->ops = &ops;
+     initGlConvWorker(WEBCODEC_MAX_PICTURES);
+-    transferMessagePort(interop->vctx);
++    setupMessagePort(interop->vctx);
+ 
+     interop->tex_target = GL_TEXTURE_2D;
+     interop->fmt_out.i_chroma = VLC_CODEC_RGBA;
+@@ -219,9 +205,9 @@ Open(vlc_object_t *obj)
+     return VLC_SUCCESS;
+ }
+ 
+-EM_ASYNC_JS(void, CopyFrameToBuffer, (int pictureId, emscripten::EM_VAL infoHandle), {
++EM_ASYNC_JS(void, CopyFrameToBuffer, (int pictureIdx, emscripten::EM_VAL infoHandle), {
+     let info = Emval.toValue(infoHandle);
+-    let frame = await Module.awaitFrame(pictureId);
++    let frame = await Module.awaitFrame(pictureIdx);
+     let copyOpts = {
+         rect: frame.codedRect,
+         layout: info.layout
+@@ -237,7 +223,8 @@ static picture_t* vlc_webcodec_UploadVideoFrame(filter_t* filter, picture_t* src
+         picture_Release(src);
+         return nullptr;
+     }
+-    auto pictureId = reinterpret_cast<uintptr_t>(src->p_sys);
++
++    auto pictureIdx = PictureContextPrivate(src->context)->pictureIdx;
+ 
+     size_t picSize = 0;
+     auto info = emscripten::val::object();
+@@ -255,7 +242,7 @@ static picture_t* vlc_webcodec_UploadVideoFrame(filter_t* filter, picture_t* src
+     info.set( "buffer", emscripten::typed_memory_view( picSize, pic->p[0].p_pixels ) );
+     info.set( "layout", std::move( planesLayout ) );
+ 
+-    CopyFrameToBuffer( pictureId, info.as_handle() );
++    CopyFrameToBuffer( pictureIdx, info.as_handle() );
+ 
+     pic->date = src->date;
+     picture_Release(src);
+@@ -283,7 +270,7 @@ static int OpenConverter(filter_t* filter)
+         return VLC_EGENERIC;
+     }
+     initGlConvWorker(WEBCODEC_MAX_PICTURES);
+-    transferMessagePort(filter->vctx_in);
++    setupMessagePort(filter->vctx_in);
+ 
+     filter->ops = &video_frame_to_sw_ops;
+ 
+-- 
+2.43.0
+

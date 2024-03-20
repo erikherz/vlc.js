@@ -1,0 +1,29 @@
+From a8db3a174866a0cd7b5f5b1ca40b19f44cd04b64 Mon Sep 17 00:00:00 2001
+From: Mehdi Sabwat <mehdi@videolabs.io>
+Date: Mon, 31 May 2021 00:18:18 +0200
+Subject: [PATCH 05/63] contrib: gnutls: add support for wasm-emscripten
+
+the contrib is temporarily disabled until this pr is merged:
+https://github.com/emscripten-core/emscripten/pull/14352
+---
+ contrib/src/gnutls/rules.mak | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/contrib/src/gnutls/rules.mak b/contrib/src/gnutls/rules.mak
+index d8c006c321..1bbb641ee3 100644
+--- a/contrib/src/gnutls/rules.mak
++++ b/contrib/src/gnutls/rules.mak
+@@ -73,6 +73,10 @@ ifeq ($(ARCH),aarch64)
+ endif
+ endif
+ 
++ifdef HAVE_EMSCRIPTEN
++	GNUTLS_CONF += --disable-hardware-acceleration
++endif
++
+ .gnutls: gnutls
+ 	$(MAKEBUILDDIR)
+ 	$(GNUTLS_ENV) $(MAKECONFIGURE) $(GNUTLS_CONF)
+-- 
+2.43.0
+

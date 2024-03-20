@@ -1,0 +1,109 @@
+From 31196ee82920d3ee550ca6a3e5eee2a58db85119 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Tue, 3 May 2022 11:12:29 +0200
+Subject: [PATCH 31/63] emscripten: converter: Use picture pool (untested)
+
+---
+ modules/hw/emscripten/Makefile.am   |  2 +-
+ modules/hw/emscripten/converter.cpp | 44 ++++++++++++++++-------------
+ 2 files changed, 26 insertions(+), 20 deletions(-)
+
+diff --git a/modules/hw/emscripten/Makefile.am b/modules/hw/emscripten/Makefile.am
+index 0402b1438b..3f2a118bc1 100644
+--- a/modules/hw/emscripten/Makefile.am
++++ b/modules/hw/emscripten/Makefile.am
+@@ -1,6 +1,6 @@
+ emscriptendir = $(pluginsdir)/emscripten
+ 
+-libglconverter_emscripten_plugin_la_SOURCES = hw/emscripten/converter.cpp
++libglconverter_emscripten_plugin_la_SOURCES = hw/emscripten/converter.cpp video_output/emscripten/common.cpp
+ libglconverter_emscripten_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
+ libglconverter_emscripten_plugin_la_CXXFLAGS = $(AM_CXXFLAGS)
+ libglconverter_emscripten_plugin_la_LIBADD = $(AM_LIBADD) 
+diff --git a/modules/hw/emscripten/converter.cpp b/modules/hw/emscripten/converter.cpp
+index 623fc69919..edc8d93bc0 100644
+--- a/modules/hw/emscripten/converter.cpp
++++ b/modules/hw/emscripten/converter.cpp
+@@ -26,6 +26,8 @@
+ #include <vlc_filter.h>
+ #include <vlc_plugin.h>
+ 
++#include "../../video_output/emscripten/common.h"
++
+ #include <emscripten/emscripten.h>
+ #include <emscripten/em_js.h>
+ #include <emscripten/val.h>
+@@ -36,6 +38,15 @@ struct chroma_sys_t
+ 
+ static picture_t* UploadSurface(filter_t* filter, picture_t* src)
+ {
++    auto vctx = static_cast<webcodec_context*>(
++            vlc_video_context_GetPrivate( filter->vctx_out, VLC_VIDEO_CONTEXT_WEBCODEC) );
++    auto dst = picture_pool_Wait( vctx->pool );
++    if (dst == nullptr)
++    {
++        picture_Release(src);
++        return nullptr;
++    }
++
+     auto size = 0u;
+     for ( auto i = 0; i < src->i_planes; ++i )
+         size += src->p[i].i_lines * src->p[i].i_pitch;
+@@ -71,23 +82,17 @@ static picture_t* UploadSurface(filter_t* filter, picture_t* src)
+     init.set( "visibleRect", visibleRect );
+ 
+     auto frame = emscripten::val::global("VideoFrame").new_( buffer, init );
+-    uintptr_t pictureId = EM_ASM_INT({return Module['pictureId']});
++    auto pictureIdx = PictureContextPrivate(dst->context)->pictureIdx;
+     EM_ASM({
+-               let frame = Emval.toValue($0);
+-               Module.msgChannel.port2.postMessage({
+-                   customCmd: 'displayFrame',
+-                   pictureId: Module.pictureId,
+-                   frame: frame
+-               });
+-               Module.pictureId = Module.pictureId + 1;
+-    }, frame.as_handle());
+-    auto dst = filter_NewPicture( filter );
+-    if (dst == nullptr)
+-    {
+-        picture_Release(src);
+-        return nullptr;
+-    }
+-    dst->p_sys = reinterpret_cast<void*>( pictureId );
++        let frame = Emval.toValue($0);
++        Module.msgChannel.port2.postMessage({
++            customCmd: 'displayFrame',
++            pictureId: $1,
++            frame: frame
++        });
++    }, frame.as_handle(), pictureIdx);
++
++
+     picture_CopyProperties( dst, src );
+     picture_Release(src);
+     return dst;
+@@ -95,7 +100,9 @@ static picture_t* UploadSurface(filter_t* filter, picture_t* src)
+ 
+ static void vlc_webcodec_CloseChroma(filter_t* filter)
+ {
+-
++    auto vctx = static_cast<webcodec_context*>(
++                vlc_video_context_GetPrivate(filter->vctx_out, VLC_VIDEO_CONTEXT_WEBCODEC ) );
++    picture_pool_Release(vctx->pool);
+ }
+ 
+ static const struct vlc_filter_operations filter_ops = {
+@@ -117,8 +124,7 @@ static int vlc_webcodec_OpenChroma(filter_t* filter)
+         return VLC_EGENERIC;
+ 
+     filter->ops = &filter_ops;
+-    EM_ASM({Module.pictureId = 0;});
+-    return VLC_SUCCESS;
++    return webcodec_CreatePool(filter->vctx_out, &filter->fmt_out.video);
+ }
+ 
+ vlc_module_begin()
+-- 
+2.43.0
+

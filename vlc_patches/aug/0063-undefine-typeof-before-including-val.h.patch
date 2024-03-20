@@ -1,0 +1,65 @@
+From 25e39efb23a5a654627b986626b69f98f1f3ae15 Mon Sep 17 00:00:00 2001
+From: Alaric Senat <alaric@videolabs.io>
+Date: Wed, 20 Mar 2024 10:13:24 +0100
+Subject: [PATCH 63/63] undefine typeof before including val.h
+
+vlc_fixup.h defines typeof as a reserved macro for C++. This clashes
+with a deprecated function in `emscripten/val.h`.
+---
+ modules/codec/webcodec.cpp                         | 1 +
+ modules/hw/emscripten/converter.cpp                | 1 +
+ modules/video_output/emscripten.cpp                | 1 +
+ modules/video_output/opengl/interop_emscripten.cpp | 1 +
+ 4 files changed, 4 insertions(+)
+
+diff --git a/modules/codec/webcodec.cpp b/modules/codec/webcodec.cpp
+index 7b43a77a27..f29d2a59ff 100644
+--- a/modules/codec/webcodec.cpp
++++ b/modules/codec/webcodec.cpp
+@@ -34,6 +34,7 @@
+ #include "../video_output/emscripten/common.h"
+ 
+ #include <emscripten/emscripten.h>
++#undef typeof // FIXME Remove once val::typeof is finally removed
+ #include <emscripten/val.h>
+ #include <emscripten/bind.h>
+ #include <emscripten/em_js.h>
+diff --git a/modules/hw/emscripten/converter.cpp b/modules/hw/emscripten/converter.cpp
+index edc8d93bc0..691ffcf5b5 100644
+--- a/modules/hw/emscripten/converter.cpp
++++ b/modules/hw/emscripten/converter.cpp
+@@ -30,6 +30,7 @@
+ 
+ #include <emscripten/emscripten.h>
+ #include <emscripten/em_js.h>
++#undef typeof // FIXME Remove once val::typeof is finally removed
+ #include <emscripten/val.h>
+ 
+ struct chroma_sys_t
+diff --git a/modules/video_output/emscripten.cpp b/modules/video_output/emscripten.cpp
+index 3289dcded7..7bacc732e2 100644
+--- a/modules/video_output/emscripten.cpp
++++ b/modules/video_output/emscripten.cpp
+@@ -42,6 +42,7 @@
+ 
+ #include <emscripten.h>
+ #include <emscripten/html5.h>
++#undef typeof // FIXME Remove once val::typeof is finally removed
+ #include <emscripten/val.h>
+ #include <webgl/webgl2.h>
+ // eglGetProcAddress
+diff --git a/modules/video_output/opengl/interop_emscripten.cpp b/modules/video_output/opengl/interop_emscripten.cpp
+index cf8bf9046f..4aafc27c41 100644
+--- a/modules/video_output/opengl/interop_emscripten.cpp
++++ b/modules/video_output/opengl/interop_emscripten.cpp
+@@ -37,6 +37,7 @@
+ 
+ #include <emscripten.h>
+ #include <emscripten/em_js.h>
++#undef typeof // FIXME Remove once val::typeof is finally removed
+ #include <emscripten/val.h>
+ #include <emscripten/html5_webgl.h>
+ 
+-- 
+2.43.0
+

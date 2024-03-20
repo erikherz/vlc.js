@@ -1,0 +1,34 @@
+From bf6299d12bf8563938335da34e50b923bb2d77fc Mon Sep 17 00:00:00 2001
+From: Alexandre Janniaux <ajanni@videolabs.io>
+Date: Tue, 22 Feb 2022 17:55:36 +0100
+Subject: [PATCH 25/63] opengl: mock: load API in mock
+
+---
+ modules/video_output/opengl/filter_mock.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/modules/video_output/opengl/filter_mock.c b/modules/video_output/opengl/filter_mock.c
+index 9500f78797..574558072d 100644
+--- a/modules/video_output/opengl/filter_mock.c
++++ b/modules/video_output/opengl/filter_mock.c
+@@ -103,6 +103,7 @@ struct sys {
+ 
+     float rotation_matrix[16];
+     float ar;
++    struct vlc_gl_api api;
+ };
+ 
+ static void
+@@ -565,6 +566,9 @@ Open(struct vlc_gl_filter *filter, const config_chain_t *config,
+ 
+     sys->sampler = NULL;
+ 
++    vlc_gl_api_Init(&sys->api, filter->gl);
++    filter->api = &sys->api;
++
+     int ret;
+     if (plane)
+         ret = InitPlane(filter, glfmt);
+-- 
+2.43.0
+

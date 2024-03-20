@@ -1,0 +1,34 @@
+From 6348fe4698e0be6633cb30b42a6b54b4912a3648 Mon Sep 17 00:00:00 2001
+From: Alaric Senat <dev.asenat@posteo.net>
+Date: Mon, 18 Mar 2024 17:47:25 +0100
+Subject: [PATCH 61/63] [HACK] default worker thread id to 2 instead of zero
+
+Calling `pthead_self()` in a non pthread worker yields a thread id of
+zero. Our vlc_mutex system checks that the thread id of the locker is
+not equal to zero before unlocking as it uses 0 as an unlocked state.
+---
+ src/emscripten/thread.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/emscripten/thread.c b/src/emscripten/thread.c
+index c3377b02c6..06d0bed7a1 100644
+--- a/src/emscripten/thread.c
++++ b/src/emscripten/thread.c
+@@ -27,8 +27,13 @@
+ #include <pthread.h>
+ #include <assert.h>
+ 
++#include <emscripten/wasm_worker.h>
++
+ unsigned long vlc_thread_id(void)
+ {
+     static_assert(sizeof(pthread_t) <= sizeof(unsigned long),"invalid pthread_t size");
+-    return (uintptr_t)(void *)pthread_self();
++    if (pthread_self() == 0)
++        return (uintptr_t)(void*)2;
++    else
++        return (uintptr_t)(void *)pthread_self();
+ }
+-- 
+2.43.0
+

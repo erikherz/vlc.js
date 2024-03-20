@@ -1,0 +1,24 @@
+From 01bfa6641c5f98fd1c9eea154cd518d079227fb6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo@beauzee.fr>
+Date: Thu, 3 Feb 2022 09:50:27 +0100
+Subject: [PATCH 18/63] vlc_picture.h: Add a webcodec video context type
+
+---
+ include/vlc_picture.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/vlc_picture.h b/include/vlc_picture.h
+index 54171e140f..d6fb51fb4e 100644
+--- a/include/vlc_picture.h
++++ b/include/vlc_picture.h
+@@ -102,6 +102,7 @@ enum vlc_video_context_type
+     VLC_VIDEO_CONTEXT_CVPX,      //!< private: cvpx_video_context*
+     VLC_VIDEO_CONTEXT_MMAL,      //!< empty
+     VLC_VIDEO_CONTEXT_GSTDECODE, //!< empty
++    VLC_VIDEO_CONTEXT_WEBCODEC,
+ };
+ 
+ VLC_API vlc_video_context * vlc_video_context_Create(vlc_decoder_device *,
+-- 
+2.43.0
+

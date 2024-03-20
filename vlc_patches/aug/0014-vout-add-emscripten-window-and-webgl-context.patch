@@ -1,0 +1,32 @@
+From f3186fe7cec8726dc758f24ea71c7ede2480969d Mon Sep 17 00:00:00 2001
+From: Etienne Brateau <etienne.brateau@gmail.com>
+Date: Tue, 27 Apr 2021 16:19:40 +0200
+Subject: [PATCH 14/63] vout: add emscripten window and webgl context
+
+---
+ include/vlc_window.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/vlc_window.h b/include/vlc_window.h
+index 26db99a480..d5a11d25af 100644
+--- a/include/vlc_window.h
++++ b/include/vlc_window.h
+@@ -66,6 +66,7 @@ enum vlc_window_type {
+     VLC_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
+     VLC_WINDOW_TYPE_DCOMP /**< Win32 DirectComposition */,
+     VLC_WINDOW_TYPE_KMS /**< DRM KMS CRTC */,
++    VLC_WINDOW_TYPE_EMSCRIPTEN_WEBGL /**< Emscripten surface */,
+ };
+ 
+ /**
+@@ -398,6 +399,7 @@ typedef struct vlc_window {
+         struct wl_surface *wl;   /**< Wayland surface (client pointer) */
+         void     *dcomp_visual;  /**<  Win32 direct composition visual */
+         uint32_t crtc;           /**< KMS CRTC identifier */
++        uint32_t em_context;     /* Emscripten webgl context */
+     } handle;
+ 
+     /** Display server (mandatory)
+-- 
+2.43.0
+
