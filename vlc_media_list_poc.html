@@ -191,7 +191,7 @@
 	      // acquire lock
 	      Module._libvlc_media_list_lock(ml_ptr);
 	      // add_media, check if return value is 0
-	      var path_ptr = Module.allocateUTF8("emjsfile://"+ id);
+	      var path_ptr = Module.stringToNewUTF8("emjsfile://"+ id);
 	      var media_ptr = Module._wasm_media_new_location(path_ptr);
 	      var ret = Module._libvlc_media_list_add_media(ml_ptr, media_ptr);
 	      console.assert(ret == 0);
@@ -217,7 +217,7 @@
 	      var buffer = Module._malloc(vlc_opts_size);
 	      var wrote_size = 0;
 	      for (let i in vlc_opts_array) {
-		  Module.writeAsciiToMemory(vlc_opts_array[i], buffer + wrote_size, true);
+		  Module.stringToAscii(vlc_opts_array[i], buffer + wrote_size);
 		  wrote_size += vlc_opts_array[i].length + 1;
 	      }
 	      var vlc_argv = Module._malloc(vlc_opts_array.length * 4 + 4);
