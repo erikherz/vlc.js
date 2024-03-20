@@ -80,6 +80,8 @@ cd ./vlc/extras/package/wasm-emscripten/
 ./build.sh --mode=${SLOW_MODE}
 cd $WORK_DIR
 echo "_main" > libvlc_wasm.sym
+echo "_malloc" >> libvlc_wasm.sym
+echo "_free" >> libvlc_wasm.sym
 sed -e 's/^/_/' ./vlc/lib/libvlc.sym >> libvlc_wasm.sym
 
 
